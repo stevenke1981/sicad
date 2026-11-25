@@ -37,13 +37,13 @@
 - **`app/static/` 已移除**（負責人核准）：未建置前端時 `/` 回傳 503 說明頁；Docker 映像以多階段建置內含前端。
 - **第三方授權聲明**：`THIRD_PARTY_NOTICES.md` 由 `scripts/gen_third_party_notices.py --strict` 產生並隨安裝包發佈；LGPL 元件（OCCT／OCP、casadi、NLopt）可在 `<安裝目錄>\sidecar\_internal\` 替換。
 - **CadQuery 投影 SVG 在深色主題下不易閱讀**：`model.svg` 改以紙色底顯示。
-- **關閉外殼時中斷進行中的渲染**：新增 `scripts/frozen_kill_check.py` 實測（Job Object 關閉後 sidecar 與 render worker 須在 5 秒內結束；`--shell-exe` 另以已安裝的外殼驗證，首次執行為 continue-on-error），在 `desktop-bundle.yml` 中執行；結果併入下方的乾淨機器驗證。
+- **關閉外殼時中斷進行中的渲染**：新增 `scripts/frozen_kill_check.py` 實測（Job Object 關閉後 sidecar 與 render worker 須在 5 秒內結束；`--shell-exe` 另以已安裝的外殼驗證，首次執行通過後已改為必過），在 `desktop-bundle.yml` 中執行；結果併入下方的乾淨機器驗證。
 
 尚未達成：
 
 - **三平台測試矩陣**：只在 Windows x86_64 建置；macOS、Linux 尚未建立。
 - **乾淨機器驗證**：已改由 GitHub `windows-latest` 上的 `desktop-bundle.yml` 執行（隔離環境 smoke、Job Object 終止檢查、安裝後檢查授權聲明存在且大於 10 KB），尚待第一次完整執行的結果。
-  - desktop-bundle 執行結果：（待整合者填入 desktop-bundle 執行結果）
+  - desktop-bundle 執行結果：2026-11-26 於 GitHub `windows-latest`（Windows Server 2025，4 CPU）首次執行 [run 45723089074](https://github.com/stevenke1981/sicad/actions/runs/45723089074) 全數通過：建置與安裝後的 sidecar 皆在 isolated env 下通過 smoke（各觀察到 7 個 render worker，`foreign_processes=[]`）；安裝 sidecar 的 Job Object 中斷檢查 `KILL_CHECK_OK`；強制結束已安裝的 `promptcad-studio.exe` 後 sidecar 於 0.007 秒內結束（`job.rs` 實證，此步驟已改為必過）；安裝目錄含 `THIRD_PARTY_NOTICES.md`。量測：安裝檔 107.5 MiB、安裝後 554.1 MiB、READY 0.64–0.66 s、warm render 2.38 s、端到端 generate 2.42 s。
 - 3D 檢視器的實際繪製尚未以畫面確認（STL 已成功取得）。
 - 檢視器只支援 STL；GLB、元件選取與 port 圖層延到第 2 階段。
 

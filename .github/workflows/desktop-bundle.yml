@@ -7,7 +7,7 @@ name: desktop-bundle
 #     watcher that fails on any process spawned from outside the bundle) against the built
 #     onedir and the installed sidecar;
 #   - the Job Object kill check against the installed sidecar (required) and against the
-#     installed shell (informational until it has proven itself on the runner);
+#     installed shell (required; first passed on run 45723089074);
 #   - THIRD_PARTY_NOTICES.md regenerated with --strict and asserted in the install dir.
 # Uploads the measurements, the notices and the installer. No signing, no release.
 on:
@@ -143,9 +143,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # Launches the installed GUI shell on the runner, force-kills it and asserts its sidecar
-      # dies with it (src-tauri/src/job.rs). Not yet proven on hosted runners: informational.
-      - name: Job Object kill check (installed shell, informational)
-        continue-on-error: true
+      # dies with it (src-tauri/src/job.rs). Proven on hosted runners since run 45723089074.
+      - name: Job Object kill check (installed shell)
         timeout-minutes: 10
         run: |
           .venv-desktop\Scripts\python.exe scripts\frozen_kill_check.py `

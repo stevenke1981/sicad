@@ -29,7 +29,7 @@
 已知限制：
 
 - 只在 Windows x86_64（MSVC 工具鏈、WebView2）建置；三平台測試矩陣尚未建立。
-- 乾淨機器驗證以 `desktop-bundle.yml` 的實際執行結果為準：（待整合者填入 desktop-bundle 執行結果）
+- 乾淨機器驗證以 `desktop-bundle.yml` 的實際執行結果為準：2026-11-26 於 GitHub `windows-latest`（Windows Server 2025，4 CPU）首次執行 [run 45723089074](https://github.com/stevenke1981/sicad/actions/runs/45723089074) 全數通過：建置與安裝後的 sidecar 皆在 isolated env 下通過 smoke（各觀察到 7 個 render worker，`foreign_processes=[]`）；安裝 sidecar 的 Job Object 中斷檢查 `KILL_CHECK_OK`；強制結束已安裝的 `promptcad-studio.exe` 後 sidecar 於 0.007 秒內結束（`job.rs` 實證，此步驟已改為必過）；安裝目錄含 `THIRD_PARTY_NOTICES.md`。量測：安裝檔 107.5 MiB、安裝後 554.1 MiB、READY 0.64–0.66 s、warm render 2.38 s、端到端 generate 2.42 s。
 - 檢視器只支援 STL；GLB、元件選取與 port 圖層尚未實作。
 
 ## v0.1.0 — 2026-07-30

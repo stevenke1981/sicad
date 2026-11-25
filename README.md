@@ -70,6 +70,8 @@ docker compose up --build
 docker compose down
 ```
 
+> Linux 主機注意：容器以 `mambauser`（uid 57439）執行，綁定掛載的 `./generated` 若屬於主機使用者可能無法寫入；請先 `sudo chown 57439 generated`，或在 compose 設定 `user:`。
+
 生成檔保存在專案的 `generated/`，重新建立容器不會消失。
 
 ## 不使用 Docker
@@ -152,6 +154,10 @@ npm run tauri build                                             # NSIS 安裝包
 ### 第三方授權聲明
 
 桌面安裝包隨附的第三方軟體（凍結進 sidecar 的 Python 套件與 wheel 隨附 DLL、前端 npm 正式相依、Tauri 外殼的 Rust crates，以及 OCCT、VTK、CPython、PyInstaller bootloader、MSVC runtime、WebView2 bootstrapper 等）列於根目錄的 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)，安裝後位於 `<安裝目錄>\THIRD_PARTY_NOTICES.md`。其中 OCCT（經 OCP 載入）、casadi 與 NLopt 為 LGPL，在 onedir 版面下以獨立的 `.dll`／`.pyd` 存放於 `<安裝目錄>\sidecar\_internal\`，可由使用者替換；原始碼網址與版本見該檔的「LGPL 元件與替換權利」段落。
+
+- 提交在版本庫中的 `THIRD_PARTY_NOTICES.md` 只是產生當下 `.venv-desktop` 的快照（該環境未鎖版，僅固定 cadquery）；安裝包內那份由 `desktop-bundle.yml` 以 `--strict` 重新產生，才是權威版本。因此 CI 不跑 `--check`。
+- 若日後某個相依套件帶來未對應的 DLL 或授權，`--strict` 會讓打包失敗——這是刻意的警報，請補上 `LICENSE_OVERRIDES`／`VENDORED_DLLS` 後重跑。
+- 公開發布前，請在安裝檔旁附上（或封存連結）LGPL 元件對應版本的原始碼（OCP/OCCT、casadi、NLopt）。本文件不是法律意見。
 
 這個檔案由 `scripts/gen_third_party_notices.py` 產生，請勿手改：相依套件變動後以 `.venv-desktop` 重新執行（見上方指令；`--check` 只比對、不寫入）。`--strict` 在授權不明、或 wheel 隨附了未登錄的 DLL 時失敗；metadata 缺漏或有誤的套件在腳本的 `LICENSE_OVERRIDES` 中逐項註明理由。此檔是授權資訊彙整，不是法律意見。
 

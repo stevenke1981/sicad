@@ -355,6 +355,9 @@ def python_components(probe: Mapping) -> list[Component]:
     comps = []
     for dist in shipped_python_dists(probe.get("dists", [])):
         texts = [LicenseText(src, txt) for src, txt in dist.get("texts") or [] if txt.strip()]
+        if normalize_name(dist["name"]) in GPL_3_REFERENCED_BY:
+            # LGPL-3.0 incorporates GPL-3.0 by reference; ship the full text explicitly.
+            texts.append(LicenseText("GPL-3.0.txt", GPL_3_TEXT))
         override = LICENSE_OVERRIDES.get(("python", normalize_name(dist["name"])))
         comps.append(
             Component(
@@ -683,12 +686,13 @@ def _lgpl_section(collected: Collected, registry: TextRegistry) -> list[str]:
     vtk = _version(v, "vtk")
     lgpl21 = text_id(LGPL_2_1_TEXT)
     exception = text_id(OCCT_EXCEPTION_TEXT)
+    gpl3 = text_id(GPL_3_TEXT)
     occt_src = f"https://github.com/Open-Cascade-SAS/OCCT/tree/{occt_tag}" if occt_tag else ""
     return [
         "## LGPL 元件與替換權利",
         "",
         "桌面版的 sidecar 以 PyInstaller **onedir** 模式封裝。下列以 LGPL（或含 LGPL 選項）授權的"
-        "函式庫**未**靜態連結進 `promptcad-sidecar.exe` 或 `PromptCAD Studio.exe`，而是以獨立的 "
+        "函式庫**未**靜態連結進 `promptcad-sidecar.exe` 或 `promptcad-studio.exe`，而是以獨立的 "
         "`.dll` / `.pyd` 檔存放在安裝目錄的 `sidecar\\_internal\\` 之下。使用者可依 LGPL 以相容"
         "（相同 ABI）的修改版本替換這些檔案，sidecar 下次啟動即會載入替換後的檔案。PromptCAD "
         "Studio 未修改這些函式庫；對應版本的原始碼可由下列網址取得。",
@@ -713,7 +717,9 @@ def _lgpl_section(collected: Collected, registry: TextRegistry) -> list[str]:
         f"[{exception}](#{exception.lower()})。依例外條款聲明：本軟體使用 Open CASCADE Technology "
         "軟體提供的功能。",
         "- CasADi、NLopt 的授權全文見下方 Python 套件表所連結的全文；LGPL-3.0 所引用的 GNU GPL "
-        "3.0 全文包含在 numpy 授權全文的 GCC runtime 段落中。",
+        f"3.0 全文見 [{gpl3}](#{gpl3.lower()})。",
+        "- 公開發布時，請在安裝檔旁一併提供（或連結封存）上述 LGPL 元件於所附版本的對應原始碼，"
+        "以滿足 LGPL-2.1 §6 / LGPL-3.0 §4 的要求；僅附上游網址屬一般作法，並非嚴格遵循。",
         "- FreeType、FreeImage、Zstandard 為多重授權，本軟體依其非 GPL 選項（FTL、FreeImage "
         "Public License、BSD-3-Clause）散布。",
         "",
@@ -966,6 +972,14 @@ def main(argv: list[str] | None = None) -> int:
 # Verbatim licence texts for components that ship no text of their own. Source:
 # https://github.com/Open-Cascade-SAS/OCCT (tag V7_9_3), OCCT_LGPL_EXCEPTION.txt and
 # LICENSE_LGPL_21.txt.
+
+# GNU GPL 3.0 (FSF verbatim copy, scripts/licenses/GPL-3.0.txt). LGPL-3.0 components such as
+# casadi incorporate it by reference, so it ships as its own text instead of relying on a copy
+# embedded in another package's licence file.
+GPL_3_TEXT = (Path(__file__).resolve().parent / "licenses" / "GPL-3.0.txt").read_text(
+    encoding="utf-8"
+)
+GPL_3_REFERENCED_BY = frozenset({"casadi"})
 
 OCCT_EXCEPTION_TEXT = """\
 Open CASCADE exception (version 1.0) to GNU LGPL version 2.1.

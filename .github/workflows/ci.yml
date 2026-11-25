@@ -69,8 +69,7 @@ jobs:
         run: >-
           docker exec promptcad /usr/local/bin/_entrypoint.sh python -c
           "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3).read(1)"
-      - name: CadQuery imports in the runtime env (informational)
-        continue-on-error: true
+      - name: CadQuery imports in the runtime env
         run: docker exec promptcad /usr/local/bin/_entrypoint.sh python -c "import cadquery; print('cadquery', cadquery.__version__)"
       - name: Container logs
         if: always()
