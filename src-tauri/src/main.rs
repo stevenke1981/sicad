@@ -5,6 +5,7 @@
 mod job;
 mod sidecar;
 
+use std::path::PathBuf;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
@@ -71,8 +72,10 @@ impl Backend {
         }
     }
 
-    fn start(self: Arc<Self>, app_data_dir: std::path::PathBuf) {
-        let result = sidecar::start(&app_data_dir);
+    fn start(self: Arc<Self>, app_data_dir: PathBuf, resource_dir: Result<PathBuf, String>) {
+        let result = resource_dir
+            .map_err(|e| format!("cannot locate resource directory: {e}"))
+            .and_then(|resource_dir| sidecar::start(&app_data_dir, &resource_dir));
         match result {
             Ok((process, info)) => {
                 let mut slot = self.process.lock().unwrap_or_else(|e| e.into_inner());
@@ -125,11 +128,15 @@ fn main() {
         .setup(|app| {
             let backend = Arc::clone(app.state::<Arc<Backend>>().inner());
             let app_data_dir = app.path().app_data_dir()?;
+            // The onedir sidecar is a bundle resource (`<resource_dir>/sidecar/`). A failure
+            // here is reported through `backend_info` instead of aborting setup, so the
+            // window still opens and can show it.
+            let resource_dir = app.path().resource_dir().map_err(|e| e.to_string());
             // Start in the background so the window appears immediately; the frontend's
             // `backend_info` call waits for READY.
             std::thread::Builder::new()
                 .name("sidecar-start".into())
-                .spawn(move || backend.start(app_data_dir))?;
+                .spawn(move || backend.start(app_data_dir, resource_dir))?;
             Ok(())
         })
         .build(tauri::generate_context!())

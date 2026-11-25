@@ -1,9 +1,11 @@
 //! Windows Job Object so the sidecar tree never outlives the shell.
 //!
-//! A PyInstaller onefile executable (and a venv `python.exe` launcher) runs the real
-//! interpreter as a *child* process; killing only the direct child would leave it running.
-//! Every process in a `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` job is terminated when the last
-//! job handle closes, which also happens automatically if the shell crashes.
+//! The PyInstaller ONEDIR sidecar runs Python inside its bootloader process, but it spawns
+//! `--render-worker` children for every CadQuery render, and in dev a venv `python.exe`
+//! launcher runs the real interpreter as a child; killing only the direct child would leave
+//! those running. Children inherit the job, and every process in a
+//! `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` job is terminated when the last job handle closes,
+//! which also happens automatically if the shell crashes.
 
 use std::io;
 use std::os::windows::io::AsRawHandle;

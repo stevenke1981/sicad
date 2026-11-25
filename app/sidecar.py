@@ -19,6 +19,10 @@ to stdout::
     PROMPTCAD_SIDECAR_READY {"port": 51234}
 
 Everything else (uvicorn logs, errors) goes to stderr so stdout stays machine readable.
+
+When the first argument is ``--render-worker`` the process instead runs one CadQuery job
+and exits (see :mod:`app.render_worker`); the frozen renderer spawns it that way because a
+PyInstaller build has no separate ``python.exe``.
 """
 
 from __future__ import annotations
@@ -32,6 +36,7 @@ import sys
 from collections.abc import Sequence
 
 READY_PREFIX = "PROMPTCAD_SIDECAR_READY"
+RENDER_WORKER_FLAG = "--render-worker"
 
 
 def ready_line(port: int) -> str:
@@ -95,7 +100,15 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = _parse_args(argv)
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == RENDER_WORKER_FLAG:
+        # Frozen render worker (ADR 0010 Phase 1b): dispatch before argparse and before
+        # uvicorn/FastAPI are imported, so a render job starts only the CAD runtime.
+        from app.render_worker import main as render_worker_main
+
+        return render_worker_main(arguments[1:])
+
+    args = _parse_args(arguments)
 
     import uvicorn
 

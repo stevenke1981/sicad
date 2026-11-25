@@ -91,4 +91,26 @@
 
 ## 回顧紀錄
 
-（尚無）
+### 2026-11-26：CadQuery 打包進桌面 sidecar（第 1 階段 1b）
+
+- **封裝方式：PyInstaller onedir**，由 Tauri 以 `bundle.resources` 帶到 `<安裝目錄>/sidecar/`。不採用 onefile：onefile 每次啟動都要把數百 MB 解壓到 `%TEMP%\_MEI*`，而外殼以 Job Object 終止 sidecar 時 bootloader 來不及清理，實測舊版 onefile 確實遺留了 `_MEI*` 目錄；onedir 版本不會產生。
+- **render worker**：凍結後沒有獨立的 Python 直譯器，renderer 改以 `promptcad-sidecar.exe --render-worker <model.py> --output-dir … --formats …` 在獨立子行程執行 `model.py`（`app/render_worker.py`）。worker 只接受資料目錄（`PROMPTCAD_RENDER_ROOT`）之內、檔名為 `model.py` 的工作；子行程環境移除 `PROMPTCAD_API_TOKEN` 與 `PROMPTCAD_LLM_API_KEY`。原始碼／Docker 模式的命令不變。
+- **修剪**：排除 `scipy`、`llvmlite`、`numba`、`matplotlib` 等（實測 `model.py` 不會匯入）；`vtk` 與 `casadi` 因 `cadquery` 在頂層匯入而保留。
+- **驗收**：`scripts/frozen_smoke.py` 以凍結後的 exe 對五種基體 × 六種孔型輸出 STEP／STL／DXF／SVG 全數通過；安裝到含空白的路徑後，桌面版產生範例固定板得到 `completed／cadquery`，`model.step` 以 `ISO-10303-21` 開頭。
+
+量測（Windows 11、24 CPU、cadquery 2.8.0、PyInstaller 6.22.3、Python 3.12.10）：
+
+| 項目 | 數值 |
+|---|---|
+| sidecar onedir 大小／檔案數 | 547.5 MiB／1,168 個 |
+| NSIS 安裝包（LZMA） | 107.0 MiB |
+| 安裝後大小 | 550.9 MiB |
+| sidecar 啟動到 READY（第一次／暖啟動中位數） | 0.85 s／0.55 s |
+| render worker，`plate-four-holes`（建置後第一次／暖中位數） | 9.65 s／2.21 s（第一次含防毒掃描新檔） |
+| `POST /generate` 端到端（rule planner，4 種格式） | 約 2.2 s |
+
+最大的組成：`vtk.libs` 264 MiB、`OCP` 90 MiB、`cadquery_ocp.libs` 62 MiB、`vtkmodules` 42 MiB、`casadi` 24 MiB。VTK 約佔 56%，是之後縮小體積最大的槓桿。
+
+**conda-pack 與 PyInstaller：選定 PyInstaller，未實作 conda-pack 原型。** 理由：本機沒有 conda；conda 原本的優勢（OCP 二進位相容）已由 pip wheel 解決（`cadquery==2.8.0` 以 pip 安裝 39 秒、渲染正確）；conda-pack 打包整個環境、無法依匯入圖修剪，**估計**會比未修剪的 1.1 GB venv 更大（此為推估，未實測）；且需要安裝時執行 `conda-unpack` 並引入第二套工具鏈。重新評估條件：凍結 smoke 無法在約一天的 hook 調整內通過，或安裝包超過 500 MB 且 vtk／casadi 的替身方案失敗。此結論是否滿足 ADR 0010「比較已完成」的完成條件，**待負責人簽核**。
+
+後續：VTK／casadi 替身以縮小體積、第三方授權聲明（OCCT 與 casadi 為 LGPL、VTK 為 BSD）在公開發佈前補齊、更新時整包重新下載的問題尚未處理。
