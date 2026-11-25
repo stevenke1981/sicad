@@ -15,9 +15,18 @@ b. render-worker mode - time direct ``--render-worker`` invocations on a sample 
 ``--measure`` additionally repeats spawn->READY and worker runs (first + median of warm
 runs) and writes ``build/sidecar/measurements.json`` and ``measurements.md``.
 
+``--isolated-env`` approximates a clean machine (Windows only): the sidecar and the direct
+worker runs get ``PATH=%SystemRoot%\\System32;%SystemRoot%`` and no ``PYTHON*``,
+``VIRTUAL_ENV*`` or ``CONDA*`` variables (only the two ``PYTHON*`` values the Tauri shell
+itself sets), and a watcher thread polls the sidecar's process tree during the server
+checks. Any descendant whose image lies outside the sidecar directory (other than the
+console host) or is named ``python*.exe`` / ``py.exe`` fails the run, so a bundle that
+silently relies on a developer interpreter cannot pass. The watcher must also see at least
+one render worker, otherwise the check would be vacuous.
+
 Usage::
 
-    python scripts/frozen_smoke.py [--exe PATH] [--measure] [--installer PATH]
+    python scripts/frozen_smoke.py [--exe PATH] [--measure] [--installer PATH] [--isolated-env]
 
 Exits non-zero on any failure. Only the standard library is used, so any Python 3.11+
 interpreter can run it.
@@ -26,6 +35,7 @@ interpreter can run it.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import json
 import os
 import platform
@@ -40,10 +50,11 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any
+from pathlib import Path, PureWindowsPath
+from typing import Any, NamedTuple
 
 ROOT = Path(__file__).resolve().parents[1]
 EXE_NAME = "promptcad-sidecar" + (".exe" if sys.platform == "win32" else "")
@@ -164,11 +175,310 @@ def smoke_cases(examples_dir: Path = EXAMPLES_DIR) -> list[tuple[str, dict[str, 
     return cases
 
 
+# --------------------------------------------------------------------------- environment
+
+# Prefixes (upper-cased) of variables a clean machine would not have. ``PATH`` is replaced.
+_STRIPPED_ENV_PREFIXES = ("PYTHON", "VIRTUAL_ENV", "CONDA", "_CONDA")
+# What the Tauri shell itself sets for the sidecar (src-tauri/src/sidecar.rs `start`).
+SHELL_PYTHON_ENV = {"PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}
+
+
+def _lookup(env: Mapping[str, str], name: str) -> str | None:
+    """Case-insensitive lookup (Windows environment names are case-insensitive)."""
+    for key, value in env.items():
+        if key.upper() == name:
+            return value
+    return None
+
+
+def isolated_env(base: Mapping[str, str], system_root: str | None = None) -> dict[str, str]:
+    """``base`` as a clean Windows machine would see it: system-only PATH, no Python/venv/conda.
+
+    Pure. Every ``PATH`` spelling is dropped and replaced by
+    ``%SystemRoot%\\System32;%SystemRoot%``; ``PYTHON*``, ``VIRTUAL_ENV*`` and ``CONDA*``
+    variables are dropped, then the shell's own ``PYTHONUNBUFFERED``/``PYTHONIOENCODING``
+    are set so the environment matches what the installed app hands the sidecar.
+    """
+    root = (system_root or _lookup(base, "SYSTEMROOT") or r"C:\Windows").rstrip("\\/")
+    env = {
+        key: value
+        for key, value in base.items()
+        if key.upper() != "PATH" and not key.upper().startswith(_STRIPPED_ENV_PREFIXES)
+    }
+    env["PATH"] = f"{root}\\System32;{root}"
+    env.update(SHELL_PYTHON_ENV)
+    return env
+
+
+def _base_env(isolated: bool) -> dict[str, str]:
+    env = {k: v for k, v in os.environ.items() if not k.upper().startswith("PROMPTCAD_")}
+    return isolated_env(env) if isolated else env
+
+
+# --------------------------------------------------------------------------- process tree
+
+
+class ProcEntry(NamedTuple):
+    """One row of a process snapshot (Toolhelp ``PROCESSENTRY32W``)."""
+
+    pid: int
+    ppid: int
+    name: str
+
+
+class ProcInfo(NamedTuple):
+    """A process in a tree walk: ``created`` is a FILETIME tick count, ``path`` the image."""
+
+    pid: int
+    ppid: int
+    name: str
+    path: str | None
+    created: int | None
+
+
+Describe = Callable[[int], tuple[int | None, str | None]]
+
+PYTHON_IMAGE_NAMES = ("py.exe", "pyw.exe")
+# Console host Windows attaches to console processes started with CREATE_NO_WINDOW.
+SYSTEM_HELPER_IMAGES = ("conhost.exe",)
+
+
+def is_python_image(name: str) -> bool:
+    lowered = name.lower()
+    return lowered in PYTHON_IMAGE_NAMES or (
+        lowered.startswith("python") and lowered.endswith(".exe")
+    )
+
+
+def is_within(path: str, directory: str | os.PathLike[str]) -> bool:
+    """Windows semantics (case-insensitive, either slash), independent of the host OS."""
+    return PureWindowsPath(str(directory)) in PureWindowsPath(path).parents
+
+
+def walk_tree(
+    entries: Iterable[ProcEntry], roots: Mapping[int, int | None], describe: Describe
+) -> list[ProcInfo]:
+    """Descendants of ``roots`` (pid -> creation time) in a snapshot; roots excluded.
+
+    A child counts only if it was created no earlier than its parent, which rules out a
+    reused PID whose stale parent id happens to equal one of ours. A child that cannot be
+    described (exited between snapshot and query, or access denied) is kept only when its
+    name alone already makes it suspicious (``python*.exe``), so nothing slips through.
+    """
+    children: dict[int, list[ProcEntry]] = {}
+    for entry in entries:
+        if entry.pid != entry.ppid:  # the idle process is its own parent
+            children.setdefault(entry.ppid, []).append(entry)
+    found: list[ProcInfo] = []
+    seen = set(roots)
+    stack = list(roots.items())
+    while stack:
+        parent_pid, parent_created = stack.pop()
+        for child in children.get(parent_pid, ()):
+            if child.pid in seen:
+                continue
+            created, path = describe(child.pid)
+            if created is None:
+                if is_python_image(child.name):
+                    seen.add(child.pid)
+                    found.append(ProcInfo(child.pid, child.ppid, child.name, path, None))
+                continue
+            if parent_created is not None and created < parent_created:
+                continue
+            seen.add(child.pid)
+            found.append(ProcInfo(child.pid, child.ppid, child.name, path, created))
+            stack.append((child.pid, created))
+    return found
+
+
+def foreign_processes(
+    tree: Iterable[ProcInfo], sidecar_dir: str | os.PathLike[str], system_root: str
+) -> list[dict[str, Any]]:
+    """Descendants that betray a dependency outside the bundle. Pure.
+
+    Foreign: any ``python*.exe`` / ``py.exe``; any image outside ``sidecar_dir`` except the
+    console host in ``%SystemRoot%\\System32``; any process whose image path is unknown and
+    whose name is not the sidecar's own.
+    """
+    system32 = PureWindowsPath(system_root) / "System32"
+    foreign = []
+    for proc in tree:
+        reason = None
+        if is_python_image(proc.name):
+            reason = "python interpreter"
+        elif proc.path is None:
+            if proc.name.lower() not in (EXE_NAME.lower(), *SYSTEM_HELPER_IMAGES):
+                reason = "image path unavailable"
+        elif not is_within(proc.path, sidecar_dir):
+            helper = proc.name.lower() in SYSTEM_HELPER_IMAGES and is_within(proc.path, system32)
+            if not helper:
+                reason = "image outside the sidecar directory"
+        if reason:
+            foreign.append({"pid": proc.pid, "name": proc.name, "path": proc.path, "reason": reason})
+    return foreign
+
+
+# Win32 plumbing (ctypes, resolved lazily so this module imports on any OS).
+TH32CS_SNAPPROCESS = 0x00000002
+PROCESS_TERMINATE = 0x0001
+PROCESS_SET_QUOTA = 0x0100
+PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+SYNCHRONIZE = 0x00100000
+_INVALID_HANDLE = ctypes.c_void_p(-1).value
+
+
+class PROCESSENTRY32W(ctypes.Structure):
+    _fields_ = [
+        ("dwSize", ctypes.c_uint32),
+        ("cntUsage", ctypes.c_uint32),
+        ("th32ProcessID", ctypes.c_uint32),
+        ("th32DefaultHeapID", ctypes.c_size_t),
+        ("th32ModuleID", ctypes.c_uint32),
+        ("cntThreads", ctypes.c_uint32),
+        ("th32ParentProcessID", ctypes.c_uint32),
+        ("pcPriClassBase", ctypes.c_int32),
+        ("dwFlags", ctypes.c_uint32),
+        ("szExeFile", ctypes.c_wchar * 260),
+    ]
+
+
+class FILETIME(ctypes.Structure):
+    _fields_ = [("dwLowDateTime", ctypes.c_uint32), ("dwHighDateTime", ctypes.c_uint32)]
+
+
+_KERNEL32: Any = None
+
+
+def kernel32() -> Any:
+    """kernel32 with argtypes/restype set (Windows only)."""
+    global _KERNEL32
+    if _KERNEL32 is None:
+        k = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+        handle, dword, boolean = ctypes.c_void_p, ctypes.c_uint32, ctypes.c_int
+        sigs: dict[str, tuple[Any, list[Any]]] = {
+            "CreateToolhelp32Snapshot": (handle, [dword, dword]),
+            "Process32FirstW": (boolean, [handle, ctypes.POINTER(PROCESSENTRY32W)]),
+            "Process32NextW": (boolean, [handle, ctypes.POINTER(PROCESSENTRY32W)]),
+            "OpenProcess": (handle, [dword, boolean, dword]),
+            "CloseHandle": (boolean, [handle]),
+            "GetProcessTimes": (boolean, [handle] + [ctypes.POINTER(FILETIME)] * 4),
+            "QueryFullProcessImageNameW": (
+                boolean,
+                [handle, dword, ctypes.c_wchar_p, ctypes.POINTER(dword)],
+            ),
+            "WaitForSingleObject": (dword, [handle, dword]),
+            "TerminateProcess": (boolean, [handle, ctypes.c_uint]),
+            "GetExitCodeProcess": (boolean, [handle, ctypes.POINTER(dword)]),
+            "CreateJobObjectW": (handle, [ctypes.c_void_p, ctypes.c_wchar_p]),
+            "SetInformationJobObject": (boolean, [handle, ctypes.c_int, ctypes.c_void_p, dword]),
+            "AssignProcessToJobObject": (boolean, [handle, handle]),
+            "IsProcessInJob": (boolean, [handle, handle, ctypes.POINTER(boolean)]),
+        }
+        for name, (restype, argtypes) in sigs.items():
+            func = getattr(k, name)
+            func.restype, func.argtypes = restype, argtypes
+        _KERNEL32 = k
+    return _KERNEL32
+
+
+def win_error(what: str) -> OSError:
+    code = ctypes.get_last_error()  # type: ignore[attr-defined]
+    return OSError(f"{what} failed: {ctypes.FormatError(code).strip()} ({code})")  # type: ignore[attr-defined]
+
+
+def process_snapshot() -> list[ProcEntry]:
+    k = kernel32()
+    snap = k.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if snap is None or snap == _INVALID_HANDLE:
+        raise win_error("CreateToolhelp32Snapshot")
+    try:
+        entry = PROCESSENTRY32W()
+        entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+        rows = []
+        more = k.Process32FirstW(snap, ctypes.byref(entry))
+        while more:
+            rows.append(ProcEntry(entry.th32ProcessID, entry.th32ParentProcessID, entry.szExeFile))
+            more = k.Process32NextW(snap, ctypes.byref(entry))
+        return rows
+    finally:
+        k.CloseHandle(snap)
+
+
+def describe_process(pid: int) -> tuple[int | None, str | None]:
+    """(creation FILETIME ticks, full image path) of a live process, or (None, None)."""
+    k = kernel32()
+    handle = k.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return None, None
+    try:
+        times = [FILETIME() for _ in range(4)]
+        created = None
+        if k.GetProcessTimes(handle, *(ctypes.byref(t) for t in times)):
+            created = (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
+        buf = ctypes.create_unicode_buffer(32768)
+        size = ctypes.c_uint32(len(buf))
+        path = buf.value if k.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)) else None
+        return created, path
+    finally:
+        k.CloseHandle(handle)
+
+
+def system_root() -> str:
+    return _lookup(os.environ, "SYSTEMROOT") or r"C:\Windows"
+
+
+class ProcessTreeWatcher:
+    """Polls a process tree on a thread; records foreign and sidecar-image descendants."""
+
+    def __init__(self, root_pid: int, sidecar_dir: Path, interval: float = 0.05) -> None:
+        self.root_pid = root_pid
+        self.root_created = describe_process(root_pid)[0]
+        self.sidecar_dir = sidecar_dir
+        self.interval = interval
+        self.foreign: list[dict[str, Any]] = []
+        self.workers_seen: set[tuple[int, int | None]] = set()
+        self.errors: list[str] = []
+        self._stop = threading.Event()
+        self._seen_foreign: set[tuple[int, int | None]] = set()
+        self._thread = threading.Thread(target=self._run, name="tree-watcher", daemon=True)
+
+    def __enter__(self) -> ProcessTreeWatcher:
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self._stop.set()
+        self._thread.join(timeout=10)
+
+    def poll_once(self) -> None:
+        tree = walk_tree(process_snapshot(), {self.root_pid: self.root_created}, describe_process)
+        for proc in tree:
+            if proc.name.lower() == EXE_NAME.lower() and proc.path and is_within(
+                proc.path, self.sidecar_dir
+            ):
+                self.workers_seen.add((proc.pid, proc.created))
+        by_pid = {p.pid: p for p in tree}
+        for item in foreign_processes(tree, self.sidecar_dir, system_root()):
+            key = (item["pid"], by_pid[item["pid"]].created)
+            if key not in self._seen_foreign:
+                self._seen_foreign.add(key)
+                self.foreign.append(item)
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            try:
+                self.poll_once()
+            except OSError as exc:
+                if len(self.errors) < 5:
+                    self.errors.append(str(exc))
+            self._stop.wait(self.interval)
+
+
 # --------------------------------------------------------------------------- process
 
 
-def _env(token: str, data_dir: Path) -> dict[str, str]:
-    env = {k: v for k, v in os.environ.items() if not k.upper().startswith("PROMPTCAD_")}
+def _env(token: str, data_dir: Path, isolated: bool = False) -> dict[str, str]:
+    env = _base_env(isolated)
     env.update(
         PROMPTCAD_API_TOKEN=token,
         PROMPTCAD_DATA_DIR=str(data_dir),
@@ -213,7 +523,20 @@ class Sidecar:
             return ""
 
 
-def spawn_sidecar(exe: Path, workdir: Path, token: str, timeout: float) -> Sidecar:
+def spawn_sidecar(
+    exe: Path,
+    workdir: Path,
+    token: str,
+    timeout: float,
+    *,
+    isolated: bool = False,
+    on_spawn: Callable[[subprocess.Popen[str]], None] | None = None,
+) -> Sidecar:
+    """Start the sidecar and wait for READY.
+
+    ``on_spawn`` runs right after the process is created, before the READY line is read
+    (frozen_kill_check.py assigns the process to its job there).
+    """
     data_dir = workdir / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
     stderr_path = workdir / f"sidecar-stderr-{time.monotonic_ns()}.log"
@@ -222,13 +545,21 @@ def spawn_sidecar(exe: Path, workdir: Path, token: str, timeout: float) -> Sidec
     proc = subprocess.Popen(
         [str(exe), "--host", "127.0.0.1", "--port", "0"],
         cwd=workdir,  # no repo .env
-        env=_env(token, data_dir),
+        env=_env(token, data_dir, isolated),
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=stderr_file,
         text=True,
         encoding="utf-8",
     )
+    if on_spawn is not None:
+        try:
+            on_spawn(proc)
+        except BaseException:
+            proc.kill()
+            proc.wait(timeout=30)
+            stderr_file.close()
+            raise
     lines: queue.Queue[str] = queue.Queue()
     threading.Thread(target=lambda: lines.put(proc.stdout.readline()), daemon=True).start()
     sidecar = Sidecar(proc, 0, 0.0, stderr_path, stderr_file)
@@ -290,73 +621,109 @@ def check_manifest(sidecar: Sidecar, token: str, label: str, manifest: dict[str,
 
 
 def run_server_checks(
-    exe: Path, workdir: Path, timeout: float, results: dict[str, Any]
+    exe: Path, workdir: Path, timeout: float, results: dict[str, Any], isolated: bool = False
 ) -> None:
     token = secrets.token_urlsafe(32)
-    sidecar = spawn_sidecar(exe, workdir, token, timeout)
+    sidecar = spawn_sidecar(exe, workdir, token, timeout, isolated=isolated)
     results["server_ready_seconds"] = round(sidecar.ready_seconds, 3)
     print(f"READY on port {sidecar.port} after {sidecar.ready_seconds:.2f}s")
     try:
-        status, _ = _request(sidecar, "GET", "/api/v1/capabilities", "wrong-token")
-        if status != 401:
-            raise SmokeFailure(f"capabilities with a wrong token -> HTTP {status}, expected 401")
-        caps = _json(sidecar, "GET", "/api/v1/capabilities", token)
-        if caps.get("cadquery_available") is not True:
-            raise SmokeFailure(f"cadquery_available is not true: {caps}")
-        print("capabilities: cadquery_available=true")
-
-        timings: list[dict[str, Any]] = []
-        for label, spec in smoke_cases():
-            started = time.perf_counter()
-            manifest = _json(
-                sidecar,
-                "POST",
-                "/api/v1/generate-from-spec",
-                token,
-                {"spec": spec, "formats": CAD_FORMATS, "render": True},
-            )
-            elapsed = time.perf_counter() - started
-            check_manifest(sidecar, token, label, manifest)
-            timings.append({"case": label, "seconds": round(elapsed, 3)})
-            extra = f" ({len(manifest['warnings'])} warnings)" if manifest.get("warnings") else ""
-            print(f"  generate-from-spec {label:<28} completed in {elapsed:6.2f}s{extra}")
-        results["generate_from_spec"] = timings
-
-        started = time.perf_counter()
-        manifest = _json(
-            sidecar,
-            "POST",
-            "/api/v1/generate",
-            token,
-            {"prompt": SAMPLE_PROMPT, "planner": "rule", "formats": CAD_FORMATS, "render": True},
-        )
-        elapsed = time.perf_counter() - started
-        check_manifest(sidecar, token, "generate (prompt)", manifest)
-        results["generate_prompt_seconds"] = round(elapsed, 3)
-        print(f"  generate (rule planner prompt)       completed in {elapsed:6.2f}s")
+        if isolated:
+            with ProcessTreeWatcher(sidecar.proc.pid, exe.parent) as watcher:
+                _server_requests(sidecar, token, results)
+            check_watcher(watcher, results)
+        else:
+            _server_requests(sidecar, token, results)
     except (SmokeFailure, OSError) as exc:
         raise SmokeFailure(f"{exc}\n--- sidecar stderr ---\n{sidecar.stderr_tail()}") from exc
     finally:
         sidecar.stop()
 
 
-def measure_ready(exe: Path, workdir: Path, timeout: float, runs: int) -> list[float]:
+def check_watcher(watcher: ProcessTreeWatcher, results: dict[str, Any]) -> None:
+    """Fail on foreign descendants, or when no render worker was seen (vacuous check)."""
+    results["foreign_processes"] = watcher.foreign
+    results["render_workers_observed"] = len(watcher.workers_seen)
+    if watcher.foreign:
+        rows = "\n".join(
+            f"  pid {f['pid']} {f['name']} {f['path']} ({f['reason']})" for f in watcher.foreign
+        )
+        raise SmokeFailure(f"the sidecar spawned processes from outside its bundle:\n{rows}")
+    if not watcher.workers_seen:
+        detail = f" (watcher errors: {watcher.errors})" if watcher.errors else ""
+        raise SmokeFailure(f"the isolation watcher never observed a render worker{detail}")
+    print(
+        f"isolated env: {len(watcher.workers_seen)} render workers observed, "
+        "foreign_processes=[]"
+    )
+
+
+def _server_requests(sidecar: Sidecar, token: str, results: dict[str, Any]) -> None:
+    status, _ = _request(sidecar, "GET", "/api/v1/capabilities", "wrong-token")
+    if status != 401:
+        raise SmokeFailure(f"capabilities with a wrong token -> HTTP {status}, expected 401")
+    caps = _json(sidecar, "GET", "/api/v1/capabilities", token)
+    if caps.get("cadquery_available") is not True:
+        raise SmokeFailure(f"cadquery_available is not true: {caps}")
+    print("capabilities: cadquery_available=true")
+
+    timings: list[dict[str, Any]] = []
+    for label, spec in smoke_cases():
+        started = time.perf_counter()
+        manifest = _json(
+            sidecar,
+            "POST",
+            "/api/v1/generate-from-spec",
+            token,
+            {"spec": spec, "formats": CAD_FORMATS, "render": True},
+        )
+        elapsed = time.perf_counter() - started
+        check_manifest(sidecar, token, label, manifest)
+        timings.append({"case": label, "seconds": round(elapsed, 3)})
+        extra = f" ({len(manifest['warnings'])} warnings)" if manifest.get("warnings") else ""
+        print(f"  generate-from-spec {label:<28} completed in {elapsed:6.2f}s{extra}")
+    results["generate_from_spec"] = timings
+
+    started = time.perf_counter()
+    manifest = _json(
+        sidecar,
+        "POST",
+        "/api/v1/generate",
+        token,
+        {"prompt": SAMPLE_PROMPT, "planner": "rule", "formats": CAD_FORMATS, "render": True},
+    )
+    elapsed = time.perf_counter() - started
+    check_manifest(sidecar, token, "generate (prompt)", manifest)
+    results["generate_prompt_seconds"] = round(elapsed, 3)
+    print(f"  generate (rule planner prompt)       completed in {elapsed:6.2f}s")
+
+
+def measure_ready(
+    exe: Path, workdir: Path, timeout: float, runs: int, isolated: bool = False
+) -> list[float]:
     samples = []
     for i in range(runs):
-        sidecar = spawn_sidecar(exe, workdir / f"ready-{i}", secrets.token_urlsafe(16), timeout)
+        sidecar = spawn_sidecar(
+            exe, workdir / f"ready-{i}", secrets.token_urlsafe(16), timeout, isolated=isolated
+        )
         samples.append(round(sidecar.ready_seconds, 3))
         sidecar.stop()
     return samples
 
 
-def run_worker(exe: Path, root: Path, index: int, timeout: float) -> float:
+def _worker_env(root: Path, isolated: bool) -> dict[str, str]:
+    env = _base_env(isolated)
+    env["PROMPTCAD_RENDER_ROOT"] = str(root)
+    return env
+
+
+def run_worker(exe: Path, root: Path, index: int, timeout: float, isolated: bool = False) -> float:
     """One direct ``--render-worker`` run of the plate example; returns wall seconds."""
     job = root / f"job-{index}"
     job.mkdir(parents=True)
     source = EXAMPLES_DIR / "plate-four-holes" / "model.py"
     shutil.copy2(source, job / "model.py")
-    env = {k: v for k, v in os.environ.items() if not k.upper().startswith("PROMPTCAD_")}
-    env["PROMPTCAD_RENDER_ROOT"] = str(root)
+    env = _worker_env(root, isolated)
     cmd = [
         str(exe),
         "--render-worker",
@@ -392,12 +759,13 @@ def run_worker(exe: Path, root: Path, index: int, timeout: float) -> float:
     return round(elapsed, 3)
 
 
-def run_worker_rejects_outside_root(exe: Path, root: Path, outside: Path) -> None:
+def run_worker_rejects_outside_root(
+    exe: Path, root: Path, outside: Path, isolated: bool = False
+) -> None:
     """The worker must refuse a job directory outside PROMPTCAD_RENDER_ROOT (exit 2)."""
     outside.mkdir(parents=True)
     shutil.copy2(EXAMPLES_DIR / "plate-four-holes" / "model.py", outside / "model.py")
-    env = {k: v for k, v in os.environ.items() if not k.upper().startswith("PROMPTCAD_")}
-    env["PROMPTCAD_RENDER_ROOT"] = str(root)
+    env = _worker_env(root, isolated)
     completed = subprocess.run(
         [str(exe), "--render-worker", str(outside / "model.py"), "--output-dir", str(outside)],
         env=env,
@@ -518,7 +886,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ready-timeout", type=float, default=180.0)
     parser.add_argument("--render-timeout", type=float, default=600.0)
     parser.add_argument("--out-dir", type=Path, default=MEASURE_DIR)
+    parser.add_argument(
+        "--isolated-env",
+        action="store_true",
+        help="clean-machine env (system-only PATH, no PYTHON*/VIRTUAL_ENV/CONDA*) and fail if "
+        "the sidecar spawns anything from outside its bundle (Windows only)",
+    )
     args = parser.parse_args(argv)
+    isolated = args.isolated_env
+    if isolated and sys.platform != "win32":
+        print("--isolated-env is only supported on Windows", file=sys.stderr)
+        return 2
 
     exe = args.exe.resolve()
     if not exe.is_file() or exe.stat().st_size == 0:
@@ -534,15 +912,20 @@ def main(argv: list[str] | None = None) -> int:
         # b first: the very first worker run is the closest to a cold start we can get here.
         render_root = workdir / "render-root"
         worker_runs = 1 + (args.warm_runs if args.measure else 0)
-        worker = [run_worker(exe, render_root, i, args.render_timeout) for i in range(worker_runs)]
+        if isolated:
+            print("isolated env: PATH=" + isolated_env(os.environ)["PATH"])
+        worker = [
+            run_worker(exe, render_root, i, args.render_timeout, isolated)
+            for i in range(worker_runs)
+        ]
         print(f"render worker: {', '.join(f'{s:.2f}s' for s in worker)}")
-        run_worker_rejects_outside_root(exe, render_root, workdir / "outside")
+        run_worker_rejects_outside_root(exe, render_root, workdir / "outside", isolated)
         print("render worker rejects a job outside PROMPTCAD_RENDER_ROOT")
 
-        run_server_checks(exe, workdir / "server", args.ready_timeout, server)
+        run_server_checks(exe, workdir / "server", args.ready_timeout, server, isolated)
         ready = [server["server_ready_seconds"]]
         if args.measure:
-            ready += measure_ready(exe, workdir, args.ready_timeout, args.warm_runs)
+            ready += measure_ready(exe, workdir, args.ready_timeout, args.warm_runs, isolated)
             print(f"spawn->READY: {', '.join(f'{s:.2f}s' for s in ready)}")
     except (SmokeFailure, subprocess.TimeoutExpired, OSError) as exc:
         print(f"FROZEN SMOKE FAILED: {exc}", file=sys.stderr)
@@ -565,6 +948,9 @@ def main(argv: list[str] | None = None) -> int:
         "render_worker": _first_warm(worker),
         "generate_from_spec": _first_warm(spec_seconds),
         "server": server,
+        "isolated_env": isolated,
+        "foreign_processes": server.get("foreign_processes", []) if isolated else None,
+        "render_workers_observed": server.get("render_workers_observed") if isolated else None,
         "environment": {
             "os": platform.platform(),
             "machine": platform.machine(),

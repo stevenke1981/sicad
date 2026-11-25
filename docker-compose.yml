@@ -25,7 +25,9 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3).read(1)"]
+      # "/" serves the React build baked into the image (503 if it were missing). The
+      # micromamba entrypoint activates the conda env; plain `python` is not on PATH.
+      test: ["CMD", "/usr/local/bin/_entrypoint.sh", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3).read(1)"]
       interval: 20s
       timeout: 5s
       retries: 5

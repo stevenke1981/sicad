@@ -73,6 +73,17 @@ def test_no_cad_build_excludes_cadquery():
     assert "cadquery" not in _flag_values(args, "--hidden-import")
 
 
+def test_pyinstaller_args_has_no_static_data(tmp_path):
+    # app/static is gone and app/web_dist must never be frozen in (Tauri serves the UI),
+    # even when a stale checkout still has either directory on disk.
+    assert build_sidecar.DATA_DIRS == ()
+    for name in ("static", "web_dist"):
+        (tmp_path / "app" / name).mkdir(parents=True)
+        (tmp_path / "app" / name / "index.html").write_text("x", encoding="utf-8")
+    for root in (ROOT, tmp_path):
+        assert "--add-data" not in build_sidecar.pyinstaller_args(ENTRY, root=root)
+
+
 def test_clean_stale_outputs(tmp_path):
     onefile = tmp_path / "promptcad-sidecar-x86_64-pc-windows-msvc.exe"
     onefile.write_bytes(b"old")

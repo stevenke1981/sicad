@@ -9,6 +9,10 @@ interface Props {
 /**
  * Shows the SVG preview fetched with auth headers. It is rendered through <img> from a
  * blob: URL (never innerHTML), so scripts or external references inside the SVG cannot run.
+ *
+ * `model.svg` (the CadQuery projection) is drawn with dark strokes on a transparent
+ * background, so it gets an off-white "paper" backdrop; `preview.svg` paints its own dark
+ * background and keeps the dark wrapper.
  */
 export function SvgPreview({ artifact, fetchArtifact }: Props) {
   const [src, setSrc] = useState<string | null>(null);
@@ -38,8 +42,11 @@ export function SvgPreview({ artifact, fetchArtifact }: Props) {
     };
   }, [artifact, fetchArtifact]);
 
+  const kind = artifact ? previewKind(artifact.filename) : undefined;
+  const className = kind === 'model' ? 'preview-wrap preview-wrap--paper' : 'preview-wrap';
+
   return (
-    <div className="preview-wrap">
+    <div className={className} data-kind={kind}>
       {src ? (
         <img src={src} alt={`${artifact?.filename ?? 'CAD'} 預覽`} />
       ) : (
@@ -47,6 +54,10 @@ export function SvgPreview({ artifact, fetchArtifact }: Props) {
       )}
     </div>
   );
+}
+
+export function previewKind(filename: string): 'model' | 'preview' {
+  return filename === 'model.svg' ? 'model' : 'preview';
 }
 
 function errorText(error: unknown): string {

@@ -77,9 +77,14 @@
 ## 相關文件
 
 - [0002](0002-desktop-shell-tauri-v2.md)、[0004](0004-3d-viewer-threejs.md)、[0008](0008-single-schema-source-of-truth.md)、[0010](0010-migration-phases.md)
-- 現行 UI：`app/static/`
+- 現行 UI：`web/`（原 `app/static/` 已於 2026-11-26 移除，見回顧紀錄）
 - 現行 API：[`../API.md`](../API.md)
 
 ## 回顧紀錄
 
-（尚無）
+### 2026-11-26：移除 `app/static/`（遷移步驟 3）
+
+- **等價驗收**：`web/` 的新前端已達到與 `app/static/` 功能等價（提示詞與 planner 選擇、生成、JSON 編輯與驗證後重新輸出、驗證報告、產物與工作 ZIP 下載、工作歷史、Token 欄位、SVG 預覽），另加 Three.js STL 檢視器，桌面與 Web 模式皆可完成 README「Web 編輯流程」。
+- **移除**：負責人於 2026-11-26 核准移除 `app/static/`。目錄與 `pyproject.toml` 中對應的 `package-data` 已刪除，驗收條件「`app/static/` 已移除」達成。
+- **未建置前端時的行為**：`app/web_dist/index.html` 不存在時，FastAPI 的 `/` 回傳 HTTP 503 的內嵌說明頁（`app/main.py` 的字串常數），指示執行 `npm --prefix web ci` 與 `npm --prefix web run build`，並連到 `/docs`；`/assets` 不掛載，`/api/v1/*` 與 `/api/v1/health` 不受影響。伺服器模式因此必須先建置前端，或使用多階段 Dockerfile（在映像內建置 `web/`）。
+- **預覽**：CadQuery 的 `model.svg` 改以紙色底顯示，`preview.svg` 不變（只改前端）。

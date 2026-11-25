@@ -29,3 +29,7 @@
 ## 未在封裝主機執行的項目
 
 封裝主機沒有 Docker、CadQuery、OpenSCAD、Conda，也不具備 CadQuery 支援的 Python 3.11 runtime，因此未在此主機實際產生 STEP／STL／DXF。完整 Docker 與 Conda 定義固定使用 Python 3.11 + CadQuery 2.8.0；請在具備 Docker 的主機執行 `docker compose up --build` 驗證 OpenCascade 路徑。
+
+## 附註（2026-11-26，第 1 階段收尾）
+
+本報告記錄的是 v0.1.0 發行包的驗證結果，內容維持原樣。其中 `node --check app/static/app.js` 只適用於 v0.1.0：`app/static/` 已經負責人核准於第 1 階段移除，Web UI 改由 `web/`（React + TypeScript + Vite）提供，對應的檢查為 `npm --prefix web run typecheck`、`npm --prefix web test` 與 `npm --prefix web run build`。未建置前端時 `/` 回傳 HTTP 503 的說明頁；Docker 映像以多階段建置內含前端。第 1 階段的驗證項目見 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)。

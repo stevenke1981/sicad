@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     port: int = Field(default=8000, ge=1, le=65535)
     data_dir: Path = Path("generated")
     # When this directory contains index.html it is served at "/" (assets under /assets);
-    # otherwise the legacy app/static UI is served.
+    # otherwise "/" returns a 503 page explaining how to build it (the API still works).
     frontend_dir: Path = DEFAULT_FRONTEND_DIR
 
     planner_mode: Literal["auto", "rule", "llm"] = "auto"
