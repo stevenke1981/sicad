@@ -1,7 +1,7 @@
 # 維度階梯（Dimensional Ladder）— 概念與技術設計
 
-> 狀態：設計草案（尚未實作）。適用對象：PromptCAD Studio v0.1.0 之後的演進。
-> 本文所有「現況」敘述均以 v0.1.0 原始碼為準（`app/models/cad.py`、`app/services/planners/intent.py`、`app/services/validator.py`、`app/services/compiler.py`）；所有「2.0」敘述均為提案，標示「提案」的檔名、欄位與環境變數目前都不存在。
+> 狀態：設計草案（尚未實作）；**階段 0 規格凍結已完成（2026-11-26）**，凍結規格見 [`CAD_DSL_2.md`](CAD_DSL_2.md)，§14.4 的審查事項皆已處理。本文與 `CAD_DSL_2.md` 衝突時，以 `CAD_DSL_2.md` 為準；本文保留設計理由與端到端敘事。適用對象：PromptCAD Studio v0.1.0 之後的演進。
+> 本文所有「現況」敘述均以 v0.1.0 原始碼為準（`app/models/cad.py`、`app/services/planners/intent.py`、`app/services/validator.py`、`app/services/compiler.py`）；所有「2.0」敘述均為提案，標示「提案」的檔名、欄位與環境變數目前都不存在。依 [ADR 0010](adr/0010-migration-phases.md)，2.0 在第 2 階段以 Rust core 實作，本文提及的 `app/models/cad2.py`、`app/services/migrate.py`、`app/services/solver.py` 等 Python 提案檔名已作廢。
 
 ---
 
@@ -92,12 +92,12 @@ flowchart LR
 | `kind` | `empty` / `dot` / `line` / `plane` / `volume` | 判別欄位 |
 | `shape` | 依 `kind` 而定的判別聯集（以 `shape.kind` 判別） | 形狀與數值參數 |
 | `label` | `str \| None`，最長 80 | 給人看的名稱，不產生識別字或程式邏輯（只隨內嵌的 `CAD_SPEC` JSON 出現，見 10.1） |
-| `origin` | `{agent, patch_id}` | 由協調器蓋章，agent 不能自己寫 |
+| `provenance` | `{agent, patch_id}` | 由協調器蓋章，agent 不能自己寫（原名 `origin`，因與埠名 `origin` 衝突而改名，見 [`CAD_DSL_2.md` §3.1](CAD_DSL_2.md#31-共通欄位)） |
 
 三個刻意的設計決定：
 
 - **元件不帶座標。** 位置完全由約束層決定（第 5 節），求解結果寫入獨立的 `resolved.json`，不寫回 `spec.json`。這樣 `spec.json` 只記錄意圖，改一個參數不必手動改一串座標。
-- **埠（port）不由 agent 宣告。** 每種 `shape.kind` 有一張固定的埠表，由程式推導（提案：`app/services/ports.py`）。agent 只能引用，不能發明。引用語法為 `元件id.埠名`，例如 `v_plate.top`。
+- **埠（port）不由 agent 宣告。** 每種 `shape.kind` 有一張固定的埠表，由程式推導（提案：`app/services/ports.py`）。agent 只能引用，不能發明。引用語法為 `元件id.埠名`，例如 `v_plate.top`；欄位引用則用 `元件id:欄位名`，例如 `v_body:height`（凍結規格見 [`CAD_DSL_2.md` §1.3、§3.4](CAD_DSL_2.md#13-引用語法)）。
 - **形狀欄位只放數值。** 參數化關係放在文件層的 `bindings`（3.7 節），不把運算式塞進形狀欄位。這讓 1.0 的 `PlateBase`、`CylinderBase`、`RingBase`、`LBracketBase`、`EnclosureBase` 可以原封不動當作 Volume 的 `shape` 重用。
 
 ### 3.2 埠的四種型別
@@ -227,13 +227,13 @@ Volume 的埠（以 `plate` 為例，其餘盒狀形狀相同）：`origin`（�
     {"name": "pcb_stack", "value": 25, "min": null, "max": null, "note": "PCB 連同元件高度"}
   ],
   "bindings": [
-    {"target": "v_body.height", "expr": "wall + standoff_h + pcb_stack + 1"}
+    {"target": "v_body:height", "expr": "wall + standoff_h + pcb_stack + 1"}
   ]
 }
 ```
 
-- `target` 的語法是 `元件id.欄位名` 或 `約束id.欄位名`。
-- `expr` 的文法是封閉的：數字、參數名、`元件id.欄位名`、`+ - * /`、括號、`min()`、`max()`。由自寫的遞迴下降解析器求值（提案：`app/services/expr.py`），不使用 `eval`。
+- `target` 的語法是 `元件id:欄位名` 或 `約束id:欄位名`（凍結時由 `.` 改為 `:`，以區分埠引用，見 [`CAD_DSL_2.md` §1.3](CAD_DSL_2.md#13-引用語法)）。
+- `expr` 的文法是封閉的：數字、參數名、`元件id:欄位名`、`+ - * /`、單元負號、括號、`min()`、`max()`（EBNF 見 [`CAD_DSL_2.md` §4.3](CAD_DSL_2.md#43-運算式文法封閉)）。由自寫的遞迴下降解析器求值（在 Rust core 實作），不使用 `eval`。
 - 被綁定的欄位仍保留一個數值作為快取。正規化器每次重算並覆寫；循環依賴回報 `binding_cycle`。
 
 ---
@@ -316,6 +316,8 @@ Volume 的埠（以 `plate` 為例，其餘盒狀形狀相同）：`origin`（�
 
 ### 5.2 求解策略：離散姿態加三軸平移
 
+> 凍結註記：第 2 點的「拓撲排序、不需迭代」已由 [`CAD_DSL_2.md` §5.5](CAD_DSL_2.md#55-平移求解不動點規則) 的不動點規則取代（以 `fixed` 為根、逐軸追蹤已知性、依文件順序迭代到不動點）；「不引入數值求解器」的立場讓位給 [ADR 0007](adr/0007-constraint-solver.md)，本節規則是 ADR 0007 允許的前處理層。
+
 2.0 刻意不引入通用數值約束求解器。理由是數值求解器的結果會隨初值與版本變動，違反「同一份 `spec.json` 永遠產生同一份輸出」的原則。
 
 做法（提案：`app/services/solver.py`）：
@@ -331,11 +333,11 @@ Volume 的埠（以 `plate` 為例，其餘盒狀形狀相同）：`origin`（�
 | 狀況 | 判定 | 處理 | 嚴重度與代碼 |
 |---|---|---|---|
 | 完全約束 | 每個元件消去 3 個平移自由度，且無矛盾 | 正常 | — |
-| 欠約束 | 某元件剩餘自由度 > 0 | 剩餘軸對齊父框原點，並把這個決定寫入 `assumptions` | `warning`：`under_constrained`（附剩餘軸） |
+| 欠約束 | 某元件剩餘自由度 > 0 | 剩餘軸對齊父框原點（凍結規則：不改寫 `spec.json` 的 `assumptions`，只記在驗證報告與 `resolved.json`，見 [`CAD_DSL_2.md` §5.5](CAD_DSL_2.md#55-平移求解不動點規則)） | `warning`：`under_constrained`（附剩餘軸） |
 | 無根 | 組裝內沒有任何 `fixed` | 無法求解 | `error`：`no_fixed_root` |
 | 冗餘 | 多餘的約束與既有解一致（誤差 ≤ 1e-6 mm） | 保留並提示 | `info`：`redundant_constraint` |
 | 矛盾 | 多餘的約束與既有解不一致 | 阻擋 | `error`：`conflicting_constraints`（附兩筆約束的 `id` 與差值） |
-| 循環 | 約束圖無法拓撲排序 | 阻擋 | `error`：`constraint_cycle` |
+| ~~循環~~ | ~~約束圖無法拓撲排序~~ | 已退役：循環被分解為「指定」或「冗餘／矛盾」 | ~~`constraint_cycle`~~（見 [`CAD_DSL_2.md` §9.3](CAD_DSL_2.md#93-退役代碼)） |
 
 欠約束採用 `warning` 加假設，而不是 `error`，是沿用現有 `intent_to_document()` 的做法：缺資料時給預設值、寫入 `assumptions`、把 `review_required` 設為 `true`，讓人決定。
 
@@ -373,7 +375,7 @@ flowchart TD
 |---|---|---|
 | 引用圖 | `shape` 內的 `id` 引用（升維來源） | 必須是 DAG；只能由高維引用低維，`of`（Empty 引用 Volume）與 `section`（Plane 引用 Volume）例外 |
 | 歸屬樹 | 組裝 → 零件 → `body` 內的元件 | 每個 Volume 與 `cut` Empty 恰屬一個零件；`reserve`／`keep_out`／`envelope` 屬於組裝層 |
-| 約束圖 | 約束的 a、b 兩端 | 可拓撲排序；每個連通分量有一個 `fixed` 根 |
+| 約束圖 | 約束的 a、b 兩端 | 可以有循環；依 [`CAD_DSL_2.md` §5.5](CAD_DSL_2.md#55-平移求解不動點規則) 的不動點規則求解；文件至少一個 `fixed` 根，未連到根的元件以 `under_constrained` 處理 |
 
 ### 6.3 BOM 與多零件輸出
 
@@ -408,7 +410,7 @@ BOM 由歸屬樹直接推導，不需 LLM：
 
 | 角色 | 職責 | 是否為 LLM |
 |---|---|---|
-| 協調器 Orchestrator | 排定回合、套用 patch、蓋章 `origin`、呼叫驗證器、控制回合上限 | 否，確定性程式 |
+| 協調器 Orchestrator | 排定回合、套用 patch、蓋章 `provenance`、呼叫驗證器、控制回合上限 | 否，確定性程式 |
 | 空間規劃師 Space Planner | 讀提示詞，建立具名參數、`envelope`、`reserve`、`keep_out`，拆出零件清單 | 是 |
 | 元件工匠 Component Smith | 建立並調整 Dot、Line、Plane、Volume 與 `cut` Empty，執行升維 | 是 |
 | 接合師 Joiner | 建立與修改約束，處理欠約束與矛盾 | 是 |
@@ -422,16 +424,18 @@ BOM 由歸屬樹直接推導，不需 LLM：
 
 ### 7.2 權限矩陣
 
+（凍結版本，含綁定與假設移除的規則，見 [`CAD_DSL_2.md` §8.5](CAD_DSL_2.md#85-權限矩陣)；下表已改用凍結後的 op 名稱。）
+
 | patch 操作 | 空間規劃師 | 元件工匠 | 接合師 | 組裝師 |
 |---|---|---|---|---|
-| `set_parameter` | 可 | 可（須附理由） | 否 | 否 |
+| `set_parameter` | 可 | 可（限 `resolves` 非空的修正 patch） | 否 | 否 |
 | `add_component`：`reserve`／`keep_out`／`envelope` Empty | 可 | 否 | 否 | 否 |
 | `add_component`：Dot／Line／Plane／Volume／`cut` Empty | 否 | 可 | 否 | 否 |
-| `set_param`、`remove_component`（實體類） | 否 | 可 | 否 | 否 |
-| `set_param`、`remove_component`（保留類 Empty） | 可 | 否 | 否 | 否 |
-| `connect`、`disconnect`、`set_param`（約束） | 否 | 否 | 可 | 否 |
+| `set_field`、`set_binding`、`remove_binding`、`remove_component`（實體類） | 否 | 可 | 否 | 否 |
+| `set_field`、`set_binding`、`remove_binding`、`remove_component`（保留類 Empty） | 可 | 否 | 否 | 否 |
+| `add_constraint`、`remove_constraint`；`set_field`、`set_binding`、`remove_binding`（約束） | 否 | 否 | 可 | 否 |
 | `add_part`、`set_body`、`add_assembly` | 否 | 否 | 否 | 可 |
-| `add_assumption`、`add_note` | 可 | 可 | 可 | 可 |
+| `add_assumption`、`add_note`、`remove_assumption` | 可 | 可 | 可 | 可 |
 
 要點：元件工匠不能改動保留類的空。這是「空優先於實」在權限層的落實，實體必須讓步。
 
@@ -439,25 +443,40 @@ BOM 由歸屬樹直接推導，不需 LLM：
 
 agent 的唯一輸出是一個 `Patch` JSON。沿用 `LLMIntent` 的風格：`extra=forbid`、所有清單有上限、欄位全部必填且可為 `null`（以相容 `llm_structured_mode=json_schema` 的 strict 模式）。
 
+`PatchOp` 是以 `op` 判別的**封閉聯集**，每個變體的欄位固定，沒有任意 JSON 值（strict 模式要求 `additionalProperties: false`，`JsonValue` 無法表達）。每個角色送給 LLM 的 schema 是此聯集的子集（ADR 0005 的具型別領域操作）。凍結規格與 Rust 型別見 [`CAD_DSL_2.md` §8](CAD_DSL_2.md#8-patch-協定)；下方以 Pydantic 風格示意，實作在 Rust core。
+
 ```python
-class PatchOp(StrictModel):
-    op: Literal[
-        "add_component", "set_param", "remove_component",
-        "connect", "disconnect",
-        "set_parameter", "add_part", "set_body", "add_assembly",
-        "add_assumption", "add_note",
-    ]
-    target: str | None      # 既有的 id，或 "id.欄位名"
-    value: JsonValue | None  # 新元件／新約束／新數值，依 op 以對應模型再驗證一次
+class AddComponent(StrictModel):     op: Literal["add_component"]; component: ComponentInput  # 無 provenance
+class RemoveComponent(StrictModel):  op: Literal["remove_component"]; id: Id
+class SetField(StrictModel):         op: Literal["set_field"]; target: FieldRef; value: float   # "id:field"
+class SetBinding(StrictModel):       op: Literal["set_binding"]; target: FieldRef; expr: str = Field(max_length=160)
+class RemoveBinding(StrictModel):    op: Literal["remove_binding"]; target: FieldRef
+class AddConstraint(StrictModel):    op: Literal["add_constraint"]; constraint: Constraint
+class RemoveConstraint(StrictModel): op: Literal["remove_constraint"]; id: Id
+class SetParameter(StrictModel):     op: Literal["set_parameter"]; parameter: Parameter
+class AddPart(StrictModel):          op: Literal["add_part"]; part: Part
+class SetBody(StrictModel):          op: Literal["set_body"]; part_id: Id; body: list[BodyOp]
+class AddAssembly(StrictModel):      op: Literal["add_assembly"]; assembly: Assembly
+class AddAssumption(StrictModel):    op: Literal["add_assumption"]; text: str = Field(max_length=300)
+class RemoveAssumption(StrictModel): op: Literal["remove_assumption"]; text: str = Field(max_length=300)
+class AddNote(StrictModel):          op: Literal["add_note"]; text: str = Field(max_length=300)
+
+PatchOp = Annotated[
+    AddComponent | RemoveComponent | SetField | SetBinding | RemoveBinding
+    | AddConstraint | RemoveConstraint | SetParameter | AddPart | SetBody | AddAssembly
+    | AddAssumption | RemoveAssumption | AddNote,
+    Field(discriminator="op")]
 
 
 class Patch(StrictModel):
     agent: Literal["space_planner", "component_smith", "joiner", "assembler"]
     base_revision: int = Field(ge=0)
-    rationale: str = Field(max_length=500)
+    rationale: str = Field(min_length=1, max_length=500)
     resolves: list[str] = Field(max_length=16)   # 要解決的驗證問題代碼
-    ops: list[PatchOp] = Field(min_length=1, max_length=64)
+    ops: list[PatchOp] = Field(min_length=1, max_length=64)  # 依角色縮小為子集聯集
 ```
+
+舊草案的 `set_param`（含 `{"expr": …}` 的隱含綁定）、`connect`、`disconnect` 已分別由 `set_field`／`set_binding`、`add_constraint`、`remove_constraint` 取代。
 
 協調器套用 patch 的步驟，全部或全無：
 
@@ -465,7 +484,7 @@ class Patch(StrictModel):
 2. 檢查 `base_revision` 等於目前修訂號，否則拒絕並要求重讀。
 3. 逐筆檢查權限矩陣。
 4. 在文件副本上套用，再以 `CadDocument2` 整份驗證。
-5. 重算 `bindings`、求解約束、執行驗證器。
+5. 重算 `bindings`、求解約束、執行驗證器（結構、引用與綁定類 `error` 使 patch 被拒絕；設計類問題不拒絕 patch，而是回饋給修正迴圈，見 [`CAD_DSL_2.md` §8.6](CAD_DSL_2.md#86-套用步驟與拒絕原因)）。
 6. 接受則修訂號加一，寫入 `oplog.jsonl`；拒絕則文件不變，同樣寫入日誌。
 
 `oplog.jsonl` 每行一筆：
@@ -532,7 +551,9 @@ sequenceDiagram
 
 ## 8. CadDocument 2.0 草案
 
-### 8.1 Schema（Pydantic 風格，提案檔案 `app/models/cad2.py`）
+### 8.1 Schema（Pydantic 風格示意）
+
+> 凍結註記：規範性定義在 [`CAD_DSL_2.md`](CAD_DSL_2.md)，實作依 ADR 0010 第 2 階段在 Rust core（`serde` + `schemars`），Pydantic 與 TypeScript 型別為生成物；原提案檔案 `app/models/cad2.py` 作廢。下方草圖已同步凍結時的改名：元件欄位 `origin` → `provenance`、綁定目標改用 `FieldRef`（`id:field`）。
 
 ```python
 from typing import Annotated, Literal
@@ -546,7 +567,8 @@ from app.models.cad import (
 )
 
 Id = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,31}$")]
-PortRef = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,31}\.[a-z][a-z0-9_]{0,31}$")]
+PortRef = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,31}\.[a-z][a-z0-9_]{0,31}$")]   # "id.port"
+FieldRef = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,31}:[a-z][a-z0-9_]{0,31}$")]  # "id:field"
 Dim = Annotated[float, Field(gt=0, le=MAX_DIMENSION_MM)]
 Coord = Annotated[float, Field(ge=-MAX_DIMENSION_MM, le=MAX_DIMENSION_MM)]
 AxisDir = Literal["+x", "-x", "+y", "-y", "+z", "-z"]
@@ -585,13 +607,13 @@ class HoleShape(StrictModel):     # HoleFeature 去掉 x, y, z；validate_subtyp
 class OfShape(StrictModel):       kind: Literal["of"] = "of"; source: Id
 
 # ---- components ---------------------------------------------------------
-class Origin(StrictModel):
+class Provenance(StrictModel):
     agent: str = Field(max_length=32); patch_id: str | None = Field(default=None, max_length=64)
 
 class _Component(StrictModel):
     id: Id
     label: str | None = Field(default=None, max_length=80)
-    origin: Origin | None = None
+    provenance: Provenance | None = None   # 原名 origin；origin 只作為埠名
 
 class DotComponent(_Component):   kind: Literal["dot"] = "dot"; shape: PointShape
 class LineComponent(_Component):
@@ -655,7 +677,7 @@ class Parameter(StrictModel):
     note: str | None = Field(default=None, max_length=120)
 
 class Binding(StrictModel):
-    target: PortRef                   # 語法同 "id.field"
+    target: FieldRef                  # "id:field"，與埠引用 "id.port" 區分
     expr: str = Field(min_length=1, max_length=160)
 
 class CadDocument2(StrictModel):
@@ -685,7 +707,7 @@ API 層以 `schema_version` 判別兩個版本：`AnyCadDocument = Annotated[Cad
 | 1.0 | 2.0 |
 |---|---|
 | `base`（五種之一） | 一個 Volume，`id="v_base"`，`shape` 為同一個 `PlateBase` 等物件；一筆 `fixed` 約束把 `v_base.origin` 固定在世界原點 |
-| `holes[i]` | Dot `d_h{i+1}` 加 Empty `e_h{i+1}`（`role=cut`、`shape.kind=hole`）；Dot 以 `fixed`（`a` 為 `d_h{i+1}.point`）定位於 `(x, y, z)`；一筆 `coincident` 連接 `e_h{i+1}.entry` 與 `d_h{i+1}.point` |
+| `holes[i]` | Dot `d_h{i+1}` 加 Empty `e_h{i+1}`（`role=cut`、`shape.kind=hole`）；Dot 以 `fixed`（`a` 為 `d_h{i+1}.point`）定位於 `(x, y, z)`；一筆 `coincident` 連接 `e_h{i+1}.entry` 與 `d_h{i+1}.point`；連同 `body` 的 `cut` 共 5 筆紀錄。凍結規則把 Dot 放在正向外表面上（見 [`CAD_DSL_2.md` §10.1](CAD_DSL_2.md#101-upgrade_1_to_2全函數)） |
 | `fillets`、`chamfers` | 移到 `parts[0].fillets`、`parts[0].chamfers`，內容不變 |
 | `material` | `parts[0].material` |
 | `name`、`source_prompt`、`unit`、`assumptions`、`notes`、`planner` | 同名欄位，原樣搬移 |
@@ -700,9 +722,9 @@ def upgrade_1_to_2(doc: CadDocument) -> CadDocument2: ...
 def downgrade_2_to_1(doc: CadDocument2) -> CadDocument | None: ...
 ```
 
-- `upgrade_1_to_2` 是全函數：任何合法的 1.0 文件都能升級，且不新增任何假設。例外待決：1.0 的 `thread` 是最長 32 的自由字串（`standards.py` 的解析也接受小寫與空白），不符合 2.0 正規表示式的值（例如 `m6`、`M6 tapped`）必須先定出正規化或移入 `notes` 的規則，否則此性質不成立。
-- `downgrade_2_to_1` 是部分函數：只有「單一零件、`body` 為一個捷徑 Volume 加上若干 `hole` 空、每個孔的 Dot 都以 `fixed` 定位、沒有 `bindings`」時回傳 1.0 文件，否則回傳 `None`。
-- 往返不變量：`downgrade_2_to_1(upgrade_1_to_2(d)) == d`，以 property-based 測試涵蓋。
+- `upgrade_1_to_2` 是全函數：任何合法的 1.0 文件都能升級，且不新增任何假設。1.0 的 `thread` 是最長 32 的自由字串（`standards.py` 的解析也接受小寫與空白）；凍結規則為先去空白、轉大寫並把 `X` 還原為 `x`，仍不符合 2.0 正規表示式者（例如 `M6 tapped`）設為 `null` 並把原值移入 `notes`（見 [`CAD_DSL_2.md` §10.1](CAD_DSL_2.md#101-upgrade_1_to_2全函數)），因此此性質成立。
+- `downgrade_2_to_1` 是部分函數：只有「單一零件、`body` 為一個捷徑 Volume 加上若干 `hole` 空、姿態皆為恆等、孔的切除方向等於 −`shape.axis`」時回傳 1.0 文件，否則回傳 `None`。綁定可以存在（使用快取值），孔點座標取自求解結果並把沿軸座標投影回 0（凍結條件見 [`CAD_DSL_2.md` §10.2](CAD_DSL_2.md#102-downgrade_2_to_1部分函數)）。
+- 往返不變量：對正規化的 1.0 文件（孔的沿軸座標為 0、`thread` 已正規化），`downgrade_2_to_1(upgrade_1_to_2(d)) == d`，以 property-based 測試涵蓋。
 
 **現有 26 個測試如何保持通過：** 第一階段不改動 1.0 的任何類別與路徑。`RuleBasedPlanner`、`intent_to_document()`、`DesignValidator`、`CadQueryCompiler`、`OpenScadCompiler` 繼續處理 1.0 文件。2.0 是新增的平行路徑。兩條路徑以等價測試綁在一起：同一份 1.0 文件，走舊編譯器與「升級後走新編譯器」，兩者產生的實體體積與包圍盒必須相等（有 CadQuery 的環境執行）；無 CadQuery 的環境則比對 `downgrade` 後的 `model.py` 文字完全一致。
 
@@ -712,13 +734,14 @@ def downgrade_2_to_1(doc: CadDocument2) -> CadDocument | None: ...
 
 ### 9.1 報告格式
 
-1.0 的 `ValidationIssue` 以 `feature_index: int | None` 指向特徵。2.0 新增三個可選欄位（1.0 產生的報告不受影響）：
+1.0 的 `ValidationIssue` 以 `feature_index: int | None` 指向特徵。2.0 新增下列可選欄位（1.0 產生的報告不受影響）：
 
 | 新欄位 | 說明 |
 |---|---|
 | `target: str \| None` | 元件、約束或零件的 `id` |
 | `related: list[str]` | 其他涉及的 `id` |
 | `owner: str \| None` | 應處理此問題的 agent 角色 |
+| `layer: "analytic" \| "kernel"` | 凍結時新增：產生此問題的驗證層（見 [`CAD_DSL_2.md` §9.1](CAD_DSL_2.md#91-validationissue-20)） |
 
 `valid` 與 `review_required` 的計算規則不變。
 
@@ -762,7 +785,7 @@ def downgrade_2_to_1(doc: CadDocument2) -> CadDocument | None: ...
 |---|---|---|
 | `port_type_mismatch` | error | 違反 5.1 的相容性矩陣 |
 | `no_fixed_root` | error | 見 5.3 |
-| `constraint_cycle` | error | 見 5.3 |
+| ~~`constraint_cycle`~~ | — | 已退役，見 [`CAD_DSL_2.md` §9.3](CAD_DSL_2.md#93-退役代碼)；凍結的完整代碼清單見同文件 §9.2 |
 | `conflicting_constraints` | error | 見 5.3 |
 | `under_constrained` | warning | 見 5.3 |
 | `redundant_constraint` | info | 見 5.3 |
@@ -889,6 +912,8 @@ OpenSCAD 路徑目前只輸出 STL（`Renderer` 對 STEP／DXF 回報「OpenSCAD
 ---
 
 ## 12. 端到端範例
+
+> 凍結註記：以下各回合的 patch JSON 保留凍結前的舊 op 語法（`{op, target, value}`、`connect`、`set_param`），用來說明流程。以凍結語法寫成的最終文件（含手算的求解結果 `expected_resolved`）是 [`examples/cad2/plate-four-holes.cad2.json`](../examples/cad2/plate-four-holes.cad2.json) 與 [`examples/cad2/enclosure-with-lid.cad2.json`](../examples/cad2/enclosure-with-lid.cad2.json)；新舊 op 的對應見 [`CAD_DSL_2.md` §8.2](CAD_DSL_2.md#82-patchop以-op-判別的封閉聯集)。
 
 ### 12.1 範例 A：帶四角 M6 孔的固定板
 
@@ -1128,7 +1153,7 @@ OpenSCAD 路徑目前只輸出 STL（`Renderer` 對 STEP／DXF 回報「OpenSCAD
 }
 ```
 
-`set_param` 的 `value` 為 `{"expr": …}` 時，協調器建立一筆綁定並求值：2 + 5 + 25 + 1 = 33。元件工匠無權修改 `e_pcb`，因此「把保留區縮小」這條捷徑在權限層就被擋掉。
+`set_param` 的 `value` 為 `{"expr": …}` 時，協調器建立一筆綁定並求值：2 + 5 + 25 + 1 = 33。凍結語法中這一回合寫成三個明確的 op：`{"op": "set_binding", "target": "v_body:height", "expr": "wall + standoff_h + pcb_stack + 1"}`、`{"op": "remove_assumption", "text": "未提供外殼高度，暫用 30 mm"}` 與 `add_assumption`；`set_binding` 需要與 `set_field` 相同的權限。元件工匠無權修改 `e_pcb`，因此「把保留區縮小」這條捷徑在權限層就被擋掉。
 
 **回合 7，驗證員：通過。**
 
@@ -1148,7 +1173,7 @@ OpenSCAD 路徑目前只輸出 STL（`Renderer` 對 STEP／DXF 回報「OpenSCAD
 }
 ```
 
-（已被取代的「未提供外殼高度，暫用 30 mm」由協調器在綁定建立時移除。）
+（已被取代的「未提供外殼高度，暫用 30 mm」由回合 6 的 patch 以明確的 `remove_assumption` 移除；協調器永遠不自動移除假設，見 [`CAD_DSL_2.md` §8.7](CAD_DSL_2.md#87-假設的移除)。）
 
 **人類審查：** 因為有假設，`review_required=true`。使用者看到的是四條假設與一個預覽，其中 PCB 保留區以虛線顯示。輸出：`model.step`（含 `p_body`、`p_lid` 兩個具名零件的組裝）、`parts/p_body.stl`、`parts/p_lid.stl`、`spaces.step`（保留區）、`bom.json`。
 
@@ -1162,7 +1187,7 @@ OpenSCAD 路徑目前只輸出 STL（`Renderer` 對 STEP／DXF 回報「OpenSCAD
 
 | 階段 | 內容 | 沿用的現有檔案 | 新增檔案（提案） | 驗收標準 |
 |---|---|---|---|---|
-| 0 規格凍結 | 本文審定；埠表與約束詞彙定稿 | `docs/CAD_DSL.md`、`docs/ARCHITECTURE.md` | `docs/CAD_DSL_2.md` | 第 14 節的開放問題都有決定 |
+| 0 規格凍結（**已完成，2026-11-26**） | 本文審定；埠表與約束詞彙定稿 | `docs/CAD_DSL.md`、`docs/ARCHITECTURE.md` | [`docs/CAD_DSL_2.md`](CAD_DSL_2.md)、`examples/cad2/*.cad2.json`、`tests/test_cad2_examples.py` | §14.4 全部處理；§14.3 的開放問題有建議預設值，待負責人簽核 |
 | 1 實體模型與遷移 | `CadDocument2` 模型；`upgrade_1_to_2`、`downgrade_2_to_1`；結構與引用類驗證；可降級的 2.0 文件走舊編譯器 | `app/models/cad.py`（不改，只匯入）、`app/services/validator.py`、`app/services/compiler.py` | `app/models/cad2.py`、`app/services/migrate.py`、`app/services/validator2.py` | 往返不變量的 property 測試通過；`examples/prompts.json` 全部提示詞升級後再降級，`model.py` 文字完全一致；`/api/v1/validate` 接受兩種 `schema_version` |
 | 2 空與布林 | Empty 四種角色；零件 `body`；單零件多體；`AssemblyCompiler` 的單零件路徑；解析層的空規則（定位暫只支援 `fixed`、`coincident`、`on_face` 的直接代入，完整求解器在階段 3） | `compiler.py` 的 `_base_lines()`、`_hole_lines()`；`app/services/preview.py` | `app/services/compiler2.py` | 等價測試：1.0 文件走新舊編譯器，體積與包圍盒相等；`reserve_violated`、`empty_cut_no_effect` 有測試 |
 | 3 埠、約束、多零件 | 埠表；求解器；`resolved.json`；`cq.Assembly` 輸出；逐零件 STEP／STL；`bom.json` | `app/services/renderer.py`、`app/services/job_service.py`、`app/services/storage.py`、`app/models/api.py` | `app/services/ports.py`、`app/services/solver.py`、`app/services/expr.py` | 範例 B 的最終文件以手寫 JSON 輸入可產生雙零件 STEP；欠約束、矛盾、循環各有測試；求解器對同一輸入重複執行 100 次結果位元組相同 |
@@ -1170,7 +1195,9 @@ OpenSCAD 路徑目前只輸出 STL（`Renderer` 對 STEP／DXF 回報「OpenSCAD
 | 5 Agent 團隊 | `Patch` 模型；協調器；權限矩陣；`oplog.jsonl`；四個 LLM 角色的 system prompt；修正迴圈 | `app/services/planners/llm.py`（HTTP 呼叫、重試、`_strip_fences`）、`planners/factory.py`（降級鏈）、`planners/rule_based.py`、`app/services/standards.py` | `app/models/patch.py`、`app/services/agents/` | 以假的 LLM 回應重播範例 A、B 的全部回合，最終文件與預期一致；越權 patch 被拒絕且文件不變；達回合上限時狀態為 `failed` 且產物齊全 |
 | 6 核心層驗證與生產化 | BREP 有效性、精確干涉；`kernel-validation.json`；獨立 worker | `ARCHITECTURE.md`「生產化建議」各項 | — | 在 Docker 的 CadQuery 2.8.0 環境中，刻意干涉的組裝被核心層判為 `error` |
 
-階段 1 到 3 完全不需要 LLM，可以用手寫的 2.0 JSON 驗收。建議在階段 5 之前就讓 Web UI 能編輯與呈現 2.0 文件，這樣人類審查點才有東西可看。
+階段 1 到 3 完全不需要 LLM，可以用手寫的 2.0 JSON 驗收。
+
+> 凍結註記：本表的階段編號是 2.0 文件模型自己的里程碑，與 [ADR 0010](adr/0010-migration-phases.md) 的產品遷移階段不同；依 ADR 0010，本表階段 1–3 的程式在 ADR 0010 第 2 階段以 Rust core 實作，「新增檔案（提案）」欄中的 Python 檔名作廢，求解器評估與 agent 編排則屬 ADR 0010 第 3 階段。建議在階段 5 之前就讓 Web UI 能編輯與呈現 2.0 文件，這樣人類審查點才有東西可看。
 
 ---
 
@@ -1181,7 +1208,7 @@ OpenSCAD 路徑目前只輸出 STL（`Renderer` 對 STEP／DXF 回報「OpenSCAD
 | 取捨 | 選擇 | 代價 |
 |---|---|---|
 | 求解器 | 離散姿態加平移傳播，不用數值求解器 | 無法表達斜向與任意角度；換得完全確定性與無外部依賴 |
-| 座標 | 元件不帶座標，全部由約束決定 | 簡單零件的 JSON 變長（一個孔由 1 筆變成 4 筆）；換得參數化與意圖可檢查 |
+| 座標 | 元件不帶座標，全部由約束決定 | 簡單零件的 JSON 變長（一個孔由 1 筆變成 5 筆：Dot、Empty、`fixed`、`coincident`、`body` 的 `cut`）；換得參數化與意圖可檢查 |
 | 參數化 | 欄位只放數值，關係放 `bindings` | 欄位值與綁定是兩份資料，需正規化器維持一致；換得重用 1.0 類別與較簡單的 LLM schema |
 | 埠 | 由形狀固定推導，agent 不能自訂 | 無法指向任意的邊或面；換得引用永遠可驗證，並避開拓撲命名問題 |
 | 版本 | 1.0 與 2.0 兩條路徑並存 | 一段時間內要維護兩套驗證器與編譯器；換得既有測試與使用者不受影響 |
@@ -1201,6 +1228,8 @@ OpenSCAD 路徑目前只輸出 STL（`Renderer` 對 STEP／DXF 回報「OpenSCAD
 
 ### 14.3 開放問題（需要決定）
 
+> 凍結註記：以下十題的建議預設值見 [`CAD_DSL_2.md` §12](CAD_DSL_2.md#12-開放問題的建議預設值待負責人簽核)，全部標示為「待負責人簽核」，尚未定案。
+
 1. **空的階梯位置。** 本文把空視為第零階，同時允許它有三維形狀。另一種看法是把空當成任何維度都可以有的「負極性」（負的面即草圖上的孔，負的線即切割線）。後者更對稱，但 schema 與驗證規則大約多一倍。2.0 是否只做三維的空？
 2. **姿態限制。** 只支援 24 種軸對齊姿態是否可接受？若需要斜撐、傾斜面板，要在 2.0 就納入任意角度（並接受引入數值求解器），還是留到 2.1？
 3. **欠約束的嚴重度。** 目前設計為 `warning` 加假設。是否應在團隊模式下改為 `error`，強迫接合師補足？
@@ -1214,12 +1243,12 @@ OpenSCAD 路徑目前只輸出 STL（`Renderer` 對 STEP／DXF 回報「OpenSCAD
 
 ### 14.4 審查待解決事項（階段 0 規格凍結前必須處理）
 
-以下為審查員發現、尚未在本文修正的設計缺口：
+> **狀態：全部已處理（2026-11-26）。** 每一項的凍結結果見 [`CAD_DSL_2.md` §0](CAD_DSL_2.md#0-階段-0-決議摘要)，本文相關章節已加註。以下保留原始審查意見作為紀錄。
 
-1. **求解器的循環規則自相矛盾（§5.2、§5.3）。** 約束是無向的，「對約束圖做拓撲排序」並無定義；若循環一律回報 `constraint_cycle`，則 `redundant_constraint` 與 `conflicting_constraints` 永遠不會出現。範例 B 的蓋子同時以 `coaxial` 與 `mate` 連到本體即屬此情況。建議改為「從根元件出發、以自由度消去做 BFS 傳播」來定向約束圖。
-2. **`PatchOp.value: JsonValue` 無法以 strict `json_schema` 模式表達。** strict 模式要求封閉物件（`additionalProperties: false`），與 §7.3「相容 strict 模式」的說法衝突。建議改為每個角色各自的 discriminated op schema。
-3. **`origin` 名稱衝突。** 它同時是元件欄位（`{agent, patch_id}`）與埠名稱（`v_plate.origin`），而綁定目標與埠引用共用 `id.name` 語法，造成歧義。
-4. **2.0 新增孔的方向未定義。** 切除體從 `entry` 出發的方向（是否沿面法向的反方向）、深度，以及沒有 1.0 全域 `max_z` 時「通孔」的意義，都需要明確規定。
-5. **核心層錯誤來得太晚。** §9.2 的核心層檢查在渲染器內執行，但驗證閘門在渲染之前。渲染後才出現的核心層 `error` 對 `status` 與輸出檔的影響需要定義。
-6. **權限矩陣沒有涵蓋綁定。** §12.2 中以 `{"expr":…}` 執行 `set_param` 會隱含建立綁定；誰可以建立或移除綁定、協調器如何移除被取代的假設，都需要規定。
-7. **其他細節：** `distance` 的正負號約定（沿哪個面的法向量）；`intersect` 搭配 Empty 時允許哪些 `role`；1.0 孔遷移實際約為每孔 5 筆紀錄（含 `body` 操作），而非 §14.1 所寫的 4 筆；§10.2 部分 CadQuery 呼叫需調整（例如 Workplane 套用 `cq.Location` 需要 `.val().moved(...)`，`Solid.extrudeLinear`／`Solid.revolve` 的多載簽名需在 2.8.0 實測）。
+1. **求解器的循環規則自相矛盾（§5.2、§5.3）。** **已解決** → [`CAD_DSL_2.md` §5.5](CAD_DSL_2.md#55-平移求解不動點規則)：以 `fixed` 為根、逐軸追蹤已知性、依文件順序迭代到不動點；`constraint_cycle` 退役。原始意見：約束是無向的，「對約束圖做拓撲排序」並無定義；若循環一律回報 `constraint_cycle`，則 `redundant_constraint` 與 `conflicting_constraints` 永遠不會出現。範例 B 的蓋子同時以 `coaxial` 與 `mate` 連到本體即屬此情況。建議改為「從根元件出發、以自由度消去做 BFS 傳播」來定向約束圖。
+2. **`PatchOp.value: JsonValue` 無法以 strict `json_schema` 模式表達。** **已解決** → [`CAD_DSL_2.md` §8.2–§8.3](CAD_DSL_2.md#82-patchop以-op-判別的封閉聯集)：以 `op` 判別的封閉聯集，每個角色為子集聯集；§7.3 已修正。原始意見：strict 模式要求封閉物件（`additionalProperties: false`），與 §7.3「相容 strict 模式」的說法衝突。建議改為每個角色各自的 discriminated op schema。
+3. **`origin` 名稱衝突。** **已解決** → [`CAD_DSL_2.md` §1.3、§3.1](CAD_DSL_2.md#13-引用語法)：元件欄位改名 `provenance`；欄位引用 `id:field`、埠引用 `id.port`；§3.1、§8.1 已修正。原始意見：它同時是元件欄位（`{agent, patch_id}`）與埠名稱（`v_plate.origin`），而綁定目標與埠引用共用 `id.name` 語法，造成歧義。
+4. **2.0 新增孔的方向未定義。** **已解決** → [`CAD_DSL_2.md` §7](CAD_DSL_2.md#7-孔的方向與切刀)：方向取入口所在面的反法向，否則 −`shape.axis`；深度自入口起算；貫穿類跨越零件包圍盒兩端各加 1.0 mm。原始意見：切除體從 `entry` 出發的方向（是否沿面法向的反方向）、深度，以及沒有 1.0 全域 `max_z` 時「通孔」的意義，都需要明確規定。
+5. **核心層錯誤來得太晚。** **已解決** → [`CAD_DSL_2.md` §9.4](CAD_DSL_2.md#94-核心層錯誤語意)：同一 issue 結構加 `layer: "kernel"`；核心層 error 使 `status="failed"`，保留來源產物、移除幾何產物。原始意見：§9.2 的核心層檢查在渲染器內執行，但驗證閘門在渲染之前。渲染後才出現的核心層 `error` 對 `status` 與輸出檔的影響需要定義。
+6. **權限矩陣沒有涵蓋綁定。** **已解決** → [`CAD_DSL_2.md` §8.5、§8.7](CAD_DSL_2.md#85-權限矩陣)：綁定權限等同 `set_field`；假設只能由同一 patch 的明確 `remove_assumption` 移除；§7.2 已修正。原始意見：§12.2 中以 `{"expr":…}` 執行 `set_param` 會隱含建立綁定；誰可以建立或移除綁定、協調器如何移除被取代的假設，都需要規定。
+7. **其他細節：** **已解決** → [`CAD_DSL_2.md` §5.2、§6.1、§10、§13](CAD_DSL_2.md#52-約束種類與正負號約定)：`distance`／`mate`／`flush` 的正負號、`intersect` 只接受 Volume 或 `envelope`、每孔 5 筆紀錄（§14.1 已修正）、CadQuery 呼叫實測移到第 2 階段（Docker）。原始意見：`distance` 的正負號約定（沿哪個面的法向量）；`intersect` 搭配 Empty 時允許哪些 `role`；1.0 孔遷移實際約為每孔 5 筆紀錄（含 `body` 操作），而非 §14.1 所寫的 4 筆；§10.2 部分 CadQuery 呼叫需調整（例如 Workplane 套用 `cq.Location` 需要 `.val().moved(...)`，`Solid.extrudeLinear`／`Solid.revolve` 的多載簽名需在 2.8.0 實測）。

@@ -12,3 +12,9 @@ dist/
 build/
 generated/*
 !generated/.gitkeep
+
+# Desktop / frontend build outputs (ADR 0010)
+app/web_dist/
+node_modules/
+src-tauri/target/
+src-tauri/binaries/

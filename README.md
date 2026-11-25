@@ -25,8 +25,9 @@ Empty（空）→ Dot（點）→ Line（線）→ Plane（面）→ Volume（�
 
 - 概念與技術設計：[`docs/CONCEPT_DIMENSIONAL_LADDER.md`](docs/CONCEPT_DIMENSIONAL_LADDER.md)
 - 技術選型架構決策紀錄（Tauri v2、React、Three.js、Rust 核心、OpenCascade sidecar）：[`docs/adr/`](docs/adr/README.md)
+- CadDocument 2.0 凍結規格與手寫範例：[`docs/CAD_DSL_2.md`](docs/CAD_DSL_2.md)、[`examples/cad2/`](examples/cad2/)
 
-> 狀態：設計草案。下方描述的是目前可執行的 v0.1.0 MVP。
+> 狀態：2.0 規格已凍結（階段 0），程式依 ADR 0010 在第 2 階段以 Rust 實作，目前**沒有**任何程式接受 2.0 文件。ADR 0010 第 1 階段的桌面／Web 前端切片已加入但尚未發佈（見下方「桌面版與新前端」與 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)）。其餘段落描述的是目前可執行的 v0.1.0 MVP。
 
 ## 已包含
 
@@ -95,6 +96,50 @@ uvicorn app.main:app --reload
 ```
 
 未安裝 CadQuery／OpenSCAD 時，系統進入 `source_only`：仍會產生 `spec.json`、`validation.json`、`model.py`、`model.scad` 與 `preview.svg`，但不會偽造 STEP／STL／DXF。
+
+## 桌面版與新前端（第 1 階段，未發佈）
+
+依 [ADR 0010](docs/adr/0010-migration-phases.md) 第 1 階段，專案多了三個部分：
+
+| 目錄 | 內容 |
+|---|---|
+| `web/` | React + TypeScript + Vite 前端，功能對齊 `app/static/`，另加 Three.js STL 檢視器；`npm --prefix web run build` 輸出到 `app/web_dist/` |
+| `src-tauri/` | Tauri v2 桌面外殼；啟動時在 `127.0.0.1` 的動態埠啟動 FastAPI sidecar，並傳入一次性 Token |
+| `schemas/` | 由 Pydantic 匯出的 JSON Schema（`scripts/export_schema.py`），前端型別由它生成，請勿手改 |
+
+`app/web_dist/index.html` 存在時，FastAPI 在 `/` 提供新前端（Docker 與 `uvicorn` 模式皆同）；不存在時沿用原本的 `app/static/` 介面，所以不建置前端也能照常使用。
+
+前端開發（需要 Node.js；開發伺服器把 `/api` 代理到 `127.0.0.1:8000`）：
+
+```bash
+uvicorn app.main:app --reload          # 另一個終端機
+npm --prefix web ci
+npm --prefix web run dev               # http://localhost:5173
+npm --prefix web run build             # 輸出 app/web_dist/，之後由 FastAPI 提供
+```
+
+Schema 與型別（修改 `app/models/` 後執行；CI 會檢查兩者是否同步）：
+
+```bash
+python scripts/export_schema.py        # 寫入 schemas/promptcad.schema.json；--check 只檢查
+npm --prefix web run gen:types         # 生成 web/src/api/generated/promptcad.d.ts
+```
+
+桌面版（目前只在 Windows x86_64 驗證；需要 Rust 的 `stable-x86_64-pc-windows-msvc` 工具鏈與 WebView2）：
+
+```bash
+npm ci                                 # 安裝根目錄的 @tauri-apps/cli
+npm --prefix web run build             # cargo check／cargo test 也需要 app/web_dist 已存在
+# 開發：以本機 Python 取代打包的 sidecar
+#   （僅 debug 建置有效）PowerShell: $env:PROMPTCAD_SIDECAR_CMD = "$PWD\.venv\Scripts\python.exe -m app.sidecar"
+npm run tauri dev
+# 發佈建置：先凍結 sidecar，再建置安裝包
+python -m pip install -e ".[desktop]"
+python scripts/build_sidecar.py        # 輸出 src-tauri/binaries/promptcad-sidecar-<target>.exe
+npm run tauri build
+```
+
+限制：sidecar 沒有打包 CadQuery，桌面版目前以 `source_only` 執行（產生 DSL、原始碼與 SVG 預覽，不產生 STEP／STL）；安裝包大小與啟動時間尚未量測。
 
 ## 使用方式
 
@@ -226,12 +271,16 @@ Create a 100x60x10 mm plate with two 5 mm blind holes 6 mm deep.
 
 ```bash
 pytest
+ruff check .
 python -m compileall -q app scripts tests
 node --check app/static/app.js
 python scripts/smoke_test.py
+python scripts/export_schema.py --check
+npm --prefix web run typecheck
+npm --prefix web test
 ```
 
-目前測試涵蓋規則解析、M 制孔徑、盲孔、沉頭孔、X/Y/Z 軸幾何原始碼、驗證閘門、可編輯 DSL、API Token、檔案下載與 ZIP。
+目前測試涵蓋規則解析、M 制孔徑、盲孔、沉頭孔、X/Y/Z 軸幾何原始碼、驗證閘門、可編輯 DSL、API Token、檔案下載與 ZIP；第 1 階段另加 schema 匯出、新前端服務、sidecar 啟動、2.0 範例的紙上驗證，以及前端的 vitest 測試。
 
 ## 專案結構
 
@@ -246,18 +295,24 @@ app/
     openscad.py        OpenSCAD 編譯器
     renderer.py        CAD 核心選擇與受限 subprocess
     validator.py       幾何／製造前驗證閘門
-  static/              無前端建置步驟的 Web UI
-docs/                  API、架構、DSL、提示詞與安全說明
-examples/generated/    可直接修改及重新輸出的完整範例
-scripts/               doctor 與 smoke test
-tests/                 單元、API 與安全回歸測試
+  static/              無前端建置步驟的 Web UI（新前端未建置時的備援）
+  web_dist/            web/ 的建置輸出（不納入版本控制）
+  sidecar.py           桌面版 sidecar 進入點（印出 READY 行後提供 API）
+web/                   React + TypeScript + Vite 前端與 Three.js 檢視器
+src-tauri/             Tauri v2 桌面外殼（Rust）
+schemas/               由 Pydantic 匯出的 JSON Schema（生成物）
+docs/                  API、架構、DSL（1.0 與 2.0）、提示詞、安全說明與 ADR
+examples/generated/    可直接修改及重新輸出的完整範例（1.0）
+examples/cad2/         CadDocument 2.0 手寫範例（只供規格驗證，目前沒有程式接受 2.0）
+scripts/               doctor、smoke test、export_schema.py、build_sidecar.py
+tests/                 單元、API、安全回歸、schema、sidecar 與 2.0 範例測試
 generated/             執行時工作目錄
 ```
 
 詳細資料：
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-- [`docs/CAD_DSL.md`](docs/CAD_DSL.md)
+- [`docs/CAD_DSL.md`](docs/CAD_DSL.md)、[`docs/CAD_DSL_2.md`](docs/CAD_DSL_2.md)
 - [`docs/API.md`](docs/API.md)
 - [`docs/SECURITY.md`](docs/SECURITY.md)
 - [`PROJECT_STATUS.md`](PROJECT_STATUS.md)

@@ -157,4 +157,22 @@
 
 ## 回顧紀錄
 
-（尚無）
+### 2026-11-26：第 1 階段切片已實作（部分達成完成條件）
+
+已完成的內容：
+
+- **前端**：`web/` 的 React + TypeScript（strict）+ Vite 應用程式，功能對齊 `app/static/`（提示詞與 planner 選擇、生成、JSON 編輯與驗證後重新輸出、驗證報告、產物下載與工作 ZIP、工作歷史、Token 欄位、SVG 預覽）。建置輸出到 `app/web_dist/`；FastAPI 在該目錄含 `index.html` 時於 `/` 提供它，否則維持原本的 `app/static/` 介面。
+- **檢視器**：`web/src/viewer/` 的最小 Three.js 檢視器（`STLLoader` + `OrbitControls`、WebGL 能力偵測），核心不依賴 React（[0004](0004-3d-viewer-threejs.md)）。
+- **Schema 管線**：`scripts/export_schema.py` 由 Pydantic 匯出 `schemas/promptcad.schema.json`（`--check` 偵測漂移），`npm --prefix web run gen:types` 以 json-schema-to-typescript 生成 `web/src/api/generated/promptcad.d.ts`；CI 比對兩者（[0008](0008-single-schema-source-of-truth.md) 的過渡安排）。
+- **桌面外殼**：`src-tauri/` 的 Tauri v2 外殼，啟動時以 PyInstaller 打包的 FastAPI sidecar（`scripts/build_sidecar.py` → `src-tauri/binaries/`）在 `127.0.0.1` 的動態埠啟動，並傳入一次性 Token（[0002](0002-desktop-shell-tauri-v2.md)）；前端只在 `web/src/api/bootstrap.ts` 透過 `backend_info` 取得位址與 Token。
+- **2.0 規格凍結**：[`../CAD_DSL_2.md`](../CAD_DSL_2.md) 與 `examples/cad2/` 的兩份手寫範例，滿足本 ADR「第 1 階段期間以範例文件與紙上推演驗證 2.0 模型」的緩解措施；2.0 的程式仍依本 ADR 在第 2 階段以 Rust 實作。
+
+尚未達成的完成條件：
+
+- **不需 Python／Conda／Docker 完成提示詞到 STEP／STL**：未達成。CadQuery 沒有打包進 sidecar，桌面版目前以 `source_only` 執行（產生 `spec.json`、`model.py`、`preview.svg` 等，不產生 STEP／STL）。
+- **`app/static/` 已移除**：未達成，刻意保留作為沒有前端建置產物時的備援介面。
+- **量測**（安裝包大小、sidecar 冷啟動時間、網格載入時間）：尚未量測。
+- **conda-pack 與 PyInstaller 的比較**：尚未進行；目前先以 PyInstaller 建立切片。
+- **三平台測試矩陣**：目前只在 Windows（x86_64，MSVC 工具鏈、WebView2）建置。
+
+結論：第 1 階段尚未結束，本 ADR 的階段順序不變。下一步依序為 CadQuery 打包與 conda-pack 比較、量測、移除 `app/static/`，之後才開始第 2 階段的主要工作。
