@@ -7,6 +7,9 @@ from typing import Literal
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Built React frontend (web/ -> `npm --prefix web run build`). Absent in a plain checkout.
+DEFAULT_FRONTEND_DIR = Path(__file__).resolve().parents[1] / "web_dist"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -22,6 +25,9 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = Field(default=8000, ge=1, le=65535)
     data_dir: Path = Path("generated")
+    # When this directory contains index.html it is served at "/" (assets under /assets);
+    # otherwise the legacy app/static UI is served.
+    frontend_dir: Path = DEFAULT_FRONTEND_DIR
 
     planner_mode: Literal["auto", "rule", "llm"] = "auto"
     render_backend: Literal["auto", "cadquery", "openscad", "source_only"] = "auto"

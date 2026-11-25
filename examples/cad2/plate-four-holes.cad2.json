@@ -1,0 +1,188 @@
+{
+  "schema_version": "2.0",
+  "name": "plate-four-holes",
+  "source_prompt": "鋁合金固定板，長120mm、寬60mm、厚10mm，四角 M6 通孔，孔中心離邊緣10mm，四角 R5。",
+  "unit": "mm",
+  "revision": 4,
+  "parameters": [
+    {"name": "len", "value": 120, "min": null, "max": null, "note": "長"},
+    {"name": "wid", "value": 60, "min": null, "max": null, "note": "寬"},
+    {"name": "thk", "value": 10, "min": null, "max": null, "note": "厚"},
+    {"name": "margin", "value": 10, "min": null, "max": null, "note": "孔邊距"}
+  ],
+  "bindings": [
+    {"target": "v_plate:length", "expr": "len"},
+    {"target": "v_plate:width", "expr": "wid"},
+    {"target": "v_plate:thickness", "expr": "thk"},
+    {"target": "k_d1:u", "expr": "margin - len / 2"},
+    {"target": "k_d1:v", "expr": "margin - wid / 2"},
+    {"target": "k_d2:u", "expr": "len / 2 - margin"},
+    {"target": "k_d2:v", "expr": "margin - wid / 2"},
+    {"target": "k_d3:u", "expr": "len / 2 - margin"},
+    {"target": "k_d3:v", "expr": "wid / 2 - margin"},
+    {"target": "k_d4:u", "expr": "margin - len / 2"},
+    {"target": "k_d4:v", "expr": "wid / 2 - margin"}
+  ],
+  "components": [
+    {
+      "id": "v_plate",
+      "kind": "volume",
+      "shape": {"kind": "plate", "length": 120, "width": 60, "thickness": 10},
+      "label": "固定板",
+      "provenance": {"agent": "component_smith", "patch_id": "r2"}
+    },
+    {
+      "id": "d_h1",
+      "kind": "dot",
+      "shape": {"kind": "point"},
+      "label": "左下角孔心",
+      "provenance": {"agent": "component_smith", "patch_id": "r2"}
+    },
+    {
+      "id": "d_h2",
+      "kind": "dot",
+      "shape": {"kind": "point"},
+      "label": "右下角孔心",
+      "provenance": {"agent": "component_smith", "patch_id": "r2"}
+    },
+    {
+      "id": "d_h3",
+      "kind": "dot",
+      "shape": {"kind": "point"},
+      "label": "右上角孔心",
+      "provenance": {"agent": "component_smith", "patch_id": "r2"}
+    },
+    {
+      "id": "d_h4",
+      "kind": "dot",
+      "shape": {"kind": "point"},
+      "label": "左上角孔心",
+      "provenance": {"agent": "component_smith", "patch_id": "r2"}
+    },
+    {
+      "id": "e_h1",
+      "kind": "empty",
+      "role": "cut",
+      "shape": {
+        "kind": "hole", "axis": "z", "diameter": 6.6, "hole_type": "clearance",
+        "depth": null, "thread": "M6",
+        "counterbore_diameter": null, "counterbore_depth": null,
+        "countersink_diameter": null, "countersink_angle": null
+      },
+      "label": null,
+      "provenance": {"agent": "component_smith", "patch_id": "r2"}
+    },
+    {
+      "id": "e_h2",
+      "kind": "empty",
+      "role": "cut",
+      "shape": {
+        "kind": "hole", "axis": "z", "diameter": 6.6, "hole_type": "clearance",
+        "depth": null, "thread": "M6",
+        "counterbore_diameter": null, "counterbore_depth": null,
+        "countersink_diameter": null, "countersink_angle": null
+      },
+      "label": null,
+      "provenance": {"agent": "component_smith", "patch_id": "r2"}
+    },
+    {
+      "id": "e_h3",
+      "kind": "empty",
+      "role": "cut",
+      "shape": {
+        "kind": "hole", "axis": "z", "diameter": 6.6, "hole_type": "clearance",
+        "depth": null, "thread": "M6",
+        "counterbore_diameter": null, "counterbore_depth": null,
+        "countersink_diameter": null, "countersink_angle": null
+      },
+      "label": null,
+      "provenance": {"agent": "component_smith", "patch_id": "r2"}
+    },
+    {
+      "id": "e_h4",
+      "kind": "empty",
+      "role": "cut",
+      "shape": {
+        "kind": "hole", "axis": "z", "diameter": 6.6, "hole_type": "clearance",
+        "depth": null, "thread": "M6",
+        "counterbore_diameter": null, "counterbore_depth": null,
+        "countersink_diameter": null, "countersink_angle": null
+      },
+      "label": null,
+      "provenance": {"agent": "component_smith", "patch_id": "r2"}
+    }
+  ],
+  "constraints": [
+    {"id": "k_root", "kind": "fixed", "a": "v_plate.origin", "b": null, "value": null, "u": null, "v": null,
+     "frame": {"origin": [0, 0, 0], "x_axis": "+x", "z_axis": "+z"}},
+    {"id": "k_d1", "kind": "on_face", "a": "d_h1.point", "b": "v_plate.top", "value": null, "u": -50, "v": -20, "frame": null},
+    {"id": "k_d2", "kind": "on_face", "a": "d_h2.point", "b": "v_plate.top", "value": null, "u": 50, "v": -20, "frame": null},
+    {"id": "k_d3", "kind": "on_face", "a": "d_h3.point", "b": "v_plate.top", "value": null, "u": 50, "v": 20, "frame": null},
+    {"id": "k_d4", "kind": "on_face", "a": "d_h4.point", "b": "v_plate.top", "value": null, "u": -50, "v": 20, "frame": null},
+    {"id": "k_e1", "kind": "coincident", "a": "e_h1.entry", "b": "d_h1.point", "value": null, "u": null, "v": null, "frame": null},
+    {"id": "k_e2", "kind": "coincident", "a": "e_h2.entry", "b": "d_h2.point", "value": null, "u": null, "v": null, "frame": null},
+    {"id": "k_e3", "kind": "coincident", "a": "e_h3.entry", "b": "d_h3.point", "value": null, "u": null, "v": null, "frame": null},
+    {"id": "k_e4", "kind": "coincident", "a": "e_h4.entry", "b": "d_h4.point", "value": null, "u": null, "v": null, "frame": null}
+  ],
+  "parts": [
+    {
+      "id": "p_plate",
+      "name": "固定板",
+      "material": "aluminum",
+      "quantity": 1,
+      "source": "made",
+      "body": [
+        {"op": "add", "component": "v_plate"},
+        {"op": "cut", "component": "e_h1"},
+        {"op": "cut", "component": "e_h2"},
+        {"op": "cut", "component": "e_h3"},
+        {"op": "cut", "component": "e_h4"}
+      ],
+      "fillets": [{"kind": "fillet", "radius": 5, "selector": "vertical"}],
+      "chamfers": []
+    }
+  ],
+  "assemblies": [],
+  "root": "p_plate",
+  "assumptions": [
+    "M6 未提供實際孔徑，暫用一般間隙孔 6.6 mm（表列值）"
+  ],
+  "notes": [],
+  "planner": {"planner": "agent_team", "confidence": 0.9, "review_required": true},
+  "expected_resolved": {
+    "note": "範例專用註記，不屬於 CadDocument 2.0 schema；載入文件前必須移除此鍵。數值為依 docs/CAD_DSL_2.md §5.5、§7 手算的結果。",
+    "components": {
+      "v_plate": {"origin": [0, 0, 0], "x_axis": "+x", "z_axis": "+z", "defaulted_axes": []},
+      "d_h1": {"origin": [-50, -20, 10], "x_axis": "+x", "z_axis": "+z", "defaulted_axes": []},
+      "d_h2": {"origin": [50, -20, 10], "x_axis": "+x", "z_axis": "+z", "defaulted_axes": []},
+      "d_h3": {"origin": [50, 20, 10], "x_axis": "+x", "z_axis": "+z", "defaulted_axes": []},
+      "d_h4": {"origin": [-50, 20, 10], "x_axis": "+x", "z_axis": "+z", "defaulted_axes": []},
+      "e_h1": {"origin": [-50, -20, 10], "x_axis": "+x", "z_axis": "+z", "defaulted_axes": []},
+      "e_h2": {"origin": [50, -20, 10], "x_axis": "+x", "z_axis": "+z", "defaulted_axes": []},
+      "e_h3": {"origin": [50, 20, 10], "x_axis": "+x", "z_axis": "+z", "defaulted_axes": []},
+      "e_h4": {"origin": [-50, 20, 10], "x_axis": "+x", "z_axis": "+z", "defaulted_axes": []}
+    },
+    "ports": {
+      "v_plate.origin": {"type": "point", "position": [0, 0, 0]},
+      "v_plate.top": {"type": "face", "origin": [0, 0, 10], "normal": "+z", "u": "+x", "v": "+y", "extent": [120, 60]},
+      "v_plate.region": {"type": "region", "min": [-60, -30, 0], "max": [60, 30, 10]},
+      "d_h1.point": {"type": "point", "position": [-50, -20, 10]},
+      "d_h2.point": {"type": "point", "position": [50, -20, 10]},
+      "d_h3.point": {"type": "point", "position": [50, 20, 10]},
+      "d_h4.point": {"type": "point", "position": [-50, 20, 10]},
+      "e_h1.entry": {"type": "point", "position": [-50, -20, 10]},
+      "e_h1.axis": {"type": "axis", "position": [-50, -20, 10], "direction": "-z"},
+      "e_h1.region": {"type": "region", "min": [-53.3, -23.3, 0], "max": [-46.7, -16.7, 10]},
+      "e_h2.entry": {"type": "point", "position": [50, -20, 10]},
+      "e_h3.entry": {"type": "point", "position": [50, 20, 10]},
+      "e_h4.entry": {"type": "point", "position": [-50, 20, 10]}
+    },
+    "holes": {
+      "e_h1": {"direction": "-z", "cutter_start": [-50, -20, 11], "cutter_end": [-50, -20, -1], "diameter": 6.6},
+      "e_h2": {"direction": "-z", "cutter_start": [50, -20, 11], "cutter_end": [50, -20, -1], "diameter": 6.6},
+      "e_h3": {"direction": "-z", "cutter_start": [50, 20, 11], "cutter_end": [50, 20, -1], "diameter": 6.6},
+      "e_h4": {"direction": "-z", "cutter_start": [-50, 20, 11], "cutter_end": [-50, 20, -1], "diameter": 6.6}
+    },
+    "issues": []
+  }
+}

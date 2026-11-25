@@ -1,0 +1,1000 @@
+{
+  "$defs": {
+    "Artifact": {
+      "additionalProperties": false,
+      "properties": {
+        "filename": {
+          "title": "Filename",
+          "type": "string"
+        },
+        "media_type": {
+          "title": "Media Type",
+          "type": "string"
+        },
+        "size": {
+          "title": "Size",
+          "type": "integer"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "filename",
+        "media_type",
+        "size",
+        "url"
+      ],
+      "title": "Artifact",
+      "type": "object"
+    },
+    "Axis": {
+      "enum": [
+        "x",
+        "y",
+        "z"
+      ],
+      "title": "Axis",
+      "type": "string"
+    },
+    "CadDocument": {
+      "additionalProperties": false,
+      "properties": {
+        "assumptions": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Assumptions",
+          "type": "array"
+        },
+        "base": {
+          "discriminator": {
+            "mapping": {
+              "cylinder": "#/$defs/CylinderBase",
+              "enclosure": "#/$defs/EnclosureBase",
+              "l_bracket": "#/$defs/LBracketBase",
+              "plate": "#/$defs/PlateBase",
+              "ring": "#/$defs/RingBase"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/PlateBase"
+            },
+            {
+              "$ref": "#/$defs/CylinderBase"
+            },
+            {
+              "$ref": "#/$defs/RingBase"
+            },
+            {
+              "$ref": "#/$defs/LBracketBase"
+            },
+            {
+              "$ref": "#/$defs/EnclosureBase"
+            }
+          ],
+          "title": "Base"
+        },
+        "chamfers": {
+          "items": {
+            "$ref": "#/$defs/ChamferFeature"
+          },
+          "maxItems": 8,
+          "title": "Chamfers",
+          "type": "array"
+        },
+        "fillets": {
+          "items": {
+            "$ref": "#/$defs/FilletFeature"
+          },
+          "maxItems": 8,
+          "title": "Fillets",
+          "type": "array"
+        },
+        "holes": {
+          "items": {
+            "$ref": "#/$defs/HoleFeature"
+          },
+          "maxItems": 64,
+          "title": "Holes",
+          "type": "array"
+        },
+        "material": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Material"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "default": "promptcad-part",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "notes": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Notes",
+          "type": "array"
+        },
+        "planner": {
+          "$ref": "#/$defs/PlannerMetadata"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_prompt": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "title": "Source Prompt",
+          "type": "string"
+        },
+        "unit": {
+          "const": "mm",
+          "default": "mm",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_prompt",
+        "base",
+        "planner"
+      ],
+      "title": "CadDocument",
+      "type": "object"
+    },
+    "CapabilityResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "base_features": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Base Features",
+          "type": "array"
+        },
+        "cadquery_available": {
+          "title": "Cadquery Available",
+          "type": "boolean"
+        },
+        "configured_planner_mode": {
+          "title": "Configured Planner Mode",
+          "type": "string"
+        },
+        "configured_render_backend": {
+          "title": "Configured Render Backend",
+          "type": "string"
+        },
+        "formats": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Formats",
+          "type": "array"
+        },
+        "hole_types": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Hole Types",
+          "type": "array"
+        },
+        "openscad_available": {
+          "title": "Openscad Available",
+          "type": "boolean"
+        },
+        "planners": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Planners",
+          "type": "array"
+        }
+      },
+      "required": [
+        "planners",
+        "base_features",
+        "hole_types",
+        "formats",
+        "cadquery_available",
+        "openscad_available",
+        "configured_planner_mode",
+        "configured_render_backend"
+      ],
+      "title": "CapabilityResponse",
+      "type": "object"
+    },
+    "ChamferFeature": {
+      "additionalProperties": false,
+      "properties": {
+        "distance": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Distance",
+          "type": "number"
+        },
+        "kind": {
+          "const": "chamfer",
+          "default": "chamfer",
+          "title": "Kind",
+          "type": "string"
+        },
+        "selector": {
+          "$ref": "#/$defs/EdgeSelector",
+          "default": "vertical"
+        }
+      },
+      "required": [
+        "distance"
+      ],
+      "title": "ChamferFeature",
+      "type": "object"
+    },
+    "CylinderBase": {
+      "additionalProperties": false,
+      "properties": {
+        "diameter": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Diameter",
+          "type": "number"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Height",
+          "type": "number"
+        },
+        "kind": {
+          "const": "cylinder",
+          "default": "cylinder",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "diameter",
+        "height"
+      ],
+      "title": "CylinderBase",
+      "type": "object"
+    },
+    "EdgeSelector": {
+      "enum": [
+        "all",
+        "vertical",
+        "top",
+        "bottom"
+      ],
+      "title": "EdgeSelector",
+      "type": "string"
+    },
+    "EnclosureBase": {
+      "additionalProperties": false,
+      "properties": {
+        "height": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Height",
+          "type": "number"
+        },
+        "kind": {
+          "const": "enclosure",
+          "default": "enclosure",
+          "title": "Kind",
+          "type": "string"
+        },
+        "length": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Length",
+          "type": "number"
+        },
+        "wall_thickness": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Wall Thickness",
+          "type": "number"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Width",
+          "type": "number"
+        }
+      },
+      "required": [
+        "length",
+        "width",
+        "height",
+        "wall_thickness"
+      ],
+      "title": "EnclosureBase",
+      "type": "object"
+    },
+    "FilletFeature": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "fillet",
+          "default": "fillet",
+          "title": "Kind",
+          "type": "string"
+        },
+        "radius": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Radius",
+          "type": "number"
+        },
+        "selector": {
+          "$ref": "#/$defs/EdgeSelector",
+          "default": "vertical"
+        }
+      },
+      "required": [
+        "radius"
+      ],
+      "title": "FilletFeature",
+      "type": "object"
+    },
+    "GenerateFromSpecRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "formats": {
+          "items": {
+            "enum": [
+              "step",
+              "stl",
+              "dxf",
+              "svg",
+              "py",
+              "scad",
+              "json"
+            ],
+            "type": "string"
+          },
+          "maxItems": 7,
+          "minItems": 1,
+          "title": "Formats",
+          "type": "array"
+        },
+        "render": {
+          "default": true,
+          "title": "Render",
+          "type": "boolean"
+        },
+        "spec": {
+          "$ref": "#/$defs/CadDocument"
+        }
+      },
+      "required": [
+        "spec"
+      ],
+      "title": "GenerateFromSpecRequest",
+      "type": "object"
+    },
+    "GenerateRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "formats": {
+          "items": {
+            "enum": [
+              "step",
+              "stl",
+              "dxf",
+              "svg",
+              "py",
+              "scad",
+              "json"
+            ],
+            "type": "string"
+          },
+          "maxItems": 7,
+          "minItems": 1,
+          "title": "Formats",
+          "type": "array"
+        },
+        "planner": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "rule",
+            "llm"
+          ],
+          "title": "Planner",
+          "type": "string"
+        },
+        "prompt": {
+          "maxLength": 20000,
+          "minLength": 3,
+          "title": "Prompt",
+          "type": "string"
+        },
+        "render": {
+          "default": true,
+          "title": "Render",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "prompt"
+      ],
+      "title": "GenerateRequest",
+      "type": "object"
+    },
+    "HoleFeature": {
+      "additionalProperties": false,
+      "properties": {
+        "axis": {
+          "$ref": "#/$defs/Axis",
+          "default": "z"
+        },
+        "counterbore_depth": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Counterbore Depth"
+        },
+        "counterbore_diameter": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Counterbore Diameter"
+        },
+        "countersink_angle": {
+          "anyOf": [
+            {
+              "exclusiveMaximum": 180,
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Countersink Angle"
+        },
+        "countersink_diameter": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Countersink Diameter"
+        },
+        "depth": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Depth"
+        },
+        "diameter": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Diameter",
+          "type": "number"
+        },
+        "hole_type": {
+          "$ref": "#/$defs/HoleType",
+          "default": "through"
+        },
+        "kind": {
+          "const": "hole",
+          "default": "hole",
+          "title": "Kind",
+          "type": "string"
+        },
+        "thread": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Thread"
+        },
+        "x": {
+          "default": 0,
+          "maximum": 100000.0,
+          "minimum": -100000.0,
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "default": 0,
+          "maximum": 100000.0,
+          "minimum": -100000.0,
+          "title": "Y",
+          "type": "number"
+        },
+        "z": {
+          "default": 0,
+          "maximum": 100000.0,
+          "minimum": -100000.0,
+          "title": "Z",
+          "type": "number"
+        }
+      },
+      "required": [
+        "diameter"
+      ],
+      "title": "HoleFeature",
+      "type": "object"
+    },
+    "HoleType": {
+      "enum": [
+        "through",
+        "blind",
+        "clearance",
+        "tapped",
+        "counterbore",
+        "countersink"
+      ],
+      "title": "HoleType",
+      "type": "string"
+    },
+    "JobListItem": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "job_id": {
+          "title": "Job Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "prompt": {
+          "title": "Prompt",
+          "type": "string"
+        },
+        "renderer_used": {
+          "title": "Renderer Used",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "job_id",
+        "status",
+        "created_at",
+        "prompt",
+        "name",
+        "renderer_used"
+      ],
+      "title": "JobListItem",
+      "type": "object"
+    },
+    "JobManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/Artifact"
+          },
+          "title": "Artifacts",
+          "type": "array"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "job_id": {
+          "title": "Job Id",
+          "type": "string"
+        },
+        "planner_used": {
+          "title": "Planner Used",
+          "type": "string"
+        },
+        "prompt": {
+          "title": "Prompt",
+          "type": "string"
+        },
+        "renderer_used": {
+          "title": "Renderer Used",
+          "type": "string"
+        },
+        "requested_formats": {
+          "items": {
+            "enum": [
+              "step",
+              "stl",
+              "dxf",
+              "svg",
+              "py",
+              "scad",
+              "json"
+            ],
+            "type": "string"
+          },
+          "title": "Requested Formats",
+          "type": "array"
+        },
+        "spec": {
+          "$ref": "#/$defs/CadDocument"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "source_only",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "validation": {
+          "$ref": "#/$defs/ValidationReport"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "job_id",
+        "status",
+        "created_at",
+        "prompt",
+        "planner_used",
+        "renderer_used",
+        "requested_formats",
+        "spec",
+        "validation"
+      ],
+      "title": "JobManifest",
+      "type": "object"
+    },
+    "LBracketBase": {
+      "additionalProperties": false,
+      "properties": {
+        "depth": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Depth",
+          "type": "number"
+        },
+        "kind": {
+          "const": "l_bracket",
+          "default": "l_bracket",
+          "title": "Kind",
+          "type": "string"
+        },
+        "thickness": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Thickness",
+          "type": "number"
+        },
+        "vertical_height": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Vertical Height",
+          "type": "number"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Width",
+          "type": "number"
+        }
+      },
+      "required": [
+        "width",
+        "depth",
+        "vertical_height",
+        "thickness"
+      ],
+      "title": "LBracketBase",
+      "type": "object"
+    },
+    "Material": {
+      "enum": [
+        "aluminum",
+        "steel",
+        "stainless_steel",
+        "plastic",
+        "wood",
+        "other"
+      ],
+      "title": "Material",
+      "type": "string"
+    },
+    "PlanRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "planner": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "rule",
+            "llm"
+          ],
+          "title": "Planner",
+          "type": "string"
+        },
+        "prompt": {
+          "maxLength": 20000,
+          "minLength": 3,
+          "title": "Prompt",
+          "type": "string"
+        }
+      },
+      "required": [
+        "prompt"
+      ],
+      "title": "PlanRequest",
+      "type": "object"
+    },
+    "PlanResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "planner_used": {
+          "title": "Planner Used",
+          "type": "string"
+        },
+        "spec": {
+          "$ref": "#/$defs/CadDocument"
+        },
+        "validation": {
+          "$ref": "#/$defs/ValidationReport"
+        }
+      },
+      "required": [
+        "spec",
+        "validation",
+        "planner_used"
+      ],
+      "title": "PlanResponse",
+      "type": "object"
+    },
+    "PlannerMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "planner": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Planner",
+          "type": "string"
+        },
+        "review_required": {
+          "default": false,
+          "title": "Review Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "planner"
+      ],
+      "title": "PlannerMetadata",
+      "type": "object"
+    },
+    "PlateBase": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "plate",
+          "default": "plate",
+          "title": "Kind",
+          "type": "string"
+        },
+        "length": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Length",
+          "type": "number"
+        },
+        "thickness": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Thickness",
+          "type": "number"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Width",
+          "type": "number"
+        }
+      },
+      "required": [
+        "length",
+        "width",
+        "thickness"
+      ],
+      "title": "PlateBase",
+      "type": "object"
+    },
+    "RingBase": {
+      "additionalProperties": false,
+      "properties": {
+        "height": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Height",
+          "type": "number"
+        },
+        "inner_diameter": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Inner Diameter",
+          "type": "number"
+        },
+        "kind": {
+          "const": "ring",
+          "default": "ring",
+          "title": "Kind",
+          "type": "string"
+        },
+        "outer_diameter": {
+          "exclusiveMinimum": 0,
+          "maximum": 100000.0,
+          "title": "Outer Diameter",
+          "type": "number"
+        }
+      },
+      "required": [
+        "outer_diameter",
+        "inner_diameter",
+        "height"
+      ],
+      "title": "RingBase",
+      "type": "object"
+    },
+    "ValidationIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "feature_index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Feature Index"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/ValidationSeverity"
+        }
+      },
+      "required": [
+        "severity",
+        "code",
+        "message"
+      ],
+      "title": "ValidationIssue",
+      "type": "object"
+    },
+    "ValidationReport": {
+      "additionalProperties": false,
+      "properties": {
+        "issues": {
+          "items": {
+            "$ref": "#/$defs/ValidationIssue"
+          },
+          "title": "Issues",
+          "type": "array"
+        },
+        "review_required": {
+          "title": "Review Required",
+          "type": "boolean"
+        },
+        "valid": {
+          "title": "Valid",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "valid",
+        "review_required"
+      ],
+      "title": "ValidationReport",
+      "type": "object"
+    },
+    "ValidationSeverity": {
+      "enum": [
+        "error",
+        "warning",
+        "info"
+      ],
+      "title": "ValidationSeverity",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Generated from app/models by scripts/export_schema.py. Do not edit by hand.",
+  "title": "PromptCAD Studio",
+  "x-promptcad-version": "0.1.0"
+}

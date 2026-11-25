@@ -32,6 +32,9 @@ dev = [
   "pytest-cov>=7,<8",
   "ruff>=0.12,<1",
 ]
+desktop = [
+  "pyinstaller>=6.10,<7",
+]
 
 [project.scripts]
 promptcad = "app.cli:main"
@@ -40,7 +43,7 @@ promptcad = "app.cli:main"
 include = ["app*"]
 
 [tool.setuptools.package-data]
-app = ["static/*"]
+app = ["static/*", "web_dist/*", "web_dist/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -49,8 +52,17 @@ addopts = "-q --disable-warnings --maxfail=1"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-exclude = ["generated", "examples/generated"]
+exclude = ["generated", "examples/generated", "build", "node_modules", "web", "src-tauri"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Pre-existing findings in modules that ADR 0010 Phase 1 must not modify; remove these
+# entries when app/services is next edited (all but SIM102 are auto-fixable).
+"app/services/compiler.py" = ["UP032"]
+"app/services/openscad.py" = ["I001"]
+"app/services/planners/rule_based.py" = ["I001"]
+"app/services/preview.py" = ["I001", "F401"]
+"app/services/validator.py" = ["SIM102"]

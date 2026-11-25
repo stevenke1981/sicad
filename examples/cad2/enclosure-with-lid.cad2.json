@@ -1,0 +1,110 @@
+{
+  "schema_version": "2.0",
+  "name": "enclosure-with-lid",
+  "source_prompt": "做一個放 80×50 mm PCB 的電子外殼，含上蓋。PCB 連同元件高 25 mm，壁厚 2 mm。",
+  "unit": "mm",
+  "revision": 5,
+  "parameters": [
+    {"name": "wall", "value": 2, "min": 0.8, "max": null, "note": "壁厚"},
+    {"name": "pcb_stack", "value": 25, "min": null, "max": null, "note": "PCB 連同元件高度"},
+    {"name": "standoff_h", "value": 5, "min": null, "max": null, "note": "PCB 底面離內底高度"}
+  ],
+  "bindings": [
+    {"target": "v_body:height", "expr": "wall + standoff_h + pcb_stack + 1"}
+  ],
+  "components": [
+    {
+      "id": "e_pcb",
+      "kind": "empty",
+      "role": "reserve",
+      "shape": {"kind": "box", "length": 80, "width": 50, "height": 25},
+      "label": "PCB 保留空間",
+      "provenance": {"agent": "space_planner", "patch_id": "r1"}
+    },
+    {
+      "id": "v_body",
+      "kind": "volume",
+      "shape": {"kind": "enclosure", "length": 100, "width": 70, "height": 33, "wall_thickness": 2},
+      "label": "外殼本體",
+      "provenance": {"agent": "component_smith", "patch_id": "r2"}
+    },
+    {
+      "id": "v_lid",
+      "kind": "volume",
+      "shape": {"kind": "plate", "length": 100, "width": 70, "thickness": 2},
+      "label": "上蓋",
+      "provenance": {"agent": "component_smith", "patch_id": "r2"}
+    }
+  ],
+  "constraints": [
+    {"id": "k_root", "kind": "fixed", "a": "v_body.origin", "b": null, "value": null, "u": null, "v": null,
+     "frame": {"origin": [0, 0, 0], "x_axis": "+x", "z_axis": "+z"}},
+    {"id": "k_lid_axis", "kind": "coaxial", "a": "v_lid.axis_z", "b": "v_body.axis_z", "value": null, "u": null, "v": null, "frame": null},
+    {"id": "k_lid_mate", "kind": "mate", "a": "v_lid.bottom", "b": "v_body.top", "value": 0, "u": null, "v": null, "frame": null},
+    {"id": "k_pcb_axis", "kind": "coaxial", "a": "e_pcb.axis_z", "b": "v_body.axis_z", "value": null, "u": null, "v": null, "frame": null},
+    {"id": "k_pcb_z", "kind": "distance", "a": "e_pcb.bottom", "b": "v_body.cavity_floor", "value": 5, "u": null, "v": null, "frame": null}
+  ],
+  "parts": [
+    {
+      "id": "p_body",
+      "name": "外殼本體",
+      "material": "plastic",
+      "quantity": 1,
+      "source": "made",
+      "body": [{"op": "add", "component": "v_body"}],
+      "fillets": [],
+      "chamfers": []
+    },
+    {
+      "id": "p_lid",
+      "name": "上蓋",
+      "material": "plastic",
+      "quantity": 1,
+      "source": "made",
+      "body": [{"op": "add", "component": "v_lid"}],
+      "fillets": [],
+      "chamfers": []
+    }
+  ],
+  "assemblies": [
+    {"id": "a_main", "name": "電子外殼", "children": ["p_body", "p_lid"]}
+  ],
+  "root": "a_main",
+  "assumptions": [
+    "未提供 PCB 離底高度，暫用 5 mm",
+    "未提供外殼長度，暫用 100 mm",
+    "未提供外殼寬度，暫用 70 mm",
+    "外殼高度由 30 mm 調整為 33 mm，以容納 PCB 保留空間並留 1 mm 餘隙"
+  ],
+  "notes": [
+    "零件：本體 p_body、上蓋 p_lid"
+  ],
+  "planner": {"planner": "agent_team", "confidence": 0.85, "review_required": true},
+  "expected_resolved": {
+    "note": "範例專用註記，不屬於 CadDocument 2.0 schema；載入文件前必須移除此鍵。數值為依 docs/CAD_DSL_2.md §5.5 手算的修正回合後結果。",
+    "components": {
+      "e_pcb": {"origin": [0, 0, 7], "x_axis": "+x", "z_axis": "+z", "defaulted_axes": []},
+      "v_body": {"origin": [0, 0, 0], "x_axis": "+x", "z_axis": "+z", "defaulted_axes": []},
+      "v_lid": {"origin": [0, 0, 33], "x_axis": "+x", "z_axis": "+z", "defaulted_axes": []}
+    },
+    "ports": {
+      "v_body.origin": {"type": "point", "position": [0, 0, 0]},
+      "v_body.axis_z": {"type": "axis", "position": [0, 0, 0], "direction": "+z"},
+      "v_body.top": {"type": "face", "origin": [0, 0, 33], "normal": "+z", "u": "+x", "v": "+y", "extent": [100, 70]},
+      "v_body.cavity_floor": {"type": "face", "origin": [0, 0, 2], "normal": "+z", "u": "+x", "v": "+y", "extent": [96, 66]},
+      "v_body.cavity": {"type": "region", "min": [-48, -33, 2], "max": [48, 33, 33]},
+      "v_body.region": {"type": "region", "min": [-50, -35, 0], "max": [50, 35, 33]},
+      "v_lid.origin": {"type": "point", "position": [0, 0, 33]},
+      "v_lid.axis_z": {"type": "axis", "position": [0, 0, 33], "direction": "+z"},
+      "v_lid.bottom": {"type": "face", "origin": [0, 0, 33], "normal": "-z", "u": "+x", "v": "-y", "extent": [100, 70]},
+      "v_lid.region": {"type": "region", "min": [-50, -35, 33], "max": [50, 35, 35]},
+      "e_pcb.origin": {"type": "point", "position": [0, 0, 7]},
+      "e_pcb.axis_z": {"type": "axis", "position": [0, 0, 7], "direction": "+z"},
+      "e_pcb.bottom": {"type": "face", "origin": [0, 0, 7], "normal": "-z", "u": "+x", "v": "-y", "extent": [80, 50]},
+      "e_pcb.top": {"type": "face", "origin": [0, 0, 32], "normal": "+z", "u": "+x", "v": "+y", "extent": [80, 50]},
+      "e_pcb.region": {"type": "region", "min": [-40, -25, 7], "max": [40, 25, 32]}
+    },
+    "holes": {},
+    "issues": []
+  }
+}

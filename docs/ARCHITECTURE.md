@@ -17,6 +17,8 @@ DesignValidator
 Job manifest + downloadable artifacts
 ```
 
+本文描述目前可執行的 v0.1.0 架構，以及 [ADR 0010](adr/0010-migration-phases.md) 第 1 階段加入、尚未發佈的前端與桌面外殼（見「前端、桌面外殼與 schema 管線」一節）。目標架構見 [`adr/overview.md`](adr/overview.md)；CadDocument 2.0 的凍結規格見 [`CAD_DSL_2.md`](CAD_DSL_2.md)，目前沒有任何程式接受 2.0 文件。
+
 ## 為何加入 DSL
 
 直接讓模型輸出並執行 CAD Python 會帶來任意程式碼執行、不可重現、套件版本漂移與幾何失敗風險。DSL 將能力限制在明確的幾何白名單；模型只負責理解需求，Pydantic 負責型別與範圍，編譯器負責確定性實作。
@@ -76,6 +78,32 @@ manifest.json
 
 manifest 記錄 planner、renderer、請求格式、狀態、警告及產物，不把 API Key 寫入檔案。
 
+## 前端、桌面外殼與 schema 管線（第 1 階段，未發佈）
+
+```text
+Pydantic models (app/models) ──export_schema.py──→ schemas/promptcad.schema.json
+                                                        │ json-schema-to-typescript
+                                                        ↓
+web/ (React + TS + Vite) ──import──→ web/src/api/generated/promptcad.d.ts
+  │  npm --prefix web run build
+  ↓
+app/web_dist/ ──served at "/" by FastAPI when index.html exists (else app/static/)
+  │
+  ├─ 瀏覽器／Docker 模式：同源呼叫 /api/v1/*，Token 由 UI 欄位提供
+  └─ 桌面模式：src-tauri/（Tauri v2）載入 app/web_dist/
+         │ 啟動 sidecar：promptcad-sidecar --host 127.0.0.1 --port 0
+         │   env: PROMPTCAD_API_TOKEN（一次性）、PROMPTCAD_DATA_DIR、PROMPTCAD_CORS_ORIGINS
+         │ 讀取 stdout：PROMPTCAD_SIDECAR_READY {"port": N}
+         └─ command backend_info() → {base_url, token} → 前端 bootstrap.ts
+```
+
+- **前端**：`web/` 是 React + TypeScript（strict）+ Vite 應用程式，功能對齊 `app/static/`。API 呼叫集中在 `web/src/api/`：`client.ts` 定義介面、`httpClient.ts` 實作 HTTP 與 Token 標頭、`bootstrap.ts` 是唯一接觸 `window.__TAURI__` 的檔案（有 Tauri 時以 `backend_info` 取得位址與 Token，否則使用同源位址）。模型型別全部由 schema 生成，不手寫。
+- **檢視器**：`web/src/viewer/` 以 Three.js 載入 `model.stl`（`STLLoader`、`OrbitControls`、WebGL 能力偵測），核心不依賴 React（[ADR 0004](adr/0004-3d-viewer-threejs.md)）。
+- **前端服務**：`Settings.frontend_dir`（預設 `app/web_dist`）含 `index.html` 時，FastAPI 在 `/` 提供它，並在 `/assets` 掛載建置資產；否則維持原本的 `app/static/` 行為。`app/web_dist/` 不納入版本控制，但會隨套件資料安裝。
+- **桌面外殼**：`src-tauri/` 是 Tauri v2 應用程式（[ADR 0002](adr/0002-desktop-shell-tauri-v2.md)），以 `stable-x86_64-pc-windows-msvc` 工具鏈建置。sidecar 由 Rust 端以固定參數啟動，WebView 沒有任何 shell 權限（capability 只開放 `core:default` 與 `backend_info`）；sidecar 只綁定 `127.0.0.1`，所有 `/api/v1/*` 請求都要帶一次性 Token；程式結束時終止 sidecar（Windows 以 Job Object 一併終止子行程）。開發時（僅 debug 建置）可用 `PROMPTCAD_SIDECAR_CMD` 以本機 Python 取代打包的 sidecar；release 建置忽略此變數。
+- **Sidecar**：`app/sidecar.py` 是同一個 FastAPI 應用程式的進入點；`scripts/build_sidecar.py` 以 PyInstaller 打包成 `src-tauri/binaries/promptcad-sidecar-<target-triple>.exe`。**CadQuery 尚未打包**，因此桌面版的 renderer 為 `source_only`。
+- **Schema 管線**：`scripts/export_schema.py` 以確定性方式（排序鍵、LF、結尾換行）輸出 `schemas/promptcad.schema.json`；`--check` 在漂移時以非零狀態結束。CI 另檢查 `npm run gen:types` 之後生成的型別沒有差異（[ADR 0008](adr/0008-single-schema-source-of-truth.md) 的過渡安排；第 2 階段 schema 來源改為 Rust）。
+
 ## 擴充新特徵
 
 1. 在 `app/models/cad.py` 加入新的 base 或 feature 型別與 schema 限制。
@@ -84,6 +112,7 @@ manifest 記錄 planner、renderer、請求格式、狀態、警告及產物，�
 4. 更新 `LLMIntent`、system prompt 與 rule parser。
 5. 新增語意、原始碼與 API 回歸測試。
 6. 更新 DSL 文件與範例。
+7. 執行 `python scripts/export_schema.py` 與 `npm --prefix web run gen:types`，提交更新後的 schema 與 TypeScript 型別。
 
 ## 生產化建議
 

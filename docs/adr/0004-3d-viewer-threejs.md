@@ -83,4 +83,9 @@ v0.1.0 沒有互動式 3D 檢視：`preview.svg` 是不依賴 CAD 核心的快�
 
 ## 回顧紀錄
 
-（尚無）
+### 2026-11-26：第 1 階段最小檢視器
+
+- 已在 `web/src/viewer/` 實作不依賴 React 的最小檢視器：`createViewer(canvas)` 提供 `loadStl(buffer)` 與 `dispose()`，以 Three.js 的 `STLLoader` 載入 sidecar 輸出的 `model.stl`，`OrbitControls` 提供旋轉、平移、縮放，啟動時偵測 WebGL 並在不可用時顯示明確錯誤；檢視器核心可脫離 React 以 vitest 測試。
+- **GLB 與元件選取尚未實作**：sidecar 目前只輸出 STL，glTF 輸出與 `cq.Assembly` 節點命名的實測需要 CadQuery 執行環境，與元件 ID 選取、port 圖層一起延到元件圖可用之後（[0010](0010-migration-phases.md) 第 2 階段）。本 ADR 以 GLB 為主要格式的決策不變。
+- **three-cad-viewer 暫不採用**：第 1 階段只需要 STL 的基本導覽，直接使用 Three.js 已足夠；它的自有細分格式與選取事件 API 是否適合 port 圖層，留到需要元件選取時再評估，結論仍以本節或新 ADR 記載。
+- 尚未完成的驗收項目：GLB 載入、元件 ID 選取與元件樹同步、port 圖層、三平台 WebView 測試（目前只在 Windows WebView2 與瀏覽器開發模式下使用）。
