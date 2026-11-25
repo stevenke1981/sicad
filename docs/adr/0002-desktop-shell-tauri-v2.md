@@ -91,4 +91,6 @@ v0.1.0 只能以伺服器形式使用：`uvicorn app.main:app`，或透過 `Dock
 
 ## 回顧紀錄
 
-（尚無）
+### 2026-11-26：sidecar 改以 `resources` 帶入
+
+本文原本以 `externalBin`（附 target triple 的單一 exe）帶入 sidecar。CadQuery 打包後 sidecar 改為 PyInstaller onedir，改以 `bundle.resources` 安裝到 `<安裝目錄>/sidecar/`；理由與量測見 [0006](0006-geometry-kernel-occt-python-sidecar.md) 的回顧紀錄。外殼的其餘決策（Rust 端啟動、一次性 Token、Job Object）不變。

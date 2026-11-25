@@ -39,3 +39,24 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  desktop:
+    # Tauri shell checks only; the full CadQuery bundle is built by desktop-bundle.yml
+    # (manual / tags) because it takes minutes and ~550 MB. build.rs drops an empty
+    # placeholder sidecar in debug builds, so no Python build is needed here.
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+      # rust-toolchain.toml pins stable-x86_64-pc-windows-msvc, the runner's default host.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test

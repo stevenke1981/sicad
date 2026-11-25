@@ -129,17 +129,18 @@ npm --prefix web run gen:types         # 生成 web/src/api/generated/promptcad.
 
 ```bash
 npm ci                                 # 安裝根目錄的 @tauri-apps/cli
-npm --prefix web run build             # cargo check／cargo test 也需要 app/web_dist 已存在
+npm --prefix web run build             # 只有 tauri build 需要；cargo check／test 不需要（tauri build 的 beforeBuildCommand 也會自動建置）
 # 開發：以本機 Python 取代打包的 sidecar
 #   （僅 debug 建置有效）PowerShell: $env:PROMPTCAD_SIDECAR_CMD = "$PWD\.venv\Scripts\python.exe -m app.sidecar"
 npm run tauri dev
-# 發佈建置：先凍結 sidecar，再建置安裝包
-python -m pip install -e ".[desktop]"
-python scripts/build_sidecar.py        # 輸出 src-tauri/binaries/promptcad-sidecar-<target>.exe
-npm run tauri build
+# 發佈建置：建立含 CadQuery 的建置環境，凍結 sidecar，驗證後建置安裝包
+python scripts/desktop_env.py                                   # 建立 .venv-desktop（cadquery==2.8.0 + PyInstaller）
+.venv-desktop/Scripts/python.exe scripts/build_sidecar.py       # 輸出 src-tauri/binaries/promptcad-sidecar/（onedir）
+.venv-desktop/Scripts/python.exe scripts/frozen_smoke.py --measure  # 以凍結後的 exe 實際渲染並量測
+npm run tauri build                                             # NSIS 安裝包；sidecar 安裝到 <安裝目錄>/sidecar/
 ```
 
-限制：sidecar 沒有打包 CadQuery，桌面版目前以 `source_only` 執行（產生 DSL、原始碼與 SVG 預覽，不產生 STEP／STL）；安裝包大小與啟動時間尚未量測。
+桌面版內含 CadQuery 2.8.0，可直接輸出 STEP／STL／DXF／SVG（凍結後以 `promptcad-sidecar.exe --render-worker` 執行 `model.py`）。安裝包約 107 MiB，安裝後約 551 MiB；其餘量測見 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)。
 
 ## 使用方式
 

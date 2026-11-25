@@ -58,7 +58,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/promptcad-sidecar"],
+    "resources": {
+      "binaries/promptcad-sidecar/": "sidecar/"
+    },
     "windows": {
       "webviewInstallMode": {
         "type": "downloadBootstrapper"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -9,6 +10,42 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.core.config import Settings
+
+CADQUERY_FORMATS = frozenset({"step", "stl", "dxf", "svg"})
+RENDER_ROOT_ENV = "PROMPTCAD_RENDER_ROOT"  # read by app.render_worker
+API_TOKEN_ENV = "PROMPTCAD_API_TOKEN"
+# Secrets generated model code never needs to see.
+_SECRET_ENV_VARS = frozenset({API_TOKEN_ENV, "PROMPTCAD_LLM_API_KEY"})
+
+
+def _cadquery_command(job_dir: Path, formats: set[str] | list[str]) -> list[str]:
+    """Command that runs a job's generated model.py with the CadQuery runtime.
+
+    From source (server, Docker, development) ``sys.executable`` is a Python interpreter and
+    runs model.py directly. A PyInstaller-frozen desktop sidecar has no separate
+    interpreter, so it re-invokes itself in render-worker mode (ADR 0010 Phase 1b); the
+    worker needs absolute paths because it runs with ``cwd=job_dir``.
+    """
+    selected = sorted(set(formats) & CADQUERY_FORMATS)
+    if getattr(sys, "frozen", False):
+        job = job_dir.resolve()
+        return [
+            sys.executable,
+            "--render-worker",
+            str(job / "model.py"),
+            "--output-dir",
+            str(job),
+            "--formats",
+            *selected,
+        ]
+    return [
+        sys.executable,
+        str(job_dir / "model.py"),
+        "--output-dir",
+        str(job_dir),
+        "--formats",
+        *selected,
+    ]
 
 
 @dataclass(slots=True)
@@ -25,28 +62,27 @@ class Renderer:
 
     @staticmethod
     def cadquery_available() -> bool:
-        return importlib.util.find_spec("cadquery") is not None
+        try:
+            return importlib.util.find_spec("cadquery") is not None
+        except (ImportError, ValueError):
+            return False
 
     @staticmethod
     def openscad_available() -> bool:
         return shutil.which("openscad") is not None
 
     def render(self, job_dir: Path, formats: list[str]) -> RenderResult:
+        # Subprocesses run with cwd=job_dir, so every path handed to them must be absolute;
+        # a relative data_dir (the default "generated") would otherwise be resolved twice.
+        job_dir = job_dir.resolve()
         requested = set(formats)
         backend = self._choose_backend()
         warnings: list[str] = []
 
         if backend == "cadquery":
-            cmd = [
-                sys.executable,
-                str(job_dir / "model.py"),
-                "--output-dir",
-                str(job_dir),
-                "--formats",
-                *sorted(requested & {"step", "stl", "dxf", "svg"}),
-            ]
+            cmd = _cadquery_command(job_dir, requested)
             try:
-                self._run(cmd, job_dir)
+                self._run(cmd, job_dir, env=self._cadquery_env())
                 warnings.extend(self._read_render_warnings(job_dir))
                 return RenderResult(
                     renderer="cadquery",
@@ -117,17 +153,33 @@ class Renderer:
             return "openscad"
         return "source_only"
 
-    def _run(self, command: list[str], cwd: Path) -> None:
+    def _cadquery_env(self) -> dict[str, str]:
+        """Environment for the model.py subprocess: no API token, plus the render root."""
+        env = {
+            key: value
+            for key, value in os.environ.items()
+            if key.upper() not in _SECRET_ENV_VARS
+        }
+        env[RENDER_ROOT_ENV] = str(self.settings.data_dir.resolve())
+        return env
+
+    def _run(self, command: list[str], cwd: Path, env: dict[str, str] | None = None) -> None:
+        # Keep the console of a windowless (Tauri) parent from flashing for each render.
+        creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
         try:
             completed = subprocess.run(
                 command,
                 cwd=cwd,
+                env=env,
                 stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
+                # OCCT/VTK may print bytes outside the console code page (e.g. cp950).
+                errors="replace",
                 timeout=self.settings.render_timeout_seconds,
                 check=False,
                 shell=False,
+                creationflags=creationflags,
             )
         except subprocess.TimeoutExpired as exc:
             raise RuntimeError(f"CAD renderer timed out after {self.settings.render_timeout_seconds}s") from exc

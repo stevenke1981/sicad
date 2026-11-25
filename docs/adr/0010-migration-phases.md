@@ -176,3 +176,11 @@
 - **三平台測試矩陣**：目前只在 Windows（x86_64，MSVC 工具鏈、WebView2）建置。
 
 結論：第 1 階段尚未結束，本 ADR 的階段順序不變。下一步依序為 CadQuery 打包與 conda-pack 比較、量測、移除 `app/static/`，之後才開始第 2 階段的主要工作。
+
+### 2026-11-26：第 1 階段 1b — CadQuery 打包與量測
+
+- **不需 Python／Conda／Docker 完成提示詞到 STEP／STL**：在本機（Windows 11）達成。安裝包內含 PyInstaller onedir 的 sidecar 與 CadQuery 2.8.0；安裝後產生範例固定板得到 `completed／cadquery`，並輸出 STEP／STL／DXF／SVG。尚未在「完全乾淨、從未安裝過 Python 的機器」上驗證（本機 PATH 上仍有 Python，但凍結的 render worker 不使用它）。
+- **量測**：已完成，見 [0006](0006-geometry-kernel-occt-python-sidecar.md) 的回顧紀錄（安裝包 107.0 MiB、安裝後 550.9 MiB、sidecar 啟動約 0.6–0.9 s、渲染約 2.2 s）。網格載入時間：STL 由檢視器以 HTTP 取得（範例 125 KB，17 ms），WebGL 實際繪製尚未以畫面確認。
+- **conda-pack 與 PyInstaller 的比較**：選定 PyInstaller，conda-pack 以推估理由排除、未建原型，見 0006；是否視為完成**待負責人簽核**。
+- **CI**：新增 `windows-latest` 的 `desktop` job（`cargo fmt`／`clippy`／`test`）；完整安裝包改由手動或 `v*` tag 觸發的 `desktop-bundle.yml` 建置並上傳量測。
+- 仍未達成：移除 `app/static/`、三平台測試矩陣。
