@@ -40,6 +40,41 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  docker:
+    # Production image: web stage (node:24-slim builds web/) + micromamba CadQuery runtime.
+    # Asserts the image serves the React build at "/" (the 503 stub would mean web_dist
+    # was not copied in).
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build --tag promptcad:ci .
+      - name: Start container
+        run: docker run --detach --name promptcad --publish 8000:8000 --env PROMPTCAD_ENV=production promptcad:ci
+      - name: GET / returns the React index
+        run: |
+          deadline=$((SECONDS + 120))
+          code=000
+          until [ "$code" = 200 ] || [ "$SECONDS" -ge "$deadline" ]; do
+            sleep 2
+            code=$(curl --silent --output /tmp/index.html --write-out '%{http_code}' http://127.0.0.1:8000/ || true)
+          done
+          echo "GET / -> $code"
+          test "$code" = 200
+          grep -F 'id="root"' /tmp/index.html
+      - name: API is up
+        run: curl --fail --silent --show-error http://127.0.0.1:8000/api/v1/health
+      - name: docker-compose healthcheck command works in the image
+        run: >-
+          docker exec promptcad /usr/local/bin/_entrypoint.sh python -c
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3).read(1)"
+      - name: CadQuery imports in the runtime env
+        run: docker exec promptcad /usr/local/bin/_entrypoint.sh python -c "import cadquery; print('cadquery', cadquery.__version__)"
+      - name: Container logs
+        if: always()
+        run: docker logs promptcad || true
+
   desktop:
     # Tauri shell checks only; the full CadQuery bundle is built by desktop-bundle.yml
     # (manual / tags) because it takes minutes and ~550 MB. build.rs drops an empty

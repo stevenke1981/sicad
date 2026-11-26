@@ -16,3 +16,10 @@ generated/*
 *.zip
 *.sha256
 .DS_Store
+# Built inside the image (web stage) or irrelevant to it; web/ itself must stay in the
+# context because the web stage builds from it.
+node_modules
+web/node_modules
+app/web_dist
+src-tauri
+.venv-desktop

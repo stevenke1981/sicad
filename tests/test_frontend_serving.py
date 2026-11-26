@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings
-from app.main import STATIC_DIR, create_app
+from app.main import FRONTEND_MISSING_HTML, create_app
+
+APP_DIR = Path(__file__).resolve().parents[1] / "app"
 
 
 def _settings(tmp_path, frontend_dir):
@@ -53,12 +57,24 @@ def test_root_file_route_rejects_traversal(tmp_path):
             assert "secret" not in response.text
 
 
-def test_legacy_ui_when_no_build(tmp_path):
-    legacy_index = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+def test_stub_when_no_build(tmp_path):
     for frontend_dir in (tmp_path / "does-not-exist", tmp_path):  # missing dir / no index.html
         with TestClient(create_app(_settings(tmp_path, frontend_dir))) as client:
             index = client.get("/")
-            assert index.status_code == 200
-            assert index.text == legacy_index
-            assert client.get("/assets/app.js").status_code == 200
-            assert client.get("/assets/styles.css").status_code == 200
+            assert index.status_code == 503
+            assert index.headers["content-type"].startswith("text/html")
+            assert index.text == FRONTEND_MISSING_HTML
+            assert "npm --prefix web run build" in index.text
+            assert 'href="/docs"' in index.text
+            assert client.get("/assets/app.js").status_code == 404  # nothing mounted
+            assert client.get("/assets/styles.css").status_code == 404
+            assert client.get("/api/v1/health").status_code == 200
+            assert client.get("/docs").status_code == 200
+
+
+def test_static_dir_is_gone():
+    # The legacy vanilla-JS UI (app/static) was removed; ADR 0003.
+    assert not (APP_DIR / "static").exists()
+    import app.main
+
+    assert not hasattr(app.main, "STATIC_DIR")

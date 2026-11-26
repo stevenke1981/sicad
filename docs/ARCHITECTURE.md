@@ -87,7 +87,7 @@ Pydantic models (app/models) ──export_schema.py──→ schemas/promptcad.s
 web/ (React + TS + Vite) ──import──→ web/src/api/generated/promptcad.d.ts
   │  npm --prefix web run build
   ↓
-app/web_dist/ ──served at "/" by FastAPI when index.html exists (else app/static/)
+app/web_dist/ ──served at "/" by FastAPI when index.html exists (else 503 "build the frontend" page)
   │
   ├─ 瀏覽器／Docker 模式：同源呼叫 /api/v1/*，Token 由 UI 欄位提供
   └─ 桌面模式：src-tauri/（Tauri v2）載入 app/web_dist/
@@ -97,11 +97,13 @@ app/web_dist/ ──served at "/" by FastAPI when index.html exists (else app/st
          └─ command backend_info() → {base_url, token} → 前端 bootstrap.ts
 ```
 
-- **前端**：`web/` 是 React + TypeScript（strict）+ Vite 應用程式，功能對齊 `app/static/`。API 呼叫集中在 `web/src/api/`：`client.ts` 定義介面、`httpClient.ts` 實作 HTTP 與 Token 標頭、`bootstrap.ts` 是唯一接觸 `window.__TAURI__` 的檔案（有 Tauri 時以 `backend_info` 取得位址與 Token，否則使用同源位址）。模型型別全部由 schema 生成，不手寫。
+- **前端**：`web/` 是 React + TypeScript（strict）+ Vite 應用程式，是唯一的 Web UI（原本無建置步驟的 `app/static/` 已於 2026-11-26 移除，見 [ADR 0003](adr/0003-frontend-react-typescript.md) 回顧紀錄）。CadQuery 投影的 `model.svg` 以米白紙色底（`#f3f1ea`）顯示以利閱讀黑色線條，`preview.svg` 維持自身的深色底。API 呼叫集中在 `web/src/api/`：`client.ts` 定義介面、`httpClient.ts` 實作 HTTP 與 Token 標頭、`bootstrap.ts` 是唯一接觸 `window.__TAURI__` 的檔案（有 Tauri 時以 `backend_info` 取得位址與 Token，否則使用同源位址）。模型型別全部由 schema 生成，不手寫。
 - **檢視器**：`web/src/viewer/` 以 Three.js 載入 `model.stl`（`STLLoader`、`OrbitControls`、WebGL 能力偵測），核心不依賴 React（[ADR 0004](adr/0004-3d-viewer-threejs.md)）。
-- **前端服務**：`Settings.frontend_dir`（預設 `app/web_dist`）含 `index.html` 時，FastAPI 在 `/` 提供它，並在 `/assets` 掛載建置資產；否則維持原本的 `app/static/` 行為。`app/web_dist/` 不納入版本控制，但會隨套件資料安裝。
+- **前端服務**：`Settings.frontend_dir`（預設 `app/web_dist`）含 `index.html` 時，FastAPI 在 `/` 提供它，並在 `/assets` 掛載建置資產；否則 `/` 回傳 HTTP 503 的內嵌說明頁（`app/main.py` 的字串常數，提示 `npm --prefix web run build` 並連到 `/docs`），`/assets` 不掛載，API 不受影響。`app/web_dist/` 不納入版本控制，但會隨套件資料安裝（非 editable 的 wheel 只有在先建置前端時才含 UI）。Docker 映像以多階段建置：`node:24-slim` 階段建置 `web/`，再複製到 `/app/app/web_dist`；CI 的 `docker` job 建置並啟動映像，確認 `/` 提供新前端。凍結的桌面 sidecar 不內含任何 Web UI，桌面 UI 由 Tauri 自身的資產提供。
 - **桌面外殼**：`src-tauri/` 是 Tauri v2 應用程式（[ADR 0002](adr/0002-desktop-shell-tauri-v2.md)），以 `stable-x86_64-pc-windows-msvc` 工具鏈建置。sidecar 由 Rust 端以固定參數啟動，WebView 沒有任何 shell 權限（capability 只開放 `core:default` 與 `backend_info`）；sidecar 只綁定 `127.0.0.1`，所有 `/api/v1/*` 請求都要帶一次性 Token；程式結束時終止 sidecar（Windows 以 Job Object 一併終止子行程）。開發時（僅 debug 建置）可用 `PROMPTCAD_SIDECAR_CMD` 以本機 Python 取代打包的 sidecar；release 建置忽略此變數。
 - **Sidecar**：`app/sidecar.py` 是同一個 FastAPI 應用程式的進入點；`scripts/build_sidecar.py`（在含 `cadquery==2.8.0` 的 `.venv-desktop` 中執行）以 PyInstaller **onedir** 打包到 `src-tauri/binaries/promptcad-sidecar/`，Tauri 以 `bundle.resources` 安裝到 `<安裝目錄>/sidecar/`（[ADR 0006](adr/0006-geometry-kernel-occt-python-sidecar.md)）。凍結後沒有獨立直譯器，renderer 以 `promptcad-sidecar.exe --render-worker <model.py> …` 在子行程執行 `model.py`（`app/render_worker.py` 只接受資料目錄內的 `model.py`；子行程環境不含 API Token 與 LLM 金鑰），桌面版因此可輸出 STEP／STL／DXF／SVG。原始碼與 Docker 模式仍以 `python model.py` 執行。
+- **桌面版驗證**：`.github/workflows/desktop-bundle.yml`（`windows-latest`，手動或 `v*` tag 觸發）代替乾淨機器：`scripts/frozen_smoke.py --isolated-env` 讓 sidecar 只看到系統 `PATH` 且移除 `PYTHON*`／`VIRTUAL_ENV`／`CONDA*`，並監看行程樹，出現 sidecar 目錄外的映像或 `python*.exe`／`py.exe` 即失敗；`scripts/frozen_kill_check.py`（標準函式庫 + ctypes）以 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` 的 Job Object 啟動 sidecar，在 render worker 執行中關閉 Job，確認追蹤的 PID 於 5 秒內全部結束（`--shell-exe` 另以已安裝的外殼驗證 `job.rs`）。`ci.yml` 只執行這些腳本的純函式測試。
+- **第三方授權聲明**：`scripts/gen_third_party_notices.py` 由 `.venv-desktop` 的 `importlib.metadata`、`web/package-lock.json` 的正式相依與 `cargo metadata`（`x86_64-pc-windows-msvc`）加上手動維護的原生元件表，產生確定性的 `THIRD_PARTY_NOTICES.md`（授權全文以 SHA-256 去重）；`tauri.conf.json` 以 `bundle.resources` 將它安裝到 `<安裝目錄>\THIRD_PARTY_NOTICES.md`。LGPL 元件（OCCT／OCP、casadi、NLopt）在 onedir 版面下是 `sidecar\_internal\` 內的獨立檔案，可由使用者替換。
 - **Schema 管線**：`scripts/export_schema.py` 以確定性方式（排序鍵、LF、結尾換行）輸出 `schemas/promptcad.schema.json`；`--check` 在漂移時以非零狀態結束。CI 另檢查 `npm run gen:types` 之後生成的型別沒有差異（[ADR 0008](adr/0008-single-schema-source-of-truth.md) 的過渡安排；第 2 階段 schema 來源改為 Rust）。
 
 ## 擴充新特徵

@@ -43,7 +43,7 @@ promptcad = "app.cli:main"
 include = ["app*"]
 
 [tool.setuptools.package-data]
-app = ["static/*", "web_dist/*", "web_dist/**/*"]
+app = ["web_dist/*", "web_dist/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

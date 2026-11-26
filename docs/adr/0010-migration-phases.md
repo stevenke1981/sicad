@@ -181,6 +181,17 @@
 
 - **不需 Python／Conda／Docker 完成提示詞到 STEP／STL**：在本機（Windows 11）達成。安裝包內含 PyInstaller onedir 的 sidecar 與 CadQuery 2.8.0；安裝後產生範例固定板得到 `completed／cadquery`，並輸出 STEP／STL／DXF／SVG。尚未在「完全乾淨、從未安裝過 Python 的機器」上驗證（本機 PATH 上仍有 Python，但凍結的 render worker 不使用它）。
 - **量測**：已完成，見 [0006](0006-geometry-kernel-occt-python-sidecar.md) 的回顧紀錄（安裝包 107.0 MiB、安裝後 550.9 MiB、sidecar 啟動約 0.6–0.9 s、渲染約 2.2 s）。網格載入時間：STL 由檢視器以 HTTP 取得（範例 125 KB，17 ms），WebGL 實際繪製尚未以畫面確認。
-- **conda-pack 與 PyInstaller 的比較**：選定 PyInstaller，conda-pack 以推估理由排除、未建原型，見 0006；是否視為完成**待負責人簽核**。
+- **conda-pack 與 PyInstaller 的比較**：選定 PyInstaller，conda-pack 以推估理由排除、未建原型，見 0006；是否視為完成原列為待負責人簽核，**負責人已於 2026-11-26 簽核**（見下一筆紀錄）。
 - **CI**：新增 `windows-latest` 的 `desktop` job（`cargo fmt`／`clippy`／`test`）；完整安裝包改由手動或 `v*` tag 觸發的 `desktop-bundle.yml` 建置並上傳量測。
 - 仍未達成：移除 `app/static/`、三平台測試矩陣。
+
+### 2026-11-26：第 1 階段收尾 — 簽核、移除 `app/static/`、乾淨機器驗證與授權聲明
+
+- **conda-pack 與 PyInstaller 的比較**：**已完成**。負責人於 2026-11-26 核准 PyInstaller onedir（見 [0006](0006-geometry-kernel-occt-python-sidecar.md) 回顧紀錄），上一筆紀錄的「待負責人簽核」就此結案。
+- **`app/static/` 已移除**：**已完成**（負責人核准，見 [0003](0003-frontend-react-typescript.md) 回顧紀錄）。`app/web_dist/index.html` 不存在時，`/` 回傳 503 的內嵌說明頁（提示執行 `npm --prefix web run build`，並連到 `/docs`），`/assets` 不掛載，API 不受影響。Dockerfile 改為多階段建置（`node:24-slim` 建置 `web/`，再複製到 `/app/app/web_dist`），CI 新增 `docker` job 實際建置映像並確認 `/` 回傳含 `id="root"` 的新前端。凍結 sidecar 不再內含任何 Web UI（`build_sidecar.py` 的 `DATA_DIRS` 為空），桌面版的 UI 由 Tauri 自身的資產提供。
+- **乾淨機器驗證**：本機無法使用 Windows Sandbox，改以 GitHub `windows-latest` runner 上的 `desktop-bundle.yml` 進行：`frozen_smoke.py --isolated-env` 讓 sidecar 只看到系統 `PATH`（`%SystemRoot%\System32;%SystemRoot%`）且移除 `PYTHON*`／`VIRTUAL_ENV`／`CONDA*`，並監看行程樹，任何位於 sidecar 目錄外或名為 `python*.exe`／`py.exe` 的子行程都會使檢查失敗（`measurements.json` 記錄 `"isolated_env": true`、`"foreign_processes": []`）；新的 `frozen_kill_check.py` 以設定 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` 的 Job Object 啟動 sidecar，在 render worker 執行中關閉 Job，確認 sidecar 與 worker 於 5 秒內結束（補上 1b 記錄「關閉外殼時中斷渲染尚未實測」的缺口）。執行結果：2026-11-26 於 GitHub `windows-latest`（Windows Server 2025，4 CPU）首次執行 [run 45723089074](https://github.com/stevenke1981/sicad/actions/runs/45723089074) 全數通過：建置與安裝後的 sidecar 皆在 isolated env 下通過 smoke（各觀察到 7 個 render worker，`foreign_processes=[]`）；安裝 sidecar 的 Job Object 中斷檢查 `KILL_CHECK_OK`；強制結束已安裝的 `promptcad-studio.exe` 後 sidecar 於 0.007 秒內結束（`job.rs` 實證，此步驟已改為必過）；安裝目錄含 `THIRD_PARTY_NOTICES.md`。量測：安裝檔 107.5 MiB、安裝後 554.1 MiB、READY 0.64–0.66 s、warm render 2.38 s、端到端 generate 2.42 s。
+- **授權聲明**：`THIRD_PARTY_NOTICES.md` 由 `scripts/gen_third_party_notices.py` 產生並隨安裝包發佈到 `<安裝目錄>\THIRD_PARTY_NOTICES.md`（見 0006）。
+- **2D 預覽可讀性**：`model.svg`（CadQuery 投影，黑色線條）在前端改以米白紙色底（`#f3f1ea`）顯示；`preview.svg` 維持原本的深色底。只改前端，不改編譯器輸出。
+- **仍未達成**：三平台測試矩陣（目前只在 Windows x86_64 建置）。乾淨機器驗證的結論以 `desktop-bundle.yml` 的實際執行結果為準。
+
+結論：除三平台測試矩陣與乾淨機器驗證的 CI 結果外，第 1 階段的完成條件均已達成。

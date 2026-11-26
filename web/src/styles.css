@@ -53,6 +53,8 @@ legend { color:var(--muted); font-size:.82rem; padding:0 8px; }
 .badge.neutral { color:var(--muted); }
 .preview-wrap { aspect-ratio: 900 / 650; display:grid; place-items:center; overflow:hidden; background:#090e1a; border:1px solid var(--line); border-radius:14px; }
 .preview-wrap img { width:100%; height:100%; object-fit:contain; }
+/* model.svg has dark strokes on a transparent background: give it paper, not the dark panel. */
+.preview-wrap--paper { background:#f3f1ea; }
 .preview-empty { color:#58677f; font-weight:700; }
 .warnings { display:grid; gap:8px; margin-top:14px; }
 .warning { border-left:3px solid var(--accent-2); background:rgba(240,179,106,.08); padding:9px 11px; color:#f5d4ac; font-size:.86rem; }

@@ -111,6 +111,15 @@
 
 最大的組成：`vtk.libs` 264 MiB、`OCP` 90 MiB、`cadquery_ocp.libs` 62 MiB、`vtkmodules` 42 MiB、`casadi` 24 MiB。VTK 約佔 56%，是之後縮小體積最大的槓桿。
 
-**conda-pack 與 PyInstaller：選定 PyInstaller，未實作 conda-pack 原型。** 理由：本機沒有 conda；conda 原本的優勢（OCP 二進位相容）已由 pip wheel 解決（`cadquery==2.8.0` 以 pip 安裝 39 秒、渲染正確）；conda-pack 打包整個環境、無法依匯入圖修剪，**估計**會比未修剪的 1.1 GB venv 更大（此為推估，未實測）；且需要安裝時執行 `conda-unpack` 並引入第二套工具鏈。重新評估條件：凍結 smoke 無法在約一天的 hook 調整內通過，或安裝包超過 500 MB 且 vtk／casadi 的替身方案失敗。此結論是否滿足 ADR 0010「比較已完成」的完成條件，**待負責人簽核**。
+**conda-pack 與 PyInstaller：選定 PyInstaller，未實作 conda-pack 原型。** 理由：本機沒有 conda；conda 原本的優勢（OCP 二進位相容）已由 pip wheel 解決（`cadquery==2.8.0` 以 pip 安裝 39 秒、渲染正確）；conda-pack 打包整個環境、無法依匯入圖修剪，**估計**會比未修剪的 1.1 GB venv 更大（此為推估，未實測）；且需要安裝時執行 `conda-unpack` 並引入第二套工具鏈。重新評估條件：凍結 smoke 無法在約一天的 hook 調整內通過，或安裝包超過 500 MB 且 vtk／casadi 的替身方案失敗。此結論是否滿足 ADR 0010「比較已完成」的完成條件，原列為待負責人簽核；**負責人已於 2026-11-26 簽核**（見下方紀錄）。
 
 後續：VTK／casadi 替身以縮小體積、第三方授權聲明（OCCT 與 casadi 為 LGPL、VTK 為 BSD）在公開發佈前補齊、更新時整包重新下載的問題尚未處理。
+
+### 2026-11-26：負責人簽核 PyInstaller，第三方授權聲明補齊
+
+- **簽核**：負責人於 2026-11-26 核准以 PyInstaller onedir 取代 conda-pack 作為 sidecar 封裝方式，並同意上一筆紀錄的比較（conda-pack 以推估理由排除、未建原型）視為滿足 ADR 0010「封裝比較已完成並選定其一」的完成條件。上述重新評估條件維持有效。本紀錄不改動上方已接受的決策內容。
+- **第三方授權聲明**：新增 `scripts/gen_third_party_notices.py`（僅用標準函式庫），產生並納入版本控制的根目錄 `THIRD_PARTY_NOTICES.md`。來源為實際安裝／鎖定的相依套件：以 `--python` 指定的直譯器（`.venv-desktop`）透過 `importlib.metadata` 列出凍結進 sidecar 的 Python 套件（排除 PyInstaller 等建置工具與 `build_sidecar.py` 修剪的模組）、`web/package-lock.json` 的正式相依、`src-tauri` 的 `cargo metadata`（`x86_64-pc-windows-msvc`、僅 normal 相依），另加手動維護的 OCCT、VTK、CPython、PyInstaller bootloader、NLopt、MSVC runtime、WebView2 bootstrapper 與 NSIS。授權全文以 SHA-256 去重，輸出排序且不含時間戳，`--check` 可比對漂移，`--strict` 在授權不明或出現未知的 wheel 隨附 DLL 時失敗。
+- **LGPL 處理**：聲明檔的「LGPL 元件與替換權利」段落列出 OCCT（經 OCP 載入，LGPL-2.1 WITH OCCT-exception-1.0）、casadi（LGPL-3.0-or-later）、NLopt（wheel metadata 標示 MIT，但編譯後函式庫受 LGPL-2.1+ 規範）、LibRaw 與 VTK 內建的 gl2ps，說明 onedir 版面下這些 `.dll`／`.pyd` 以獨立檔案存放在 `<安裝目錄>\sidecar\_internal\`、可由使用者替換，並附原始碼網址與版本。OCCT 的 LGPL-2.1 全文與例外條款逐字收錄於產生器中（來源：OCCT `V7_9_3` 標籤）。
+- **隨安裝包發佈**：`tauri.conf.json` 的 `bundle.resources` 新增 `"../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"`，安裝後位於 `<安裝目錄>\THIRD_PARTY_NOTICES.md`；`desktop-bundle.yml` 在 `tauri build` 前以 `--strict` 自 `.venv-desktop` 重新產生並上傳，安裝後檢查該檔存在且大於 10 KB。
+- **交叉核對**：以 PyInstaller 的分析結果（`build/sidecar/work/*/PYZ-00.toc`、`COLLECT-00.toc`）核對，凍結內容中的每個套件都列在聲明檔中；`setuptools`（含 `_vendor`）實際被凍結，因此列入而不視為建置工具。
+- 本聲明檔是授權資訊彙整，不是法律意見；公開發佈前仍建議由負責人複核「需特別留意的授權」表（GPL／LGPL／MPL／EPL／CDDL）。

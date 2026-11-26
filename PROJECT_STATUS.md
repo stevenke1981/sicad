@@ -17,23 +17,35 @@
 
 | 項目 | 位置 | 狀態 |
 |---|---|---|
-| React + TypeScript + Vite 前端，功能對齊 `app/static/` | `web/` | 已實作；建置輸出到 `app/web_dist/` |
-| FastAPI 提供新前端 | `app/main.py`、`app/core/config.py`（`frontend_dir`） | `app/web_dist/index.html` 存在時於 `/` 提供；否則沿用 `app/static/` |
+| React + TypeScript + Vite 前端（已取代 `app/static/`） | `web/` | 已實作；建置輸出到 `app/web_dist/` |
+| FastAPI 提供新前端 | `app/main.py`、`app/core/config.py`（`frontend_dir`） | `app/web_dist/index.html` 存在時於 `/` 提供；否則 `/` 回傳 503 說明頁（`app/static/` 已移除） |
 | Three.js STL 檢視器（最小版，不依賴 React） | `web/src/viewer/` | 已實作；GLB 與元件選取未實作 |
 | Pydantic → JSON Schema → TypeScript 型別管線 | `scripts/export_schema.py`、`schemas/promptcad.schema.json`、`web/src/api/generated/` | 已實作；CI 檢查漂移 |
 | Tauri v2 桌面外殼 + FastAPI sidecar | `src-tauri/`、`app/sidecar.py`、`scripts/build_sidecar.py` | 已實作（Windows／MSVC）；sidecar 以 PyInstaller 打包 |
 | CadDocument 2.0 規格凍結 | `docs/CAD_DSL_2.md`、`examples/cad2/`、`tests/test_cad2_examples.py` | 已凍結；程式依 ADR 0010 在第 2 階段以 Rust 實作 |
 | 桌面版內含 CadQuery（第 1 階段 1b） | `app/render_worker.py`、`app/services/renderer.py`、`scripts/{desktop_env,build_sidecar,frozen_smoke}.py`、`src-tauri/` | 已實作：PyInstaller onedir sidecar 經 Tauri `resources` 安裝；凍結後以 `--render-worker` 執行 `model.py`，桌面版可輸出 STEP／STL／DXF／SVG |
+| 移除 `app/static/`（負責人核准） | `app/main.py`、`Dockerfile`、`.github/workflows/ci.yml`（`docker` job） | 已完成；Dockerfile 多階段建置前端，CI 實際建置映像並確認 `/` 回傳新前端 |
+| 乾淨機器驗證（隔離環境 smoke、Job Object 終止檢查） | `scripts/frozen_smoke.py --isolated-env`、`scripts/frozen_kill_check.py`、`.github/workflows/desktop-bundle.yml` | 已實作；在 GitHub `windows-latest` 上執行 |
+| 第三方授權聲明 | `scripts/gen_third_party_notices.py`、`THIRD_PARTY_NOTICES.md`、`src-tauri/tauri.conf.json` | 已完成；隨安裝包安裝到 `<安裝目錄>\THIRD_PARTY_NOTICES.md` |
+| 2D 預覽可讀性 | `web/src/components/SvgPreview.tsx`、`web/src/styles.css` | 已完成；`model.svg` 以紙色底顯示，`preview.svg` 不變 |
 
-### 第 1 階段尚未達成的完成條件
+### 第 1 階段狀態（2026-11-26）
 
-- **`app/static/` 刻意保留**：作為沒有前端建置產物時的備援介面，尚未移除。
-- **conda-pack 與 PyInstaller**：選定 PyInstaller onedir，conda-pack 以推估理由排除（見 ADR 0006 回顧紀錄），**待負責人簽核**。
-- **尚未在完全乾淨的機器上驗證**，3D 檢視器的實際繪製尚未以畫面確認（STL 已成功取得）。
-- CadQuery 的投影 SVG 是黑色線條，在深色主題的 2D 預覽上不易閱讀。
-- **只在 Windows x86_64 建置**；macOS、Linux 的測試矩陣尚未建立。
+已結案：
+
+- **conda-pack 與 PyInstaller**：選定 PyInstaller onedir，**負責人已於 2026-11-26 簽核**（見 ADR 0006、0010 回顧紀錄）。
+- **`app/static/` 已移除**（負責人核准）：未建置前端時 `/` 回傳 503 說明頁；Docker 映像以多階段建置內含前端。
+- **第三方授權聲明**：`THIRD_PARTY_NOTICES.md` 由 `scripts/gen_third_party_notices.py --strict` 產生並隨安裝包發佈；LGPL 元件（OCCT／OCP、casadi、NLopt）可在 `<安裝目錄>\sidecar\_internal\` 替換。
+- **CadQuery 投影 SVG 在深色主題下不易閱讀**：`model.svg` 改以紙色底顯示。
+- **關閉外殼時中斷進行中的渲染**：新增 `scripts/frozen_kill_check.py` 實測（Job Object 關閉後 sidecar 與 render worker 須在 5 秒內結束；`--shell-exe` 另以已安裝的外殼驗證，首次執行通過後已改為必過），在 `desktop-bundle.yml` 中執行；結果併入下方的乾淨機器驗證。
+
+尚未達成：
+
+- **三平台測試矩陣**：只在 Windows x86_64 建置；macOS、Linux 尚未建立。
+- **乾淨機器驗證**：已改由 GitHub `windows-latest` 上的 `desktop-bundle.yml` 執行（隔離環境 smoke、Job Object 終止檢查、安裝後檢查授權聲明存在且大於 10 KB），尚待第一次完整執行的結果。
+  - desktop-bundle 執行結果：2026-11-26 於 GitHub `windows-latest`（Windows Server 2025，4 CPU）首次執行 [run 45723089074](https://github.com/stevenke1981/sicad/actions/runs/45723089074) 全數通過：建置與安裝後的 sidecar 皆在 isolated env 下通過 smoke（各觀察到 7 個 render worker，`foreign_processes=[]`）；安裝 sidecar 的 Job Object 中斷檢查 `KILL_CHECK_OK`；強制結束已安裝的 `promptcad-studio.exe` 後 sidecar 於 0.007 秒內結束（`job.rs` 實證，此步驟已改為必過）；安裝目錄含 `THIRD_PARTY_NOTICES.md`。量測：安裝檔 107.5 MiB、安裝後 554.1 MiB、READY 0.64–0.66 s、warm render 2.38 s、端到端 generate 2.42 s。
+- 3D 檢視器的實際繪製尚未以畫面確認（STL 已成功取得）。
 - 檢視器只支援 STL；GLB、元件選取與 port 圖層延到第 2 階段。
-- **關閉外殼時中斷進行中的渲染**：依設計 render worker 繼承 sidecar 的 Job Object，會一併終止，但尚未實測。
 
 ### 桌面版量測（2026-11-26，Windows 11）
 
@@ -54,7 +66,7 @@ v0.1.0 發行包：
 
 - 26 個 pytest 測試通過。
 - Python `compileall` 通過。
-- Web JavaScript `node --check` 通過。
+- Web JavaScript `node --check` 通過（`app/static/` 已於第 1 階段移除，此項不再適用）。
 - Editable package 安裝與 `promptcad --help` 通過。
 - Source-only 端到端 smoke generation 通過。
 
@@ -66,6 +78,9 @@ v0.1.0 發行包：
 - `npm --prefix web run typecheck`、`test`、`build`。
 - `src-tauri` 的 `cargo fmt --check`、`cargo clippy -D warnings`、`cargo test`（CI 的 `windows-latest` `desktop` job）。
 - 桌面安裝包：`scripts/frozen_smoke.py` 以凍結後的 sidecar 對五種基體 × 六種孔型實際渲染 STEP／STL／DXF／SVG（手動或 `v*` tag 觸發 `.github/workflows/desktop-bundle.yml`）。
+- 前端服務：`tests/test_frontend_serving.py` 檢查建置產物的提供、路徑穿越防護，以及未建置時的 503 說明頁；CI 的 `docker` job 建置映像並確認 `/` 回傳含 `id="root"` 的新前端。
+- 授權聲明：`tests/test_third_party_notices.py`（純函式、假資料，不需 CadQuery）；`desktop-bundle.yml` 以 `--strict` 重新產生聲明檔。
+- 桌面驗證腳本：`tests/test_frozen_kill_check.py` 等純函式測試在 `ci.yml` 執行；實際的隔離環境 smoke 與 Job Object 終止檢查只在 `desktop-bundle.yml` 對已安裝的 sidecar 執行。
 
 ## 封裝環境限制
 
@@ -75,7 +90,7 @@ v0.1.0 發行包：
 
 依 [ADR 0010](docs/adr/0010-migration-phases.md)：
 
-1. 完成第 1 階段：負責人簽核 PyInstaller 決定、在乾淨機器上驗證安裝包、移除 `app/static/`、建立三平台測試矩陣；視需要以 VTK／casadi 替身縮小體積。
+1. 完成第 1 階段：取得 `desktop-bundle.yml` 在 `windows-latest` 上的乾淨機器驗證結果、建立三平台測試矩陣；視需要以 VTK／casadi 替身縮小體積。
 2. 第 2 階段：Rust core 實作 CadDocument 2.0（依 [`docs/CAD_DSL_2.md`](docs/CAD_DSL_2.md)）、驗證器、patch 引擎與 1.0 → 2.0 adapter；前端加入元件樹與 port 顯示。
 3. 第 3 階段：約束求解器評估（[ADR 0007](docs/adr/0007-constraint-solver.md)）與多 agent 編排。
 

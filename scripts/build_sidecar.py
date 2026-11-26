@@ -84,9 +84,10 @@ PRUNED_MODULES = (
 )
 
 # Data directories shipped inside the bundle (source dir relative to ROOT -> bundle dir).
-# app/web_dist is deliberately NOT bundled: the desktop UI is served from Tauri's own
-# assets, and bundling it here would freeze whatever stale build happened to exist.
-DATA_DIRS = (("app/static", "app/static"),)
+# None today: the desktop UI is served from Tauri's own assets, so app/web_dist is
+# deliberately NOT bundled (it would freeze whatever stale build happened to exist) and the
+# frozen sidecar's "/" is the "frontend not built" stub. The legacy app/static UI is gone.
+DATA_DIRS: tuple[tuple[str, str], ...] = ()
 
 # Outputs of earlier layouts that must not be picked up by tauri-build or the shell.
 STALE_OUTPUTS = (

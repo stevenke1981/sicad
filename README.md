@@ -45,7 +45,7 @@ Empty（空）→ Dot（點）→ Line（線）→ Plane（面）→ Volume（�
 
 ## 最快啟動：Docker
 
-Docker 環境內含 CadQuery 2.8.0，可實際產生 STEP、STL、DXF 與 SVG。
+Docker 環境內含 CadQuery 2.8.0，可實際產生 STEP、STL、DXF 與 SVG。Dockerfile 為多階段建置：第一階段以 `node:24-slim` 建置 `web/` 前端，再複製到映像的 `app/web_dist/`，因此不需在主機上安裝 Node.js。
 
 ```bash
 docker compose up --build
@@ -70,6 +70,8 @@ docker compose up --build
 docker compose down
 ```
 
+> Linux 主機注意：容器以 `mambauser`（uid 57439）執行，綁定掛載的 `./generated` 若屬於主機使用者可能無法寫入；請先 `sudo chown 57439 generated`，或在 compose 設定 `user:`。
+
 生成檔保存在專案的 `generated/`，重新建立容器不會消失。
 
 ## 不使用 Docker
@@ -81,8 +83,11 @@ CadQuery 的 OpenCascade 相依套件較重，建議使用 Miniforge／Mambaforg
 ```bash
 mamba env create -f environment.yml
 conda activate promptcad
+npm --prefix web ci && npm --prefix web run build   # Web UI；需要 Node.js
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+非 Docker 的伺服器模式必須先建置前端：`app/web_dist/index.html` 不存在時，`/` 回傳 HTTP 503 的說明頁（提示上述建置指令並連到 `/docs`），API 本身照常運作。
 
 ### 僅開發 DSL、API 與原始碼
 
@@ -103,11 +108,13 @@ uvicorn app.main:app --reload
 
 | 目錄 | 內容 |
 |---|---|
-| `web/` | React + TypeScript + Vite 前端，功能對齊 `app/static/`，另加 Three.js STL 檢視器；`npm --prefix web run build` 輸出到 `app/web_dist/` |
+| `web/` | React + TypeScript + Vite 前端（已取代並移除原本的 `app/static/`），另加 Three.js STL 檢視器；`npm --prefix web run build` 輸出到 `app/web_dist/` |
 | `src-tauri/` | Tauri v2 桌面外殼；啟動時在 `127.0.0.1` 的動態埠啟動 FastAPI sidecar，並傳入一次性 Token |
 | `schemas/` | 由 Pydantic 匯出的 JSON Schema（`scripts/export_schema.py`），前端型別由它生成，請勿手改 |
 
-`app/web_dist/index.html` 存在時，FastAPI 在 `/` 提供新前端（Docker 與 `uvicorn` 模式皆同）；不存在時沿用原本的 `app/static/` 介面，所以不建置前端也能照常使用。
+FastAPI 在 `/` 提供 `app/web_dist/` 的建置產物（Docker 與 `uvicorn` 模式皆同）。原本無建置步驟的 `app/static/` 介面已移除；`app/web_dist/index.html` 不存在時，`/` 回傳 HTTP 503 的說明頁（提示執行 `npm --prefix web run build`，並連到 `/docs`），`/api/v1/*` 不受影響。因此伺服器模式需先執行 `npm --prefix web run build`，或使用會在映像內建置前端的多階段 Dockerfile。
+
+以 `pip install .`（非 editable）建置 wheel 時，`app/web_dist/` 以 package data 打包，**只有先建置前端，wheel 才會內含 Web UI**；否則安裝後的 `/` 也是 503 說明頁。
 
 前端開發（需要 Node.js；開發伺服器把 `/api` 代理到 `127.0.0.1:8000`）：
 
@@ -136,11 +143,23 @@ npm run tauri dev
 # 發佈建置：建立含 CadQuery 的建置環境，凍結 sidecar，驗證後建置安裝包
 python scripts/desktop_env.py                                   # 建立 .venv-desktop（cadquery==2.8.0 + PyInstaller）
 .venv-desktop/Scripts/python.exe scripts/build_sidecar.py       # 輸出 src-tauri/binaries/promptcad-sidecar/（onedir）
-.venv-desktop/Scripts/python.exe scripts/frozen_smoke.py --measure  # 以凍結後的 exe 實際渲染並量測
+.venv-desktop/Scripts/python.exe scripts/frozen_smoke.py --measure  # 以凍結後的 exe 實際渲染並量測（--isolated-env 模擬乾淨機器）
+.venv-desktop/Scripts/python.exe scripts/frozen_kill_check.py --exe src-tauri/binaries/promptcad-sidecar/promptcad-sidecar.exe  # 關閉 Job Object 時 sidecar 與 render worker 一併結束
+.venv-desktop/Scripts/python.exe scripts/gen_third_party_notices.py --python .venv-desktop/Scripts/python.exe --strict  # 更新 THIRD_PARTY_NOTICES.md
 npm run tauri build                                             # NSIS 安裝包；sidecar 安裝到 <安裝目錄>/sidecar/
 ```
 
-桌面版內含 CadQuery 2.8.0，可直接輸出 STEP／STL／DXF／SVG（凍結後以 `promptcad-sidecar.exe --render-worker` 執行 `model.py`）。安裝包約 107 MiB，安裝後約 551 MiB；其餘量測見 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)。
+桌面版內含 CadQuery 2.8.0，可直接輸出 STEP／STL／DXF／SVG（凍結後以 `promptcad-sidecar.exe --render-worker` 執行 `model.py`）。安裝包約 107 MiB，安裝後約 551 MiB；其餘量測見 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)。乾淨機器驗證在 GitHub `windows-latest` 上以手動或 `v*` tag 觸發的 `.github/workflows/desktop-bundle.yml` 執行（隔離環境 smoke、Job Object 終止檢查、安裝後檢查）。
+
+### 第三方授權聲明
+
+桌面安裝包隨附的第三方軟體（凍結進 sidecar 的 Python 套件與 wheel 隨附 DLL、前端 npm 正式相依、Tauri 外殼的 Rust crates，以及 OCCT、VTK、CPython、PyInstaller bootloader、MSVC runtime、WebView2 bootstrapper 等）列於根目錄的 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)，安裝後位於 `<安裝目錄>\THIRD_PARTY_NOTICES.md`。其中 OCCT（經 OCP 載入）、casadi 與 NLopt 為 LGPL，在 onedir 版面下以獨立的 `.dll`／`.pyd` 存放於 `<安裝目錄>\sidecar\_internal\`，可由使用者替換；原始碼網址與版本見該檔的「LGPL 元件與替換權利」段落。
+
+- 提交在版本庫中的 `THIRD_PARTY_NOTICES.md` 只是產生當下 `.venv-desktop` 的快照（該環境未鎖版，僅固定 cadquery）；安裝包內那份由 `desktop-bundle.yml` 以 `--strict` 重新產生，才是權威版本。因此 CI 不跑 `--check`。
+- 若日後某個相依套件帶來未對應的 DLL 或授權，`--strict` 會讓打包失敗——這是刻意的警報，請補上 `LICENSE_OVERRIDES`／`VENDORED_DLLS` 後重跑。
+- 公開發布前，請在安裝檔旁附上（或封存連結）LGPL 元件對應版本的原始碼（OCP/OCCT、casadi、NLopt）。本文件不是法律意見。
+
+這個檔案由 `scripts/gen_third_party_notices.py` 產生，請勿手改：相依套件變動後以 `.venv-desktop` 重新執行（見上方指令；`--check` 只比對、不寫入）。`--strict` 在授權不明、或 wheel 隨附了未登錄的 DLL 時失敗；metadata 缺漏或有誤的套件在腳本的 `LICENSE_OVERRIDES` 中逐項註明理由。此檔是授權資訊彙整，不是法律意見。
 
 ## 使用方式
 
@@ -274,14 +293,13 @@ Create a 100x60x10 mm plate with two 5 mm blind holes 6 mm deep.
 pytest
 ruff check .
 python -m compileall -q app scripts tests
-node --check app/static/app.js
 python scripts/smoke_test.py
 python scripts/export_schema.py --check
 npm --prefix web run typecheck
 npm --prefix web test
 ```
 
-目前測試涵蓋規則解析、M 制孔徑、盲孔、沉頭孔、X/Y/Z 軸幾何原始碼、驗證閘門、可編輯 DSL、API Token、檔案下載與 ZIP；第 1 階段另加 schema 匯出、新前端服務、sidecar 啟動、2.0 範例的紙上驗證，以及前端的 vitest 測試。
+目前測試涵蓋規則解析、M 制孔徑、盲孔、沉頭孔、X/Y/Z 軸幾何原始碼、驗證閘門、可編輯 DSL、API Token、檔案下載與 ZIP；第 1 階段另加 schema 匯出、新前端服務（含未建置時的 503 說明頁）、sidecar 啟動、凍結 smoke／Job Object 終止檢查與授權聲明產生器的純函式測試、2.0 範例的紙上驗證，以及前端的 vitest 測試。CI 另有 `docker` job 實際建置映像並確認 `/` 提供新前端。
 
 ## 專案結構
 
@@ -296,8 +314,7 @@ app/
     openscad.py        OpenSCAD 編譯器
     renderer.py        CAD 核心選擇與受限 subprocess
     validator.py       幾何／製造前驗證閘門
-  static/              無前端建置步驟的 Web UI（新前端未建置時的備援）
-  web_dist/            web/ 的建置輸出（不納入版本控制）
+  web_dist/            web/ 的建置輸出（不納入版本控制；不存在時 "/" 回傳 503 說明頁）
   sidecar.py           桌面版 sidecar 進入點（印出 READY 行後提供 API）
 web/                   React + TypeScript + Vite 前端與 Three.js 檢視器
 src-tauri/             Tauri v2 桌面外殼（Rust）
@@ -305,9 +322,11 @@ schemas/               由 Pydantic 匯出的 JSON Schema（生成物）
 docs/                  API、架構、DSL（1.0 與 2.0）、提示詞、安全說明與 ADR
 examples/generated/    可直接修改及重新輸出的完整範例（1.0）
 examples/cad2/         CadDocument 2.0 手寫範例（只供規格驗證，目前沒有程式接受 2.0）
-scripts/               doctor、smoke test、export_schema.py、build_sidecar.py
-tests/                 單元、API、安全回歸、schema、sidecar 與 2.0 範例測試
+scripts/               doctor、smoke test、export_schema.py、build_sidecar.py、frozen_smoke.py、
+                       frozen_kill_check.py、gen_third_party_notices.py
+tests/                 單元、API、安全回歸、schema、sidecar、授權聲明與 2.0 範例測試
 generated/             執行時工作目錄
+THIRD_PARTY_NOTICES.md 桌面安裝包的第三方授權聲明（生成物，隨安裝包發佈）
 ```
 
 詳細資料：
