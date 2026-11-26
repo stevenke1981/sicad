@@ -1,4 +1,5 @@
-.PHONY: dev test lint format doctor docker-up docker-down clean schema schema-check web-deps web sidecar desktop
+.PHONY: dev test lint format doctor docker-up docker-down clean schema schema-check web-deps web \
+        desktop-lock desktop-lock-check desktop-env notices notices-check sidecar desktop
 
 PYTHON ?= python
 NPM ?= npm
@@ -43,10 +44,34 @@ web: schema
 	$(NPM) --prefix web run gen:types
 	$(NPM) --prefix web run build
 
-# PyInstaller onefile -> src-tauri/binaries/promptcad-sidecar-<target-triple>[.exe]
-# (needs the desktop extra: pip install -e ".[desktop]").
+# Hashed per-platform locks for the sidecar build env (ADR 0011):
+# requirements/desktop-{windows-x86_64,macos-arm64,linux-x86_64}.txt. Needs uv.
+desktop-lock:
+	$(PYTHON) scripts/desktop_lock.py
+
+desktop-lock-check:
+	$(PYTHON) scripts/desktop_lock.py --check
+
+# .venv-desktop (cadquery + PyInstaller) installed from this platform's lock file.
+desktop-env:
+	$(PYTHON) scripts/desktop_env.py
+
+ifeq ($(OS),Windows_NT)
+DESKTOP_PYTHON ?= .venv-desktop/Scripts/python.exe
+else
+DESKTOP_PYTHON ?= .venv-desktop/bin/python
+endif
+
+# THIRD_PARTY_NOTICES.md (the committed file is the Windows one; see ADR 0011).
+notices:
+	$(DESKTOP_PYTHON) scripts/gen_third_party_notices.py --python $(DESKTOP_PYTHON) --strict
+
+notices-check:
+	$(DESKTOP_PYTHON) scripts/gen_third_party_notices.py --python $(DESKTOP_PYTHON) --check --strict
+
+# PyInstaller onedir -> src-tauri/binaries/promptcad-sidecar/ (run with .venv-desktop).
 sidecar:
-	$(PYTHON) scripts/build_sidecar.py
+	$(DESKTOP_PYTHON) scripts/build_sidecar.py
 
 # Tauri bundle; beforeBuildCommand in src-tauri/tauri.conf.json builds the frontend.
 desktop: sidecar

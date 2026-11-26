@@ -6,12 +6,13 @@ import queue
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 
 import httpx
 import pytest
 
-from app.sidecar import READY_PREFIX, ready_line
+from app.sidecar import READY_PREFIX, _parse_args, ready_line
 
 ROOT = Path(__file__).resolve().parents[1]
 TOKEN = "test-sidecar-token-0123456789abcdef"
@@ -30,12 +31,14 @@ def _env(tmp_path: Path, **extra: str) -> dict[str, str]:
     return env
 
 
-def _spawn(tmp_path: Path, env: dict[str, str]) -> subprocess.Popen[str]:
+def _spawn(
+    tmp_path: Path, env: dict[str, str], extra_args: tuple[str, ...] = (), stdin=subprocess.DEVNULL
+) -> subprocess.Popen[str]:
     return subprocess.Popen(
-        [sys.executable, "-m", "app.sidecar", "--host", "127.0.0.1", "--port", "0"],
+        [sys.executable, "-m", "app.sidecar", "--host", "127.0.0.1", "--port", "0", *extra_args],
         cwd=tmp_path,  # no .env from the repo; app must be importable via PYTHONPATH
         env={**env, "PYTHONPATH": str(ROOT)},
-        stdin=subprocess.DEVNULL,
+        stdin=stdin,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -129,3 +132,61 @@ def test_sidecar_rejects_non_loopback_host(tmp_path):
     )
     assert result.returncode == 2
     assert READY_PREFIX not in result.stdout
+
+
+def test_exit_on_stdin_eof_flag_parses():
+    assert _parse_args([]).exit_on_stdin_eof is False
+    assert _parse_args(["--exit-on-stdin-eof"]).exit_on_stdin_eof is True
+
+
+def _spawn_ready_with_pipe(tmp_path: Path) -> subprocess.Popen[str]:
+    proc = _spawn(
+        tmp_path,
+        _env(tmp_path, PROMPTCAD_API_TOKEN=TOKEN),
+        extra_args=("--exit-on-stdin-eof",),
+        stdin=subprocess.PIPE,
+    )
+    line = _first_line(proc.stdout)
+    if not line:
+        proc.kill()
+        _out, err = proc.communicate(timeout=30)
+        pytest.fail(f"no READY line; stderr: {err}")
+    assert line.startswith(READY_PREFIX + " ")
+    return proc
+
+
+def _reap(proc: subprocess.Popen[str]) -> str:
+    if proc.poll() is None:
+        proc.kill()
+    _out, err = proc.communicate(timeout=30)
+    return err
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="unix stdin-EOF kill-on-close")
+def test_sidecar_exits_when_stdin_closes_unix(tmp_path):
+    proc = _spawn_ready_with_pipe(tmp_path)
+    try:
+        # The sidecar leads its own process group, so killing it can never reach ours.
+        assert os.getpgid(proc.pid) == proc.pid
+        assert os.getpgid(proc.pid) != os.getpgrp()
+        proc.stdin.close()  # what the kernel does when the shell dies
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            pytest.fail("the sidecar outlived its closed stdin pipe by 10 s")
+    finally:
+        err = _reap(proc)
+    assert "stdin closed" in err
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows ignores the flag (Job Object)")
+def test_exit_on_stdin_eof_is_a_noop_on_windows(tmp_path):
+    proc = _spawn_ready_with_pipe(tmp_path)
+    try:
+        proc.stdin.close()
+        time.sleep(1.5)
+        assert proc.poll() is None, "the flag must not stop the sidecar on Windows"
+    finally:
+        proc.terminate()
+        err = _reap(proc)
+    assert "ignored on Windows" in err

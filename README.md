@@ -132,7 +132,7 @@ python scripts/export_schema.py        # 寫入 schemas/promptcad.schema.json；
 npm --prefix web run gen:types         # 生成 web/src/api/generated/promptcad.d.ts
 ```
 
-桌面版（目前只在 Windows x86_64 驗證；需要 Rust 的 `stable-x86_64-pc-windows-msvc` 工具鏈與 WebView2）：
+桌面版支援三個平台（[ADR 0011](docs/adr/0011-cross-platform-desktop.md)）：Windows x86_64（NSIS，需 Rust `stable-x86_64-pc-windows-msvc` 與 WebView2）、macOS arm64（`.app`／`.dmg`，macOS 11+）、Linux x86_64（`.deb`／AppImage，glibc 2.35+，即 Ubuntu 22.04／Debian 12 以上，需 WebKitGTK 4.1）。`rust-toolchain.toml` 固定 Windows 的 MSVC 工具鏈；在 macOS／Linux 建置時請先設定 `RUSTUP_TOOLCHAIN=stable`。Linux 建置另需 `libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libxdo-dev libssl-dev`。
 
 ```bash
 npm ci                                 # 安裝根目錄的 @tauri-apps/cli
@@ -140,23 +140,57 @@ npm --prefix web run build             # 只有 tauri build 需要；cargo check
 # 開發：以本機 Python 取代打包的 sidecar
 #   （僅 debug 建置有效）PowerShell: $env:PROMPTCAD_SIDECAR_CMD = "$PWD\.venv\Scripts\python.exe -m app.sidecar"
 npm run tauri dev
-# 發佈建置：建立含 CadQuery 的建置環境，凍結 sidecar，驗證後建置安裝包
-python scripts/desktop_env.py                                   # 建立 .venv-desktop（cadquery==2.8.0 + PyInstaller）
-.venv-desktop/Scripts/python.exe scripts/build_sidecar.py       # 輸出 src-tauri/binaries/promptcad-sidecar/（onedir）
+# 發佈建置：以鎖檔建立含 CadQuery 的建置環境，凍結 sidecar，驗證後建置安裝包
+# （以下以 Windows 路徑示範；macOS／Linux 把 .venv-desktop/Scripts/python.exe 換成 .venv-desktop/bin/python）
+python scripts/desktop_env.py                                   # 依本機平台的 requirements/desktop-*.txt 建立 .venv-desktop（--recreate 重建）
+.venv-desktop/Scripts/python.exe scripts/build_sidecar.py       # 輸出 src-tauri/binaries/promptcad-sidecar/（onedir，含 VTK 精簡；--no-prune 關閉）
 .venv-desktop/Scripts/python.exe scripts/frozen_smoke.py --measure  # 以凍結後的 exe 實際渲染並量測（--isolated-env 模擬乾淨機器）
-.venv-desktop/Scripts/python.exe scripts/frozen_kill_check.py --exe src-tauri/binaries/promptcad-sidecar/promptcad-sidecar.exe  # 關閉 Job Object 時 sidecar 與 render worker 一併結束
-.venv-desktop/Scripts/python.exe scripts/gen_third_party_notices.py --python .venv-desktop/Scripts/python.exe --strict  # 更新 THIRD_PARTY_NOTICES.md
-npm run tauri build                                             # NSIS 安裝包；sidecar 安裝到 <安裝目錄>/sidecar/
+.venv-desktop/Scripts/python.exe scripts/frozen_kill_check.py --exe src-tauri/binaries/promptcad-sidecar/promptcad-sidecar.exe  # 關閉外殼時 sidecar 與 render worker 一併結束（Windows：Job Object；unix：stdin EOF + 行程群組）
+.venv-desktop/Scripts/python.exe scripts/gen_third_party_notices.py --python .venv-desktop/Scripts/python.exe --strict  # 更新 THIRD_PARTY_NOTICES.md（Windows 版才提交）
+npm run tauri build                                             # Windows：NSIS；macOS：.app + .dmg；Linux：.deb + AppImage
 ```
 
-桌面版內含 CadQuery 2.8.0，可直接輸出 STEP／STL／DXF／SVG（凍結後以 `promptcad-sidecar.exe --render-worker` 執行 `model.py`）。安裝包約 107 MiB，安裝後約 551 MiB；其餘量測見 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)。乾淨機器驗證在 GitHub `windows-latest` 上以手動或 `v*` tag 觸發的 `.github/workflows/desktop-bundle.yml` 執行（隔離環境 smoke、Job Object 終止檢查、安裝後檢查）。
+#### 建置環境鎖檔
+
+`.venv-desktop` 的每個套件（含雜湊）都固定在三份鎖檔中：`requirements/desktop-windows-x86_64.txt`、`desktop-macos-arm64.txt`、`desktop-linux-x86_64.txt`。三份都由 `scripts/desktop_lock.py` 在**同一台機器**上以 `uv pip compile --python-platform` 產生（需要 uv），`scripts/desktop_env.py` 則以 `uv pip sync --require-hashes` 讓環境與鎖檔完全一致。
+
+```bash
+python scripts/desktop_lock.py            # pyproject.toml 改了之後：重新編譯，沿用既有版本
+python scripts/desktop_lock.py --check    # 只比對（CI 的 lock-check job）
+python scripts/desktop_lock.py --upgrade  # 升級全部版本：三份一起更新
+python scripts/desktop_env.py --recreate  # 依新鎖檔重建 .venv-desktop
+# 之後重新產生 THIRD_PARTY_NOTICES.md，與三份鎖檔一起提交
+```
+
+Makefile 也提供 `make desktop-lock`、`desktop-lock-check`、`desktop-env`、`notices`、`notices-check`。
+
+#### 安裝未簽章的測試版
+
+macOS 與 Linux 的安裝包未經 Apple 公證或簽章（macOS 只有 ad-hoc 簽章），僅供測試：
+
+- **macOS**：把 `PromptCAD Studio.app` 拖到「應用程式」後，Gatekeeper 會因隔離屬性拒絕開啟從網路下載的 App。確認來源可信後執行：
+
+  ```bash
+  xattr -dr com.apple.quarantine "/Applications/PromptCAD Studio.app"
+  ```
+
+- **Linux（.deb）**：以 apt 安裝本機檔案，系統相依（`deb.depends` 列出的 GL／X11 函式庫與 WebKitGTK）會一併安裝：
+
+  ```bash
+  sudo apt install ./PromptCAD*.deb       # 注意 ./ 前綴；之後以 promptcad-studio 或應用程式選單啟動
+  sudo apt remove <套件名>                 # 套件名可由 dpkg-deb -f PromptCAD*.deb Package 查詢
+  ```
+
+  AppImage 目前為參考產物：`chmod +x` 後直接執行（需要 FUSE 2）。
+
+桌面版內含 CadQuery 2.8.0，可直接輸出 STEP／STL／DXF／SVG（凍結後以 `promptcad-sidecar --render-worker` 執行 `model.py`）。Windows 安裝包約 107 MiB，精簡前安裝後約 551 MiB；其餘量測見 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)。乾淨機器驗證在 GitHub hosted runner（`windows-latest`、`macos-latest`、`ubuntu-22.04`）上以手動或 `v*` tag 觸發的 `.github/workflows/desktop-bundle.yml` 執行（鎖檔安裝、onedir smoke、終止檢查、安裝後檢查；各項在各平台的必過／參考分級見 ADR 0011）。
 
 ### 第三方授權聲明
 
 桌面安裝包隨附的第三方軟體（凍結進 sidecar 的 Python 套件與 wheel 隨附 DLL、前端 npm 正式相依、Tauri 外殼的 Rust crates，以及 OCCT、VTK、CPython、PyInstaller bootloader、MSVC runtime、WebView2 bootstrapper 等）列於根目錄的 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)，安裝後位於 `<安裝目錄>\THIRD_PARTY_NOTICES.md`。其中 OCCT（經 OCP 載入）、casadi 與 NLopt 為 LGPL，在 onedir 版面下以獨立的 `.dll`／`.pyd` 存放於 `<安裝目錄>\sidecar\_internal\`，可由使用者替換；原始碼網址與版本見該檔的「LGPL 元件與替換權利」段落。
 
-- 提交在版本庫中的 `THIRD_PARTY_NOTICES.md` 只是產生當下 `.venv-desktop` 的快照（該環境未鎖版，僅固定 cadquery）；安裝包內那份由 `desktop-bundle.yml` 以 `--strict` 重新產生，才是權威版本。因此 CI 不跑 `--check`。
-- 若日後某個相依套件帶來未對應的 DLL 或授權，`--strict` 會讓打包失敗——這是刻意的警報，請補上 `LICENSE_OVERRIDES`／`VENDORED_DLLS` 後重跑。
+- 提交在版本庫中的 `THIRD_PARTY_NOTICES.md` 是 **Windows 版的權威檔**：`.venv-desktop` 由鎖檔建立，因此可重現，`desktop-bundle.yml` 在 Windows 上以 `--check --strict` 比對，不一致即失敗。macOS／Linux 的安裝包各自在 CI 以 `--strict` 重新產生一份（路徑與原生函式庫依平台而異，並移除只屬於 Windows 的元件），隨安裝包發佈並上傳為 artifact，但不提交。
+- 若日後某個相依套件帶來未對應的原生函式庫（`.dll`／`.so`／`.dylib`）或授權，`--strict` 會讓打包失敗——這是刻意的警報，請補上 `LICENSE_OVERRIDES`／`VENDORED_DLLS` 後重跑。`scripts/build_sidecar.py` 的 `PRUNED_DISTS`（確認未凍結的套件）不列入聲明。
 - 公開發布前，請在安裝檔旁附上（或封存連結）LGPL 元件對應版本的原始碼（OCP/OCCT、casadi、NLopt）。本文件不是法律意見。
 
 這個檔案由 `scripts/gen_third_party_notices.py` 產生，請勿手改：相依套件變動後以 `.venv-desktop` 重新執行（見上方指令；`--check` 只比對、不寫入）。`--strict` 在授權不明、或 wheel 隨附了未登錄的 DLL 時失敗；metadata 缺漏或有誤的套件在腳本的 `LICENSE_OVERRIDES` 中逐項註明理由。此檔是授權資訊彙整，不是法律意見。
@@ -299,7 +333,7 @@ npm --prefix web run typecheck
 npm --prefix web test
 ```
 
-目前測試涵蓋規則解析、M 制孔徑、盲孔、沉頭孔、X/Y/Z 軸幾何原始碼、驗證閘門、可編輯 DSL、API Token、檔案下載與 ZIP；第 1 階段另加 schema 匯出、新前端服務（含未建置時的 503 說明頁）、sidecar 啟動、凍結 smoke／Job Object 終止檢查與授權聲明產生器的純函式測試、2.0 範例的紙上驗證，以及前端的 vitest 測試。CI 另有 `docker` job 實際建置映像並確認 `/` 提供新前端。
+目前測試涵蓋規則解析、M 制孔徑、盲孔、沉頭孔、X/Y/Z 軸幾何原始碼、驗證閘門、可編輯 DSL、API Token、檔案下載與 ZIP；第 1 階段另加 schema 匯出、新前端服務（含未建置時的 503 說明頁）、sidecar 啟動、凍結 smoke／終止檢查、鎖檔與授權聲明產生器的純函式測試、2.0 範例的紙上驗證，以及前端的 vitest 測試。CI 另有 `docker` job 實際建置映像並確認 `/` 提供新前端、`lock-check` job 確認三份桌面鎖檔與 `pyproject.toml` 一致，以及三平台的 `desktop` job（`cargo fmt`／`clippy`／`test`）。
 
 ## 專案結構
 
@@ -322,8 +356,10 @@ schemas/               由 Pydantic 匯出的 JSON Schema（生成物）
 docs/                  API、架構、DSL（1.0 與 2.0）、提示詞、安全說明與 ADR
 examples/generated/    可直接修改及重新輸出的完整範例（1.0）
 examples/cad2/         CadDocument 2.0 手寫範例（只供規格驗證，目前沒有程式接受 2.0）
-scripts/               doctor、smoke test、export_schema.py、build_sidecar.py、frozen_smoke.py、
-                       frozen_kill_check.py、gen_third_party_notices.py
+scripts/               doctor、smoke test、export_schema.py、desktop_lock.py、desktop_env.py、
+                       build_sidecar.py、frozen_smoke.py、frozen_kill_check.py、
+                       gen_third_party_notices.py
+requirements/          桌面建置環境的三平台雜湊鎖檔（desktop-*.txt，由 desktop_lock.py 產生）
 tests/                 單元、API、安全回歸、schema、sidecar、授權聲明與 2.0 範例測試
 generated/             執行時工作目錄
 THIRD_PARTY_NOTICES.md 桌面安裝包的第三方授權聲明（生成物，隨安裝包發佈）

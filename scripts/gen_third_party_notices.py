@@ -12,15 +12,25 @@ Sources (all read from what is actually installed / locked, nothing from the net
   dumps ``importlib.metadata`` for every distribution: name, version, ``License-Expression``,
   ``License``, Trove licence classifiers, licence file texts (``License-File`` entries in
   ``.dist-info/licenses/``; otherwise ``LICENSE*`` / ``COPYING*`` / ``NOTICE*`` files from the
-  RECORD) and the DLLs vendored in ``<pkg>.libs/`` (delvewheel). Build-only tools and the
-  modules ``scripts/build_sidecar.py`` prunes from the bundle are left out.
+  RECORD) and the native libraries vendored by the wheel: ``<pkg>.libs/*.dll`` (delvewheel),
+  ``<pkg>.libs/*.so*`` (auditwheel), ``*/.dylibs/*.dylib`` (delocate) and in-package
+  ``lib*.so*`` / ``lib*.dylib`` (e.g. ``vtkmodules/libvtk*.so`` on Linux). Build-only tools,
+  the modules ``scripts/build_sidecar.py`` excludes (:data:`PRUNED_DISTS`) and the
+  distributions it verified absent from ``_internal`` (``build_sidecar.PRUNED_DISTS``) are
+  left out.
 * npm - production (non-dev) entries of ``web/package-lock.json``; texts from
   ``web/node_modules/<name>/LICENSE*``.
-* Rust - ``cargo metadata --format-version 1 --filter-platform x86_64-pc-windows-msvc``
-  in ``src-tauri``; normal (non-dev, non-build) dependencies reachable from the root crate,
+* Rust - ``cargo metadata --format-version 1 --filter-platform <host target>`` in
+  ``src-tauri`` (``x86_64-pc-windows-msvc`` / ``aarch64-apple-darwin`` /
+  ``x86_64-unknown-linux-gnu``, chosen from the probed interpreter's ``sys.platform``); normal (non-dev, non-build) dependencies reachable from the root crate,
   deduplicated by name+version; texts from the crate directories.
 * A hand-kept table for what no package manager reports: OCCT, VTK, CPython, the
-  PyInstaller bootloader, nlopt, the MSVC runtime, the WebView2 bootstrapper and NSIS.
+  PyInstaller bootloader, nlopt and, on Windows only, the MSVC runtime, the WebView2
+  bootstrapper and NSIS.
+
+The committed ``THIRD_PARTY_NOTICES.md`` is the Windows one (ADR 0011): Windows CI asserts it
+with ``--check --strict`` against the locked env; macOS / Linux CI regenerate it in place with
+``--strict`` and ship that file in their bundle (paths and library names follow the platform).
 
 Licence texts are deduplicated by SHA-256 of the normalised text. Output is sorted and
 contains no timestamps, so ``--check`` can compare it byte for byte with the committed file.
@@ -36,7 +46,10 @@ This is a compliance aid, not legal advice. Only the standard library is used.
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
+import importlib.util
+import inspect
 import json
 import re
 import subprocess
@@ -49,7 +62,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT = ROOT / "THIRD_PARTY_NOTICES.md"
 WEB_DIR = ROOT / "web"
 TAURI_DIR = ROOT / "src-tauri"
-RUST_TARGET = "x86_64-pc-windows-msvc"
+RUST_TARGET = "x86_64-pc-windows-msvc"  # the committed (Windows) notices
 
 # Tools that build the bundle but are not shipped in it. setuptools is deliberately NOT
 # listed: PyInstaller's analysis of the real sidecar (build/sidecar/work/*/PYZ-00.toc)
@@ -61,6 +74,7 @@ BUILD_ONLY_DISTS = frozenset(
         "altgraph",
         "pefile",
         "pywin32-ctypes",
+        "macholib",  # PyInstaller's Mach-O analysis on macOS
         "pip",
         "wheel",
         "uv",
@@ -77,6 +91,55 @@ PRUNED_DISTS: Mapping[str, str] = {
     "pillow": "PIL",
     "scipy": "scipy",
 }
+
+
+def _literal_assignment(source: str, name: str) -> tuple[bool, object]:
+    """``(found, value)`` of a top-level ``NAME = <literal>`` (or annotated) in ``source``."""
+    for node in ast.parse(source).body:
+        if isinstance(node, ast.Assign):
+            targets, value = node.targets, node.value
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            targets, value = [node.target], node.value
+        else:
+            continue
+        if any(isinstance(t, ast.Name) and t.id == name for t in targets):
+            try:
+                return True, ast.literal_eval(value)
+            except ValueError:
+                return False, None  # computed: needs a real import
+    return False, None
+
+
+def _load_sidecar_pruned_dists(path: Path | None = None) -> tuple[frozenset[str], str]:
+    """``build_sidecar.PRUNED_DISTS`` (dists verified absent from ``_internal``), normalised.
+
+    Read as a literal from the source when possible (no import side effects, works in the
+    CadQuery-free test venv); otherwise the module is imported and ``getattr(..., ())`` used,
+    so an older build_sidecar without the attribute yields an empty set. Returns
+    ``(names, error)``: a build_sidecar that cannot be read is reported by ``--strict``
+    (silently listing pruned dists would make the Windows ``--check`` flap).
+    """
+    path = path or Path(__file__).resolve().parent / "build_sidecar.py"
+    scripts_dir = str(path.parent)
+    added = False
+    try:
+        found, value = _literal_assignment(path.read_text(encoding="utf-8"), "PRUNED_DISTS")
+        if not found:
+            added = scripts_dir not in sys.path
+            if added:  # build_sidecar imports its sibling helper modules by bare name
+                sys.path.insert(0, scripts_dir)
+            spec = importlib.util.spec_from_file_location("_build_sidecar_for_notices", path)
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[spec.name] = module
+            spec.loader.exec_module(module)
+            value = getattr(module, "PRUNED_DISTS", ())
+        return frozenset(normalize_name(str(n)) for n in value or ()), ""
+    except Exception as exc:  # only on a broken checkout
+        return frozenset(), f"{type(exc).__name__}: {exc}"
+    finally:
+        if added:
+            sys.path.remove(scripts_dir)
+
 
 # This project itself (MIT, see LICENSE) - not a third party.
 OWN_DISTS = frozenset({"promptcad-studio"})
@@ -134,8 +197,12 @@ LICENSE_ALIASES: Mapping[str, str] = {
 
 UNKNOWN_VALUES = frozenset({"", "unknown", "none", "n/a", "osi approved", "other/proprietary"})
 
-# DLLs vendored by delvewheel in ``<pkg>.libs/``. Matched on the normalised stem (lower
-# case, delvewheel hash and trailing version removed). Entries ending in "*" are prefixes.
+# Native libraries vendored by wheels (delvewheel ``<pkg>.libs/*.dll``; auditwheel
+# ``<pkg>.libs/*.so*``; delocate ``.dylibs/*.dylib``; in-package ``lib*.so*``). Matched on the
+# normalised stem (see :func:`normalize_lib_stem`: lower case, hash / version / suffix removed).
+# Unix stems are tried as-is and then without their ``lib`` prefix, so ``libTKernel`` hits
+# ``tk*`` and ``libpng16`` hits ``libpng16``. Entries ending in "*" are prefixes. Unix-only
+# entries come from the first macOS / Linux CI ``--strict`` runs (ADR 0011).
 VENDORED_DLLS: tuple[tuple[str, str, str], ...] = (
     ("tk*", "Open CASCADE Technology (OCCT)", "LGPL-2.1-only WITH OCCT-exception-1.0"),
     ("vtk*", "VTK（含其內建 ThirdParty 模組）", "BSD-3-Clause"),
@@ -172,13 +239,65 @@ VENDORED_DLLS: tuple[tuple[str, str, str], ...] = (
     ("tiff", "libtiff", "libtiff"),
     ("zlib", "zlib", "Zlib"),
     ("zstd", "Zstandard", "BSD-3-Clause OR GPL-2.0-only"),
+    # --- unix (auditwheel / delocate / in-package) -----------------------------------
+    ("casadi*", "CasADi", "LGPL-3.0-or-later"),
+    ("nlopt*", "NLopt", "LGPL-2.1-or-later AND MIT"),
+    ("libgomp", "GCC OpenMP runtime（libgomp）", "GPL-3.0-or-later WITH GCC-exception-3.1"),
+    (
+        "libgfortran",
+        "GCC Fortran runtime（libgfortran）",
+        "GPL-3.0-or-later WITH GCC-exception-3.1",
+    ),
+    ("libgcc_s", "GCC runtime（libgcc_s）", "GPL-3.0-or-later WITH GCC-exception-3.1"),
+    ("libstdc++", "GCC C++ runtime（libstdc++）", "GPL-3.0-or-later WITH GCC-exception-3.1"),
+    ("libquadmath", "GCC libquadmath", "LGPL-2.1-or-later"),
+    ("libomp", "LLVM OpenMP runtime（libomp）", "Apache-2.0 WITH LLVM-exception"),
+    ("libc++", "LLVM libc++", "Apache-2.0 WITH LLVM-exception"),
+    ("libc++abi", "LLVM libc++abi", "Apache-2.0 WITH LLVM-exception"),
+    ("libz", "zlib", "Zlib"),
+    ("bz2", "bzip2", "bzip2-1.0.6"),
+    ("expat", "Expat", "MIT"),
+    ("jpeg", "libjpeg-turbo", "IJG AND BSD-3-Clause AND Zlib"),
+    ("turbojpeg", "libjpeg-turbo", "IJG AND BSD-3-Clause AND Zlib"),
+    ("raw_r", "LibRaw", "LGPL-2.1-only OR CDDL-1.0"),
+    ("tbb*", "oneTBB", "Apache-2.0"),
+    ("openblas*", "OpenBLAS", "BSD-3-Clause"),
 )
 
 LICENSE_FILE_RE = re.compile(r"^(licen[cs]e|copying|notice|unlicense|copyright)([.\-_].*)?$", re.I)
 COPYLEFT_RE = re.compile(r"\b(A?GPL|LGPL|MPL|EPL|CDDL)")
 
+
+def is_vendored_lib(parts) -> bool:  # parts: tuple[str, ...]; no annotations (probe)
+    """Is this wheel RECORD path (split into parts) a vendored native library?
+
+    * ``<pkg>.libs/*.dll`` (delvewheel) and ``<pkg>.libs/*.so*`` / ``*.dylib`` (auditwheel);
+    * ``.../.dylibs/*.dylib`` (delocate);
+    * in-package ``lib*.so[.N...]`` / ``lib*.dylib`` that are not Python extension modules
+      (``vtkmodules/libvtk*.so`` on Linux). In-package Windows DLLs are not counted: they are
+      covered by their distribution's own entry, as before.
+
+    Pure and stdlib-only: its source is also embedded in :data:`PY_PROBE`.
+    """
+    import re as _re
+
+    if len(parts) < 2:
+        return False
+    lower = parts[-1].lower()
+    shared = bool(_re.search(r"\.so(\.\d+)*$", lower)) or lower.endswith(".dylib")
+    if parts[0].endswith(".libs"):
+        return lower.endswith(".dll") or shared
+    if ".dylibs" in parts[:-1]:
+        return shared
+    if ".cpython-" in lower or ".abi3." in lower or not lower.startswith("lib"):
+        return False
+    return shared
+
+
 # Executed by the ``--python`` interpreter (``-I -c``): stdlib only, prints one JSON object.
-PY_PROBE = r"""
+PY_PROBE = (
+    inspect.getsource(is_vendored_lib)
+    + r"""
 import importlib.metadata as md, json, os, platform, re, sys
 PAT = re.compile(r"^(licen[cs]e|copying|notice|unlicense|copyright)([.\-_].*)?$", re.I)
 SKIP_DIRS = {"test", "tests", "doc", "docs", "example", "examples"}
@@ -230,10 +349,7 @@ for d in md.distributions():
             text = read_path(f.locate())
             if text:
                 texts.append([str(f).replace(os.sep, "/"), text])
-    libs = sorted(
-        f.parts[-1] for f in files
-        if len(f.parts) >= 2 and f.parts[0].endswith(".libs") and f.parts[-1].lower().endswith(".dll")
-    )
+    libs = sorted(f.parts[-1] for f in files if is_vendored_lib(f.parts))
     dists.append({
         "name": name,
         "version": meta.get("Version") or "",
@@ -249,8 +365,9 @@ for cand in ("LICENSE.txt", "LICENSE"):
     if cpython:
         break
 json.dump({"python_version": platform.python_version(), "cpython_license": cpython or "",
-           "dists": dists}, sys.stdout, ensure_ascii=True)
+           "platform": sys.platform, "dists": dists}, sys.stdout, ensure_ascii=True)
 """
+)
 
 
 # --------------------------------------------------------------------------------------
@@ -283,6 +400,87 @@ class VendoredDll:
     license: str | None
 
 
+@dataclass(frozen=True)
+class Target:
+    """Where and how the bundle for one OS lays out its files (wording of the notices)."""
+
+    key: str  # sys.platform prefix: win32 | darwin | linux
+    bundle: str  # what the notices describe, e.g. "Windows x64 NSIS 安裝程式"
+    rust_target: str  # cargo metadata --filter-platform
+    sep: str  # path separator shown in the notices
+    notices_path: str  # where the installed notices file lives
+    install_note: str  # where sidecar/_internal ends up after installation
+    lib_ext: str  # glob suffix of a shared library: ".dll" | ".dylib" | ".so*"
+    ext_ext: str  # Python extension module suffix: ".pyd" | ".so"
+    lib_prefix: str  # "" on Windows (TK*.dll), "lib" on unix (libTK*.so*)
+    exe_suffix: str
+    windows_only_hand: bool
+
+    def internal(self, *parts: str) -> str:
+        """``sidecar/_internal/<parts>/`` spelled with this OS's separator (trailing sep)."""
+        return self.sep.join(("sidecar", "_internal", *parts)) + self.sep
+
+    def lib(self, stem_glob: str) -> str:
+        return f"{self.lib_prefix}{stem_glob}{self.lib_ext}"
+
+    def libs_dir(self, wheel_libs: str) -> str:
+        """Typical directory of vendored libraries: ``<pkg>.libs`` on Windows, generic on unix."""
+        return self.internal(wheel_libs) if self.key == "win32" else self.internal()
+
+
+TARGETS: Mapping[str, Target] = {
+    "win32": Target(
+        key="win32",
+        bundle="Windows x64 NSIS 安裝程式",
+        rust_target="x86_64-pc-windows-msvc",
+        sep="\\",
+        notices_path="<安裝目錄>\\THIRD_PARTY_NOTICES.md",
+        install_note="安裝目錄的 `sidecar\\_internal\\`",
+        lib_ext=".dll",
+        ext_ext=".pyd",
+        lib_prefix="",
+        exe_suffix=".exe",
+        windows_only_hand=True,
+    ),
+    "darwin": Target(
+        key="darwin",
+        bundle="macOS arm64 .app／.dmg",
+        rust_target="aarch64-apple-darwin",
+        sep="/",
+        notices_path="PromptCAD Studio.app/Contents/Resources/THIRD_PARTY_NOTICES.md",
+        install_note="安裝位置 `PromptCAD Studio.app/Contents/Resources/sidecar/_internal/`",
+        lib_ext=".dylib",
+        ext_ext=".so",
+        lib_prefix="lib",
+        exe_suffix="",
+        windows_only_hand=False,
+    ),
+    "linux": Target(
+        key="linux",
+        bundle="Linux x86_64 .deb／AppImage",
+        rust_target="x86_64-unknown-linux-gnu",
+        sep="/",
+        notices_path="/usr/lib/PromptCAD Studio/THIRD_PARTY_NOTICES.md",
+        install_note=(
+            "安裝位置 `/usr/lib/PromptCAD Studio/sidecar/_internal/`（.deb；AppImage 內為相同相對位置）"
+        ),
+        lib_ext=".so*",
+        ext_ext=".so",
+        lib_prefix="lib",
+        exe_suffix="",
+        windows_only_hand=False,
+    ),
+}
+
+
+def target_for(sys_platform: str | None) -> Target:
+    """The :class:`Target` of a probed ``sys.platform`` (Windows when unknown / missing)."""
+    for key, target in TARGETS.items():
+        if (sys_platform or "win32").startswith(key):
+            return target
+    return TARGETS["win32"]
+
+
 @dataclass
 class Collected:
     python: list[Component]
@@ -292,10 +490,19 @@ class Collected:
     hand: list[Component]
     python_version: str
     dist_versions: dict[str, str]
+    target: Target = TARGETS["win32"]
 
 
 def normalize_name(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
+
+
+SIDECAR_PRUNED_DISTS, SIDECAR_PRUNED_ERROR = _load_sidecar_pruned_dists()
+
+
+def excluded_pruned_dists() -> list[str]:
+    """Every dist left out because the sidecar build drops it (both lists, normalised)."""
+    return sorted(set(PRUNED_DISTS) | SIDECAR_PRUNED_DISTS)
 
 
 def is_unknown(expr: str | None) -> bool:
@@ -345,7 +552,9 @@ def shipped_python_dists(dists: Iterable[Mapping]) -> list[Mapping]:
     seen: dict[tuple[str, str], Mapping] = {}
     for dist in dists:
         key = normalize_name(dist["name"])
-        if key in BUILD_ONLY_DISTS or key in PRUNED_DISTS or key in OWN_DISTS:
+        if key in BUILD_ONLY_DISTS or key in OWN_DISTS:
+            continue
+        if key in PRUNED_DISTS or key in SIDECAR_PRUNED_DISTS:
             continue
         seen.setdefault((key, dist.get("version", "")), dist)
     return [seen[k] for k in sorted(seen)]
@@ -372,14 +581,33 @@ def python_components(probe: Mapping) -> list[Component]:
     return comps
 
 
-def normalize_dll_stem(file_name: str) -> str:
-    stem = file_name.rsplit(".", 1)[0].lower()
-    stem = re.sub(r"-[0-9a-f]{32}$", "", stem)
-    return re.sub(r"-\d+(\.\d+)*$", "", stem)
+def is_unix_lib(file_name: str) -> bool:
+    lower = file_name.lower()
+    return bool(re.search(r"\.so(\.\d+)*$", lower)) or lower.endswith(".dylib")
 
 
-def classify_dll(file_name: str) -> tuple[str, str] | None:
-    stem = normalize_dll_stem(file_name)
+def normalize_lib_stem(file_name: str) -> str:
+    """Stable name of a vendored library: no suffix, wheel-repair hash, soname or version.
+
+    ``TKernel-<32 hex>.dll`` -> ``tkernel`` (delvewheel); ``libgomp-a34b3233.so.1.0.0`` ->
+    ``libgomp`` (auditwheel); ``libgfortran.5.dylib`` -> ``libgfortran`` (delocate);
+    ``libvtkCommonCore-9.6.so`` -> ``libvtkcommoncore``; ``libIex-3_2.so.31`` -> ``libiex``.
+    """
+    lower = file_name.lower()
+    if not is_unix_lib(lower):  # Windows: unchanged since the committed notices
+        stem = lower.rsplit(".", 1)[0]
+        stem = re.sub(r"-[0-9a-f]{32}$", "", stem)
+        return re.sub(r"-\d+(\.\d+)*$", "", stem)
+    stem = re.sub(r"(\.so(\.\d+)*|\.dylib)$", "", lower)
+    stem = re.sub(r"\.\d+(\.\d+)*$", "", stem)  # libfoo.1.2(.dylib)
+    stem = re.sub(r"-[0-9a-f]{8}$", "", stem)  # auditwheel hash
+    return re.sub(r"-\d+([._]\d+)*$", "", stem)
+
+
+normalize_dll_stem = normalize_lib_stem  # former name
+
+
+def _match_vendored(stem: str) -> tuple[str, str] | None:
     for pattern, label, licence in VENDORED_DLLS:
         if pattern.endswith("*"):
             if stem.startswith(pattern[:-1]):
@@ -387,6 +615,15 @@ def classify_dll(file_name: str) -> tuple[str, str] | None:
         elif stem == pattern:
             return label, licence
     return None
+
+
+def classify_dll(file_name: str) -> tuple[str, str] | None:
+    """``(label, licence)`` of a vendored library, or None when :data:`VENDORED_DLLS` lacks it."""
+    stem = normalize_lib_stem(file_name)
+    hit = _match_vendored(stem)
+    if hit is None and is_unix_lib(file_name) and stem.startswith("lib") and len(stem) > 3:
+        hit = _match_vendored(stem[3:])
+    return hit
 
 
 def vendored_dlls(probe: Mapping) -> list[VendoredDll]:
@@ -520,14 +757,16 @@ def _version(dist_versions: Mapping[str, str], dist: str, parts: int | None = No
     return ".".join(version.split(".")[:parts]) if parts else version
 
 
-def hand_components(probe: Mapping) -> list[Component]:
+def hand_components(probe: Mapping, target: Target | None = None) -> list[Component]:
+    target = target or target_for(probe.get("platform"))
+    win = target.key == "win32"
     versions = {normalize_name(d["name"]): d.get("version", "") for d in probe.get("dists", [])}
     texts_of = {
         normalize_name(d["name"]): [LicenseText(s, t) for s, t in d.get("texts") or [] if t.strip()]
         for d in probe.get("dists", [])
     }
     cpython_text = probe.get("cpython_license") or ""
-    return [
+    common = [
         Component(
             "hand",
             "Open CASCADE Technology (OCCT)",
@@ -537,7 +776,10 @@ def hand_components(probe: Mapping) -> list[Component]:
                 LicenseText("LICENSE_LGPL_21.txt", LGPL_2_1_TEXT),
                 LicenseText("OCCT_LGPL_EXCEPTION.txt", OCCT_EXCEPTION_TEXT),
             ],
-            note="由 OCP（cadquery-ocp wheel，綁定層為 Apache-2.0）以動態連結的 TK*.dll 提供。",
+            note=(
+                "由 OCP（cadquery-ocp wheel，綁定層為 Apache-2.0）以動態連結的 "
+                f"{target.lib('TK*')} 提供。"
+            ),
             url="https://github.com/Open-Cascade-SAS/OCCT",
         ),
         Component(
@@ -547,7 +789,7 @@ def hand_components(probe: Mapping) -> list[Component]:
             "BSD-3-Clause",
             texts_of.get("vtk", []),
             note=(
-                "vtk wheel 隨附 vtk*.dll；VTK 內建的 ThirdParty 模組（hdf5、netCDF、libxml2、"
+                f"vtk wheel 隨附 {target.lib('vtk*')}；VTK 內建的 ThirdParty 模組（hdf5、netCDF、libxml2、"
                 "expat、freetype、gl2ps、sqlite、libharu、libproj、pugixml、lz4、theora 等）各有授權，"
                 "見 VTK 原始碼 ThirdParty/ 目錄；其中 gl2ps 為 LGPL-2.0-or-later 或 GL2PS 授權擇一。"
             ),
@@ -560,7 +802,8 @@ def hand_components(probe: Mapping) -> list[Component]:
             "PSF-2.0",
             [LicenseText("LICENSE.txt", cpython_text)] if cpython_text.strip() else [],
             note=(
-                "PyInstaller 隨附 python3*.dll 與標準函式庫；CPython 的 LICENSE 亦列出其內含的"
+                f"PyInstaller 隨附 {'python3*.dll' if win else target.lib('python3*')} 與標準"
+                "函式庫；CPython 的 LICENSE 亦列出其內含的"
                 "第三方元件（OpenSSL、libffi、SQLite、zlib、bzip2、xz 等）。"
             ),
             url="https://www.python.org/",
@@ -572,7 +815,7 @@ def hand_components(probe: Mapping) -> list[Component]:
             "GPL-2.0-or-later WITH Bootloader-exception",
             texts_of.get("pyinstaller", []),
             note=(
-                "promptcad-sidecar.exe 內含 PyInstaller bootloader 與執行期模組（pyimod*、pyi_rth_*）；"
+                f"promptcad-sidecar{target.exe_suffix} 內含 PyInstaller bootloader 與執行期模組（pyimod*、pyi_rth_*）；"
                 "其 GPL 附加例外允許以任意授權散布由其封裝的程式。PyInstaller 的分析／建置工具本身不隨附。"
             ),
             url="https://github.com/pyinstaller/pyinstaller",
@@ -589,6 +832,12 @@ def hand_components(probe: Mapping) -> list[Component]:
             ),
             url="https://github.com/stevengj/nlopt",
         ),
+    ]
+    if not target.windows_only_hand:
+        # macOS / Linux: the system WebView (WKWebView / WebKitGTK) and the C/C++ runtimes
+        # are OS libraries, not shipped; vendored GCC / LLVM runtimes are listed per file.
+        return common
+    return common + [
         Component(
             "hand",
             "Microsoft Visual C++ Runtime",
@@ -688,29 +937,34 @@ def _lgpl_section(collected: Collected, registry: TextRegistry) -> list[str]:
     exception = text_id(OCCT_EXCEPTION_TEXT)
     gpl3 = text_id(GPL_3_TEXT)
     occt_src = f"https://github.com/Open-Cascade-SAS/OCCT/tree/{occt_tag}" if occt_tag else ""
+    t = collected.target
+    exe = t.exe_suffix
+    files = {"win32": "`.dll` / `.pyd` 檔", "darwin": "`.dylib` / `.so` 檔"}.get(t.key, "`.so` 檔")
+    raw = t.lib("raw*")
+    ocp_libs = t.libs_dir("cadquery_ocp.libs")
     return [
         "## LGPL 元件與替換權利",
         "",
         "桌面版的 sidecar 以 PyInstaller **onedir** 模式封裝。下列以 LGPL（或含 LGPL 選項）授權的"
-        "函式庫**未**靜態連結進 `promptcad-sidecar.exe` 或 `promptcad-studio.exe`，而是以獨立的 "
-        "`.dll` / `.pyd` 檔存放在安裝目錄的 `sidecar\\_internal\\` 之下。使用者可依 LGPL 以相容"
+        f"函式庫**未**靜態連結進 `promptcad-sidecar{exe}` 或 `promptcad-studio{exe}`，而是以獨立的 "
+        f"{files}存放在{t.install_note} 之下。使用者可依 LGPL 以相容"
         "（相同 ABI）的修改版本替換這些檔案，sidecar 下次啟動即會載入替換後的檔案。PromptCAD "
         "Studio 未修改這些函式庫；對應版本的原始碼可由下列網址取得。",
         "",
         "| 元件 | 版本 | 授權 | 安裝目錄中的檔案（典型位置） | 原始碼 |",
         "|---|---|---|---|---|",
         f"| Open CASCADE Technology（OCCT，經 OCP / cadquery-ocp 載入） | {occt} | "
-        "LGPL-2.1-only WITH OCCT-exception-1.0 | `sidecar\\_internal\\cadquery_ocp.libs\\TK*.dll`、"
-        f"`sidecar\\_internal\\OCP\\` | {occt_src or 'https://github.com/Open-Cascade-SAS/OCCT'}；"
+        f"LGPL-2.1-only WITH OCCT-exception-1.0 | `{ocp_libs}{t.lib('TK*')}`、"
+        f"`{t.internal('OCP')}` | {occt_src or 'https://github.com/Open-Cascade-SAS/OCCT'}；"
         "OCP 綁定層：https://github.com/CadQuery/OCP |",
-        f"| CasADi | {casadi} | LGPL-3.0-or-later | `sidecar\\_internal\\casadi\\`（`_casadi.pyd`、"
-        f"`libcasadi*.dll` 等） | https://github.com/casadi/casadi/tree/{casadi} |",
-        f"| NLopt | {nlopt} | LGPL-2.1-or-later AND MIT | `sidecar\\_internal\\nlopt\\` | "
+        f"| CasADi | {casadi} | LGPL-3.0-or-later | `{t.internal('casadi')}`（`_casadi{t.ext_ext}`、"
+        f"`libcasadi*{t.lib_ext}` 等） | https://github.com/casadi/casadi/tree/{casadi} |",
+        f"| NLopt | {nlopt} | LGPL-2.1-or-later AND MIT | `{t.internal('nlopt')}` | "
         "https://github.com/stevengj/nlopt；Python wheel：https://github.com/DanielBok/nlopt-python |",
-        "| LibRaw（cadquery-ocp 隨附 `raw*.dll`） | 隨 cadquery-ocp | LGPL-2.1-only OR CDDL-1.0 | "
-        "`sidecar\\_internal\\cadquery_ocp.libs\\raw*.dll` | https://www.libraw.org/ |",
+        f"| LibRaw（cadquery-ocp 隨附 `{raw}`） | 隨 cadquery-ocp | LGPL-2.1-only OR CDDL-1.0 | "
+        f"`{ocp_libs}{raw}` | https://www.libraw.org/ |",
         f"| gl2ps（VTK 內建 `vtkgl2ps`） | 隨 VTK {vtk} | LGPL-2.0-or-later OR GL2PS | "
-        "`sidecar\\_internal\\vtk.libs\\vtkgl2ps*.dll` | "
+        f"`{t.libs_dir('vtk.libs')}{t.lib('vtkgl2ps*')}` | "
         f"https://gitlab.kitware.com/vtk/vtk/-/tree/v{vtk}/ThirdParty/gl2ps |",
         "",
         f"- OCCT 授權全文：GNU LGPL 2.1 見 [{lgpl21}](#{lgpl21.lower()})，Open CASCADE 例外條款見 "
@@ -726,18 +980,25 @@ def _lgpl_section(collected: Collected, registry: TextRegistry) -> list[str]:
     ]
 
 
-def _native_section(dlls: list[VendoredDll]) -> list[str]:
+def _native_section(dlls: list[VendoredDll], target: Target = TARGETS["win32"]) -> list[str]:
     groups: dict[tuple[str, str], dict[str, list[str]]] = {}
     for dll in dlls:
         if dll.label is None:
             continue
         key = (dll.label, dll.license or "")
         groups.setdefault(key, {}).setdefault(f"{dll.dist} {dll.dist_version}", []).append(dll.file)
+    if target.key == "win32":
+        intro = "以下 DLL 由 wheel 以 delvewheel 打包在 `<套件>.libs/`，隨 sidecar 安裝於 "
+    else:
+        intro = (
+            "以下共享函式庫由 wheel 以 auditwheel（`<套件>.libs/`）或 delocate（`.dylibs/`）打包，"
+            "或直接放在套件目錄內，隨 sidecar 安裝於 "
+        )
     lines = [
         "## Python wheel 隨附的原生函式庫",
         "",
-        "以下 DLL 由 wheel 以 delvewheel 打包在 `<套件>.libs/`，隨 sidecar 安裝於 "
-        "`sidecar\\_internal\\`。授權依各上游專案；授權全文若未隨 wheel 提供，請見上游網站。",
+        intro
+        + f"`{target.internal()}`。授權依各上游專案；授權全文若未隨 wheel 提供，請見上游網站。",
         "",
         "| 元件 | 授權 | 來源 wheel | 檔案 |",
         "|---|---|---|---|",
@@ -773,15 +1034,17 @@ def _copyleft_section(comps: list[Component]) -> list[str]:
 
 def render(collected: Collected) -> str:
     registry = TextRegistry()
+    t = collected.target
     all_comps = collected.hand + collected.python + collected.npm + collected.rust
+    native_label = "DLL" if t.key == "win32" else "共享函式庫"
     lines = [
         "# 第三方軟體授權聲明（Third-Party Notices）",
         "",
         "<!-- 本檔由 scripts/gen_third_party_notices.py 產生，請勿手動編輯。 -->",
         "",
-        "PromptCAD Studio 桌面版（Windows x64 NSIS 安裝程式）隨附下列第三方軟體。本檔由 "
+        f"PromptCAD Studio 桌面版（{t.bundle}）隨附下列第三方軟體。本檔由 "
         "`scripts/gen_third_party_notices.py` 依實際安裝／鎖定的相依套件產生，安裝後位於 "
-        "`<安裝目錄>\\THIRD_PARTY_NOTICES.md`。本檔僅為授權資訊彙整，並非法律意見。",
+        f"`{t.notices_path}`。本檔僅為授權資訊彙整，並非法律意見。",
         "",
         "PromptCAD Studio 本身以 MIT 授權釋出（見 `LICENSE`）。",
         "",
@@ -792,9 +1055,9 @@ def render(collected: Collected) -> str:
         f"| 原生／手動維護元件 | {len(collected.hand)} |",
         f"| Python 套件（凍結 sidecar，CPython {collected.python_version}） | "
         f"{len(collected.python)} |",
-        f"| Python wheel 隨附 DLL | {len([d for d in collected.native if d.label])} |",
+        f"| Python wheel 隨附 {native_label} | {len([d for d in collected.native if d.label])} |",
         f"| npm 套件（前端正式相依） | {len(collected.npm)} |",
-        f"| Rust crates（桌面殼層，{RUST_TARGET}） | {len(collected.rust)} |",
+        f"| Rust crates（桌面殼層，{t.rust_target}） | {len(collected.rust)} |",
         "",
     ]
     lines += _lgpl_section(collected, registry)
@@ -820,16 +1083,16 @@ def render(collected: Collected) -> str:
         "## Python 套件（凍結 sidecar）",
         "",
         "不含建置工具（" + "、".join(sorted(BUILD_ONLY_DISTS)) + "）與 "
-        "`scripts/build_sidecar.py` 排除的模組（" + "、".join(sorted(PRUNED_DISTS)) + "）。",
+        "`scripts/build_sidecar.py` 排除的模組（" + "、".join(excluded_pruned_dists()) + "）。",
         "",
     ]
     lines += _component_table(collected.python, registry, notes=True)
     lines.append("")
-    lines += _native_section(collected.native)
+    lines += _native_section(collected.native, t)
     lines += ["## npm 套件（前端正式相依，打包進 Web UI）", ""]
     lines += _component_table(collected.npm, registry, notes=False)
     lines.append("")
-    lines += [f"## Rust crates（桌面殼層，{RUST_TARGET}）", ""]
+    lines += [f"## Rust crates（桌面殼層，{t.rust_target}）", ""]
     lines += _component_table(collected.rust, registry, notes=False)
     lines.append("")
     lines += ["## 授權全文", ""]
@@ -869,6 +1132,8 @@ def strict_errors(collected: Collected) -> list[str]:
     for dist in REQUIRED_PYTHON_DISTS:
         if dist not in collected.dist_versions:
             errors.append(f"python: 找不到 {dist}；--python 應指向含 CadQuery 的 .venv-desktop")
+    if SIDECAR_PRUNED_ERROR:
+        errors.append(f"無法載入 scripts/build_sidecar.py 的 PRUNED_DISTS：{SIDECAR_PRUNED_ERROR}")
     return errors
 
 
@@ -881,16 +1146,18 @@ def missing_text_warnings(collected: Collected) -> list[str]:
 
 
 def collect(probe: Mapping, lock: Mapping, web_dir: Path, cargo_meta: Mapping) -> Collected:
+    target = target_for(probe.get("platform"))
     return Collected(
         python=python_components(probe),
         native=vendored_dlls(probe),
         npm=npm_components(lock, web_dir),
         rust=rust_components(cargo_meta),
-        hand=hand_components(probe),
+        hand=hand_components(probe, target),
         python_version=probe.get("python_version", ""),
         dist_versions={
             normalize_name(d["name"]): d.get("version", "") for d in probe.get("dists", [])
         },
+        target=target,
     )
 
 
@@ -909,9 +1176,9 @@ def run_python_probe(python: str) -> dict:
     return json.loads(proc.stdout)
 
 
-def run_cargo_metadata(cargo: str, tauri_dir: Path) -> dict:
+def run_cargo_metadata(cargo: str, tauri_dir: Path, rust_target: str = RUST_TARGET) -> dict:
     proc = subprocess.run(
-        [cargo, "metadata", "--format-version", "1", "--filter-platform", RUST_TARGET, "--locked"],
+        [cargo, "metadata", "--format-version", "1", "--filter-platform", rust_target, "--locked"],
         cwd=tauri_dir,
         capture_output=True,
         text=True,
@@ -937,7 +1204,9 @@ def main(argv: list[str] | None = None) -> int:
 
     probe = run_python_probe(args.python)
     lock = json.loads((WEB_DIR / "package-lock.json").read_text(encoding="utf-8"))
-    cargo_meta = run_cargo_metadata(args.cargo, TAURI_DIR)
+    cargo_meta = run_cargo_metadata(
+        args.cargo, TAURI_DIR, target_for(probe.get("platform")).rust_target
+    )
     collected = collect(probe, lock, WEB_DIR, cargo_meta)
 
     for warning in missing_text_warnings(collected):

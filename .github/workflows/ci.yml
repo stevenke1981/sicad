@@ -75,17 +75,41 @@ jobs:
         if: always()
         run: docker logs promptcad || true
 
+  lock-check:
+    # requirements/desktop-*.txt (hashed, per platform) must still satisfy pyproject.toml:
+    # recompiling with the committed pins as preferences must not change a byte (ADR 0011).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run --no-project --python 3.12 python scripts/desktop_lock.py --check
+
   desktop:
-    # Tauri shell checks only; the full CadQuery bundle is built by desktop-bundle.yml
-    # (manual / tags) because it takes minutes and ~550 MB. build.rs drops an empty
-    # placeholder sidecar in debug builds, so no Python build is needed here.
-    runs-on: windows-latest
+    # Tauri shell checks only, on all three bundle platforms; the full CadQuery bundle is
+    # built by desktop-bundle.yml (manual / tags) because it takes minutes and ~450 MB.
+    # build.rs drops an empty placeholder sidecar in debug builds, so no Python build is
+    # needed here.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: src-tauri
     steps:
       - uses: actions/checkout@v4
-      # rust-toolchain.toml pins stable-x86_64-pc-windows-msvc, the runner's default host.
+      # rust-toolchain.toml pins stable-x86_64-pc-windows-msvc (the Windows runner's default
+      # host); other OSes override it before any rustup call.
+      - name: Use the host stable toolchain (non-Windows)
+        if: runner.os != 'Windows'
+        run: echo "RUSTUP_TOOLCHAIN=stable" >> "$GITHUB_ENV"
+      - name: Linux system packages (WebKitGTK for tauri/wry)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
+            libxdo-dev libssl-dev
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt

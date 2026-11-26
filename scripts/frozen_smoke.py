@@ -15,14 +15,20 @@ b. render-worker mode - time direct ``--render-worker`` invocations on a sample 
 ``--measure`` additionally repeats spawn->READY and worker runs (first + median of warm
 runs) and writes ``build/sidecar/measurements.json`` and ``measurements.md``.
 
-``--isolated-env`` approximates a clean machine (Windows only): the sidecar and the direct
-worker runs get ``PATH=%SystemRoot%\\System32;%SystemRoot%`` and no ``PYTHON*``,
-``VIRTUAL_ENV*`` or ``CONDA*`` variables (only the two ``PYTHON*`` values the Tauri shell
-itself sets), and a watcher thread polls the sidecar's process tree during the server
-checks. Any descendant whose image lies outside the sidecar directory (other than the
-console host) or is named ``python*.exe`` / ``py.exe`` fails the run, so a bundle that
+``--isolated-env`` approximates a clean machine: the sidecar and the direct worker runs get
+``PATH=%SystemRoot%\\System32;%SystemRoot%`` (unix: ``PATH=/usr/bin:/bin`` and no
+``LD_LIBRARY_PATH``, ``LD_PRELOAD`` or ``DYLD_*``) and no ``PYTHON*``, ``VIRTUAL_ENV*`` or
+``CONDA*`` variables (only the two ``PYTHON*`` values the Tauri shell itself sets), and a
+watcher thread polls the sidecar's process tree during the server checks (Toolhelp on
+Windows; ``ps -A -o pid=,ppid=,comm=`` plus ``/proc`` on Linux or libproc on macOS). Any
+descendant whose image lies outside the sidecar directory (other than the Windows console
+host) or is a Python interpreter (``python*``, ``py.exe``) fails the run, so a bundle that
 silently relies on a developer interpreter cannot pass. The watcher must also see at least
 one render worker, otherwise the check would be vacuous.
+
+``--measure`` also records the onedir's symlink count and its dereferenced size (what a
+resource copy that follows links ships); ``--installer`` takes any installer artifact
+(.exe/.msi/.dmg/.deb/.AppImage file, or a .app directory).
 
 Usage::
 
@@ -35,11 +41,13 @@ interpreter can run it.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import ctypes
 import json
 import os
 import platform
 import queue
+import re
 import secrets
 import shutil
 import statistics
@@ -50,10 +58,10 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from pathlib import Path, PureWindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, NamedTuple
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -179,6 +187,10 @@ def smoke_cases(examples_dir: Path = EXAMPLES_DIR) -> list[tuple[str, dict[str, 
 
 # Prefixes (upper-cased) of variables a clean machine would not have. ``PATH`` is replaced.
 _STRIPPED_ENV_PREFIXES = ("PYTHON", "VIRTUAL_ENV", "CONDA", "_CONDA")
+# Unix additionally drops loader overrides that could satisfy a missing bundled library.
+_STRIPPED_UNIX_ENV_PREFIXES = (*_STRIPPED_ENV_PREFIXES, "DYLD_")
+_STRIPPED_UNIX_ENV_NAMES = ("LD_LIBRARY_PATH", "LD_PRELOAD")
+UNIX_SYSTEM_PATH = "/usr/bin:/bin"
 # What the Tauri shell itself sets for the sidecar (src-tauri/src/sidecar.rs `start`).
 SHELL_PYTHON_ENV = {"PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}
 
@@ -191,14 +203,29 @@ def _lookup(env: Mapping[str, str], name: str) -> str | None:
     return None
 
 
-def isolated_env(base: Mapping[str, str], system_root: str | None = None) -> dict[str, str]:
-    """``base`` as a clean Windows machine would see it: system-only PATH, no Python/venv/conda.
+def isolated_env(
+    base: Mapping[str, str], system_root: str | None = None, *, platform: str | None = None
+) -> dict[str, str]:
+    """``base`` as a clean machine would see it: system-only PATH, no Python/venv/conda.
 
-    Pure. Every ``PATH`` spelling is dropped and replaced by
-    ``%SystemRoot%\\System32;%SystemRoot%``; ``PYTHON*``, ``VIRTUAL_ENV*`` and ``CONDA*``
-    variables are dropped, then the shell's own ``PYTHONUNBUFFERED``/``PYTHONIOENCODING``
-    are set so the environment matches what the installed app hands the sidecar.
+    Pure. ``platform`` (default ``sys.platform``) picks the rules. Windows: every ``PATH``
+    spelling is dropped and replaced by ``%SystemRoot%\\System32;%SystemRoot%``. Unix:
+    ``PATH=/usr/bin:/bin`` and ``LD_LIBRARY_PATH``, ``LD_PRELOAD`` and ``DYLD_*`` are dropped
+    too (``system_root`` is ignored). Both drop ``PYTHON*``, ``VIRTUAL_ENV*`` and ``CONDA*``,
+    then set the shell's own ``PYTHONUNBUFFERED``/``PYTHONIOENCODING`` so the environment
+    matches what the installed app hands the sidecar.
     """
+    if (platform or sys.platform) != "win32":
+        env = {
+            key: value
+            for key, value in base.items()
+            if key != "PATH"
+            and key not in _STRIPPED_UNIX_ENV_NAMES
+            and not key.upper().startswith(_STRIPPED_UNIX_ENV_PREFIXES)
+        }
+        env["PATH"] = UNIX_SYSTEM_PATH
+        env.update(SHELL_PYTHON_ENV)
+        return env
     root = (system_root or _lookup(base, "SYSTEMROOT") or r"C:\Windows").rstrip("\\/")
     env = {
         key: value
@@ -219,7 +246,7 @@ def _base_env(isolated: bool) -> dict[str, str]:
 
 
 class ProcEntry(NamedTuple):
-    """One row of a process snapshot (Toolhelp ``PROCESSENTRY32W``)."""
+    """One row of a process snapshot (Toolhelp ``PROCESSENTRY32W``, or a ``ps`` line)."""
 
     pid: int
     ppid: int
@@ -227,7 +254,9 @@ class ProcEntry(NamedTuple):
 
 
 class ProcInfo(NamedTuple):
-    """A process in a tree walk: ``created`` is a FILETIME tick count, ``path`` the image."""
+    """A process in a tree walk: ``created`` is a monotonic-per-boot start stamp (Windows
+    FILETIME ticks, Linux ``/proc/<pid>/stat`` start ticks, macOS epoch seconds), ``path``
+    the image."""
 
     pid: int
     ppid: int
@@ -243,16 +272,31 @@ PYTHON_IMAGE_NAMES = ("py.exe", "pyw.exe")
 SYSTEM_HELPER_IMAGES = ("conhost.exe",)
 
 
+# python, python3, python3.12, pythonw (+ .exe), but not e.g. "pythonic-tool".
+_PYTHON_IMAGE_RE = re.compile(r"pythonw?(\d+(\.\d+)*)?(\.exe)?")
+
+
 def is_python_image(name: str) -> bool:
     lowered = name.lower()
     return lowered in PYTHON_IMAGE_NAMES or (
         lowered.startswith("python") and lowered.endswith(".exe")
-    )
+    ) or _PYTHON_IMAGE_RE.fullmatch(lowered) is not None
+
+
+_WINDOWS_PATH_RE = re.compile(r"^(?:[A-Za-z]:[\\/]|\\\\)")
+
+
+def is_windows_path(path: str | os.PathLike[str]) -> bool:
+    """Drive-letter or UNC path: decides path semantics independently of the host OS."""
+    return _WINDOWS_PATH_RE.match(str(path)) is not None
 
 
 def is_within(path: str, directory: str | os.PathLike[str]) -> bool:
-    """Windows semantics (case-insensitive, either slash), independent of the host OS."""
-    return PureWindowsPath(str(directory)) in PureWindowsPath(path).parents
+    """Windows semantics (case-insensitive, either slash) for Windows-style paths, POSIX
+    (case-sensitive) otherwise - independent of the host OS."""
+    if is_windows_path(directory):
+        return PureWindowsPath(str(directory)) in PureWindowsPath(path).parents
+    return PurePosixPath(str(directory)) in PurePosixPath(path).parents
 
 
 def walk_tree(
@@ -387,6 +431,26 @@ def win_error(what: str) -> OSError:
 
 
 def process_snapshot() -> list[ProcEntry]:
+    """Every process on the machine as (pid, ppid, image base name). Any OS."""
+    if sys.platform == "win32":
+        return _win_process_snapshot()
+    return _unix_process_snapshot()
+
+
+def describe_process(pid: int) -> tuple[int | None, str | None]:
+    """(creation stamp, full image path) of a live process, or (None, None). Any OS.
+
+    The stamp is only comparable with stamps of other processes on the same machine
+    (Windows FILETIME ticks, Linux start ticks since boot, macOS epoch seconds).
+    """
+    if sys.platform == "win32":
+        return _win_describe_process(pid)
+    if sys.platform.startswith("linux"):
+        return _linux_describe_process(pid)
+    return _mac_describe_process(pid)
+
+
+def _win_process_snapshot() -> list[ProcEntry]:
     k = kernel32()
     snap = k.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
     if snap is None or snap == _INVALID_HANDLE:
@@ -404,7 +468,7 @@ def process_snapshot() -> list[ProcEntry]:
         k.CloseHandle(snap)
 
 
-def describe_process(pid: int) -> tuple[int | None, str | None]:
+def _win_describe_process(pid: int) -> tuple[int | None, str | None]:
     """(creation FILETIME ticks, full image path) of a live process, or (None, None)."""
     k = kernel32()
     handle = k.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
@@ -421,6 +485,140 @@ def describe_process(pid: int) -> tuple[int | None, str | None]:
         return created, path
     finally:
         k.CloseHandle(handle)
+
+
+# Unix plumbing: `ps` + /proc (Linux) or libproc (macOS). The parsers are pure.
+PS_SNAPSHOT_CMD = ("ps", "-A", "-o", "pid=,ppid=,comm=")  # POSIX -A: GNU procps and BSD ps
+LINUX_COMM_LEN = 15  # TASK_COMM_LEN - 1: Linux truncates `comm` to 15 bytes
+_PS_ENV = {"LC_ALL": "C", "PATH": UNIX_SYSTEM_PATH}
+
+
+def parse_ps_output(text: str) -> list[ProcEntry]:
+    """Rows of ``ps -A -o pid=,ppid=,comm=``. Pure.
+
+    macOS prints ``comm`` as the full executable path (which may contain spaces), Linux as
+    the bare (truncated) task name; either way the entry's name is the image base name.
+    Malformed lines are skipped.
+    """
+    rows = []
+    for line in text.splitlines():
+        parts = line.split(None, 2)
+        if len(parts) < 3 or not parts[0].isdigit() or not parts[1].isdigit():
+            continue
+        comm = parts[2].strip()
+        name = comm.rsplit("/", 1)[-1] if comm.startswith("/") else comm
+        rows.append(ProcEntry(int(parts[0]), int(parts[1]), name))
+    return rows
+
+
+def linux_full_name(comm: str, exe_path: str | None) -> str:
+    """Undo the 15-byte ``comm`` truncation using ``/proc/<pid>/exe`` when it agrees. Pure."""
+    if exe_path and len(comm) >= LINUX_COMM_LEN:
+        base = exe_path.rsplit("/", 1)[-1]
+        if base.startswith(comm):
+            return base
+    return comm
+
+
+def linux_stat_starttime(stat: str) -> int | None:
+    """Field 22 (``starttime``, clock ticks since boot) of ``/proc/<pid>/stat``. Pure.
+
+    ``comm`` (field 2) is parenthesised and may contain spaces or parentheses, so fields
+    are counted from the last ``)``.
+    """
+    _, sep, rest = stat.rpartition(")")
+    fields = rest.split()
+    if not sep or len(fields) < 20:
+        return None
+    try:
+        return int(fields[19])  # fields[0] is field 3 (state)
+    except ValueError:
+        return None
+
+
+def strip_deleted(link: str) -> str:
+    """``/proc/<pid>/exe`` of a replaced image reads ``<path> (deleted)``. Pure."""
+    return link[: -len(" (deleted)")] if link.endswith(" (deleted)") else link
+
+
+def parse_lstart(text: str) -> int | None:
+    """``ps -o lstart=`` (C locale, e.g. ``Wed Nov 26 10:00:00 2026``) -> seconds. Pure.
+
+    The value is the wall clock read as UTC: only used to order processes on one machine.
+    """
+    import calendar
+
+    try:
+        return calendar.timegm(time.strptime(" ".join(text.split()), "%a %b %d %H:%M:%S %Y"))
+    except ValueError:
+        return None
+
+
+def _unix_process_snapshot() -> list[ProcEntry]:
+    completed = subprocess.run(
+        PS_SNAPSHOT_CMD, capture_output=True, text=True, env=_PS_ENV, timeout=30, check=False
+    )
+    if completed.returncode != 0:
+        raise OSError(f"ps failed ({completed.returncode}): {completed.stderr.strip()}")
+    rows = parse_ps_output(completed.stdout)
+    if sys.platform.startswith("linux"):
+        fixed = []
+        for row in rows:
+            if len(row.name) >= LINUX_COMM_LEN:
+                try:
+                    exe = strip_deleted(os.readlink(f"/proc/{row.pid}/exe"))
+                except OSError:
+                    exe = None
+                row = row._replace(name=linux_full_name(row.name, exe))
+            fixed.append(row)
+        rows = fixed
+    return rows
+
+
+def _linux_describe_process(pid: int) -> tuple[int | None, str | None]:
+    try:
+        with open(f"/proc/{pid}/stat", encoding="utf-8", errors="replace") as handle:
+            created = linux_stat_starttime(handle.read())
+    except OSError:
+        return None, None
+    try:
+        path: str | None = strip_deleted(os.readlink(f"/proc/{pid}/exe"))
+    except OSError:  # another user's process, or a zombie
+        path = None
+    return created, path
+
+
+_LIBPROC: Any = None
+
+
+def _mac_pidpath(pid: int) -> str | None:
+    global _LIBPROC
+    try:
+        if _LIBPROC is None:
+            lib = ctypes.CDLL("/usr/lib/libproc.dylib")
+            lib.proc_pidpath.restype = ctypes.c_int
+            lib.proc_pidpath.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32]
+            _LIBPROC = lib
+        buf = ctypes.create_string_buffer(4096)  # PROC_PIDPATHINFO_MAXSIZE
+        length = _LIBPROC.proc_pidpath(pid, buf, len(buf))
+    except OSError:
+        return None
+    return buf.raw[:length].decode("utf-8", "replace") if length > 0 else None
+
+
+def _mac_describe_process(pid: int) -> tuple[int | None, str | None]:
+    completed = subprocess.run(
+        ["ps", "-o", "lstart=", "-p", str(pid)],
+        capture_output=True,
+        text=True,
+        env=_PS_ENV,
+        timeout=30,
+        check=False,
+    )
+    created = parse_lstart(completed.stdout) if completed.returncode == 0 else None
+    if created is None:
+        return None, None
+    return created, _mac_pidpath(pid)
 
 
 def system_root() -> str:
@@ -504,6 +702,9 @@ class Sidecar:
         return f"http://127.0.0.1:{self.port}"
 
     def stop(self) -> None:
+        if self.proc.stdin:  # a held stdin pipe (--exit-on-stdin-eof): EOF first
+            with contextlib.suppress(OSError):
+                self.proc.stdin.close()
         if self.proc.poll() is None:
             self.proc.terminate()
             try:
@@ -523,6 +724,11 @@ class Sidecar:
             return ""
 
 
+def sidecar_command(exe: Path, extra_args: Sequence[str] = ()) -> list[str]:
+    """Server-mode command line, as the shell builds it. Pure."""
+    return [str(exe), "--host", "127.0.0.1", "--port", "0", *extra_args]
+
+
 def spawn_sidecar(
     exe: Path,
     workdir: Path,
@@ -531,11 +737,17 @@ def spawn_sidecar(
     *,
     isolated: bool = False,
     on_spawn: Callable[[subprocess.Popen[str]], None] | None = None,
+    extra_args: Sequence[str] = (),
+    stdin: Any = None,
 ) -> Sidecar:
-    """Start the sidecar and wait for READY.
+    """Start the sidecar and wait for READY. Any OS.
 
     ``on_spawn`` runs right after the process is created, before the READY line is read
-    (frozen_kill_check.py assigns the process to its job there).
+    (frozen_kill_check.py assigns the process to its job there). ``extra_args`` are
+    appended after ``--host 127.0.0.1 --port 0`` (e.g. ``--exit-on-stdin-eof``). ``stdin``
+    is passed to :class:`subprocess.Popen` (``None`` means ``DEVNULL``, as the Windows
+    shell does; ``subprocess.PIPE`` gives a held pipe on ``sidecar.proc.stdin``, closed by
+    :meth:`Sidecar.stop`).
     """
     data_dir = workdir / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -543,10 +755,10 @@ def spawn_sidecar(
     stderr_file = stderr_path.open("w", encoding="utf-8")
     started = time.perf_counter()
     proc = subprocess.Popen(
-        [str(exe), "--host", "127.0.0.1", "--port", "0"],
+        sidecar_command(exe, extra_args),
         cwd=workdir,  # no repo .env
         env=_env(token, data_dir, isolated),
-        stdin=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL if stdin is None else stdin,
         stdout=subprocess.PIPE,
         stderr=stderr_file,
         text=True,
@@ -783,13 +995,51 @@ def run_worker_rejects_outside_root(
 # --------------------------------------------------------------------------- measure
 
 
+def tree_stats(path: Path) -> tuple[int, int, int]:
+    """(dereferenced bytes, files, symlinks) under ``path``.
+
+    Symlinks are counted and contribute their target's size (a symlinked directory its
+    whole tree, without descending into it twice): that is what a dereferencing copy - e.g.
+    a bundler's resource copy - ships. Dangling links count as links with no size.
+    """
+    total = files = links = 0
+    for dirpath, dirnames, filenames in os.walk(path, followlinks=False):
+        base = Path(dirpath)
+        for name in dirnames:
+            item = base / name
+            if item.is_symlink():
+                links += 1
+                if item.is_dir():
+                    total += tree_stats(item.resolve())[0]
+        for name in filenames:
+            item = base / name
+            if item.is_symlink():
+                links += 1
+            if item.is_file():
+                total += item.stat().st_size
+                files += 1
+    return total, files, links
+
+
 def dir_stats(path: Path) -> tuple[int, int]:
-    total = count = 0
-    for item in path.rglob("*"):
-        if item.is_file():
-            total += item.stat().st_size
-            count += 1
-    return total, count
+    total, files, _ = tree_stats(path)
+    return total, files
+
+
+def artifact_stats(path: Path) -> dict[str, Any]:
+    """Size record of an installer artifact: a file (.exe/.msi/.dmg/.deb/.AppImage) or a
+    directory bundle (.app)."""
+    if path.is_dir():
+        total, files, links = tree_stats(path)
+        return {
+            "path": str(path),
+            "kind": "directory",
+            "bytes": total,
+            "files": files,
+            "symlinks": links,
+        }
+    kind = path.suffix.lstrip(".").lower() or "file"
+    return {"path": str(path), "kind": kind, "bytes": path.stat().st_size}
 
 
 def top_dirs(onedir: Path, top: int = 10) -> list[dict[str, Any]]:
@@ -827,12 +1077,18 @@ def _secs(value: float | None) -> str:
     return "n/a" if value is None else f"{value:.2f} s"
 
 
+def installer_label(installer: Mapping[str, Any] | None) -> str:
+    kind = (installer or {}).get("kind")
+    return f"Installer size ({kind})" if kind else "Installer size"
+
+
 def render_markdown(m: dict[str, Any]) -> str:
     size = m["onedir"]
     rows = [
         ("Onedir size", _mib(size["bytes"])),
         ("Onedir file count", str(size["files"])),
-        ("NSIS installer size", _mib(m.get("installer", {}).get("bytes"))),
+        ("Onedir symlinks", str(size.get("symlinks", 0))),
+        (installer_label(m.get("installer")), _mib(m.get("installer", {}).get("bytes"))),
         ("Installed size", _mib(m.get("installed", {}).get("bytes"))),
         ("Spawn -> READY (first)", _secs(m["ready"]["first"])),
         (f"Spawn -> READY (warm median of {len(m['ready']['samples']) - 1})",
@@ -880,7 +1136,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Smoke-test the frozen PromptCAD sidecar")
     parser.add_argument("--exe", type=Path, default=DEFAULT_EXE, help="frozen sidecar executable")
     parser.add_argument("--measure", action="store_true", help="write build/sidecar/measurements.*")
-    parser.add_argument("--installer", type=Path, help="NSIS installer to record the size of")
+    parser.add_argument(
+        "--installer",
+        type=Path,
+        help="installer artifact to record the size of (.exe/.msi/.dmg/.deb/.AppImage, or a "
+        ".app directory)",
+    )
     parser.add_argument("--installed-dir", type=Path, help="installed app dir to record the size of")
     parser.add_argument("--warm-runs", type=int, default=5, help="warm samples for --measure")
     parser.add_argument("--ready-timeout", type=float, default=180.0)
@@ -889,20 +1150,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--isolated-env",
         action="store_true",
-        help="clean-machine env (system-only PATH, no PYTHON*/VIRTUAL_ENV/CONDA*) and fail if "
-        "the sidecar spawns anything from outside its bundle (Windows only)",
+        help="clean-machine env (system-only PATH, no PYTHON*/VIRTUAL_ENV/CONDA*, on unix no "
+        "LD_LIBRARY_PATH/DYLD_*) and fail if the sidecar spawns anything from outside its bundle",
     )
     args = parser.parse_args(argv)
     isolated = args.isolated_env
-    if isolated and sys.platform != "win32":
-        print("--isolated-env is only supported on Windows", file=sys.stderr)
-        return 2
 
     exe = args.exe.resolve()
     if not exe.is_file() or exe.stat().st_size == 0:
         print(f"frozen sidecar not found (or a placeholder): {exe}", file=sys.stderr)
         return 2
-    if args.installer and not args.installer.is_file():
+    if args.installer and not args.installer.exists():
         print(f"installer not found: {args.installer}", file=sys.stderr)
         return 2
 
@@ -938,12 +1196,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     onedir = exe.parent
-    total, files = dir_stats(onedir)
+    total, files, links = tree_stats(onedir)
     spec_seconds = [t["seconds"] for t in server["generate_from_spec"]]
     measurements: dict[str, Any] = {
         "measured_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "exe": str(exe),
-        "onedir": {"bytes": total, "files": files, "top": top_dirs(onedir)},
+        "onedir": {"bytes": total, "files": files, "symlinks": links, "top": top_dirs(onedir)},
         "ready": _first_warm(ready),
         "render_worker": _first_warm(worker),
         "generate_from_spec": _first_warm(spec_seconds),
@@ -962,13 +1220,15 @@ def main(argv: list[str] | None = None) -> int:
         },
     }
     if args.installer:
-        measurements["installer"] = {
-            "path": str(args.installer),
-            "bytes": args.installer.stat().st_size,
-        }
+        measurements["installer"] = artifact_stats(args.installer)
     if args.installed_dir and args.installed_dir.is_dir():
-        size, count = dir_stats(args.installed_dir)
-        measurements["installed"] = {"path": str(args.installed_dir), "bytes": size, "files": count}
+        size, count, installed_links = tree_stats(args.installed_dir)
+        measurements["installed"] = {
+            "path": str(args.installed_dir),
+            "bytes": size,
+            "files": count,
+            "symlinks": installed_links,
+        }
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     json_path = args.out_dir / "measurements.json"
