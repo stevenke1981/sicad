@@ -21,6 +21,7 @@ the policy is unit-tested on any OS (``tests/test_parent_watch.py``).
 
 from __future__ import annotations
 
+import contextlib
 import os
 import signal
 import sys
@@ -48,10 +49,8 @@ _KILLPG: Kill | None = getattr(os, "killpg", None)
 def _stderr_log(message: str) -> None:
     # stderr is a pipe read by the shell. Once the shell is gone that write raises
     # BrokenPipeError (Python ignores SIGPIPE), and must never stop the watch from signalling.
-    try:
+    with contextlib.suppress(OSError, ValueError):
         print(f"promptcad-sidecar: {message}", file=sys.stderr, flush=True)
-    except (OSError, ValueError):
-        pass
 
 
 def wait_for_eof(stream: Any) -> None:
@@ -151,10 +150,8 @@ class StdinEofWatch:
     def _safe_log(self, message: str) -> None:
         # The shell reads our stderr; after it dies a log write can raise. Logging is best
         # effort: the signals below are the point of this thread.
-        try:
+        with contextlib.suppress(Exception):
             self._log(message)
-        except Exception:  # noqa: BLE001
-            pass
 
     def _signal(self, sig: int) -> None:
         self.sent.append(sig)
