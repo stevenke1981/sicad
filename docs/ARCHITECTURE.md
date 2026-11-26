@@ -17,7 +17,7 @@ DesignValidator
 Job manifest + downloadable artifacts
 ```
 
-本文描述目前可執行的 v0.1.0 架構，以及 [ADR 0010](adr/0010-migration-phases.md) 第 1 階段加入、尚未發佈的前端與桌面外殼（見「前端、桌面外殼與 schema 管線」一節）。目標架構見 [`adr/overview.md`](adr/overview.md)；CadDocument 2.0 的凍結規格見 [`CAD_DSL_2.md`](CAD_DSL_2.md)，目前沒有任何程式接受 2.0 文件。
+本文描述目前可執行的 v0.1.0 架構，以及 [ADR 0010](adr/0010-migration-phases.md) 第 1 階段加入、尚未發佈的前端與桌面外殼（見「前端、桌面外殼與 schema 管線」一節）。目標架構見 [`adr/overview.md`](adr/overview.md)；CadDocument 2.0 的凍結規格見 [`CAD_DSL_2.md`](CAD_DSL_2.md)，2.0 的 Rust core 已實作於 `crates/promptcad-core/`（見「Rust core crate」一節），但尚未被應用程式呼叫，執行中的應用程式只接受 1.0 文件。
 
 ## 為何加入 DSL
 
@@ -105,6 +105,28 @@ app/web_dist/ ──served at "/" by FastAPI when index.html exists (else 503 "b
 - **桌面版驗證**：`.github/workflows/desktop-bundle.yml`（`windows-latest`，手動或 `v*` tag 觸發）代替乾淨機器：`scripts/frozen_smoke.py --isolated-env` 讓 sidecar 只看到系統 `PATH` 且移除 `PYTHON*`／`VIRTUAL_ENV`／`CONDA*`，並監看行程樹，出現 sidecar 目錄外的映像或 `python*.exe`／`py.exe` 即失敗；`scripts/frozen_kill_check.py`（標準函式庫 + ctypes）以 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` 的 Job Object 啟動 sidecar，在 render worker 執行中關閉 Job，確認追蹤的 PID 於 5 秒內全部結束（`--shell-exe` 另以已安裝的外殼驗證 `job.rs`）。`ci.yml` 只執行這些腳本的純函式測試。
 - **第三方授權聲明**：`scripts/gen_third_party_notices.py` 由 `.venv-desktop` 的 `importlib.metadata`、`web/package-lock.json` 的正式相依與 `cargo metadata`（`x86_64-pc-windows-msvc`）加上手動維護的原生元件表，產生確定性的 `THIRD_PARTY_NOTICES.md`（授權全文以 SHA-256 去重）；`tauri.conf.json` 以 `bundle.resources` 將它安裝到 `<安裝目錄>\THIRD_PARTY_NOTICES.md`。LGPL 元件（OCCT／OCP、casadi、NLopt）在 onedir 版面下是 `sidecar\_internal\` 內的獨立檔案，可由使用者替換。
 - **Schema 管線**：`scripts/export_schema.py` 以確定性方式（排序鍵、LF、結尾換行）輸出 `schemas/promptcad.schema.json`；`--check` 在漂移時以非零狀態結束。CI 另檢查 `npm run gen:types` 之後生成的型別沒有差異（[ADR 0008](adr/0008-single-schema-source-of-truth.md) 的過渡安排；第 2 階段 schema 來源改為 Rust）。
+
+## Rust core crate（第 2 階段 2a，未發佈）
+
+`crates/promptcad-core/` 是依 [`CAD_DSL_2.md`](CAD_DSL_2.md) 與 [ADR 0005](adr/0005-rust-core-document-model.md) 實作的獨立 library crate，不依賴 Tauri，有自己的 `Cargo.lock`。**目前沒有任何應用程式程式碼呼叫它**：Tauri 外殼與 FastAPI 都沒有連到這個 crate，Python 編譯器也不接受 2.0；它只能透過 `cargo test` 與 `promptcad-core` 命令列工具（用法見 `crates/promptcad-core/README.md`）使用。
+
+模組分層（由下而上，上層只依賴下層）：
+
+```text
+model        CadDocument 2.0／1.0 型別、id 與參照、24 個軸對齊朝向、issue 與 §9.2 代碼表、
+             patch 型別、resolved.json 型別（serde + schemars，deny_unknown_fields）
+fields, canonical     欄位處理；正規化序列化與 SHA-256
+expr, bindings        封閉文法的運算式與綁定求值（§4）
+ports, solver         port 表（§3.4）；朝向與位移的不動點求解、孔方向與切削體（§5、§7）
+validate              schema → 結構 → 綁定 → 求解 → 設計規則 的分層驗證
+patch_engine, oplog   原子套用 patch（§8.5 權限矩陣）、復原；append-only JSONL op log 與重播
+migrate               upgrade_1_to_2（全函式）、downgrade_2_to_1（部分函式）
+bin/promptcad-core    命令列工具（schema 匯出與其他子命令）
+```
+
+- **Schema**：`promptcad-core schema --out-dir ../../schemas/cad2` 由 Rust 型別生成 `schemas/cad2/` 的五份 JSON Schema，`ci.yml` 的 `core` job 以 `--check` 比對漂移（該 job 尚未在 GitHub 上執行過）。Pydantic 與 TypeScript 的 2.0 生成型別尚不存在；執行中的 1.0 應用程式仍以 `app/models/cad.py` 為 schema 來源。
+- **驗證範圍**：解析檢查對 `extrude`、`revolve` 與沉頭孔錐體使用保守的外包圖元（可能漏報，不會憑空產生 issue）；核心層（kernel）驗證代碼不在此 crate，屬於 sidecar。
+- **與 1.0 的關係**：Rust 驗證器對 Python `DesignValidator` 有 49 個案例的差異測試；Python 驗證器仍是實際使用的驗證器。
 
 ## 擴充新特徵
 

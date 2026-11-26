@@ -1,0 +1,157 @@
+{
+  "$defs": {
+    "Layer": {
+      "description": "Which validation layer produced an issue (§9.1, §9.4).",
+      "oneOf": [
+        {
+          "const": "analytic",
+          "description": "Rust analytic validator (default).",
+          "type": "string"
+        },
+        {
+          "const": "kernel",
+          "description": "Geometry-kernel validation in the renderer sidecar.",
+          "type": "string"
+        }
+      ]
+    },
+    "Role": {
+      "description": "Agent roles (§8.1, §8.3). Used as issue `owner` and as the patch `agent`.",
+      "oneOf": [
+        {
+          "const": "space_planner",
+          "description": "Space planner: reserved-class Empties, parameters.",
+          "type": "string"
+        },
+        {
+          "const": "component_smith",
+          "description": "Component smith: Dots, Lines, Planes, Volumes, `cut` Empties.",
+          "type": "string"
+        },
+        {
+          "const": "joiner",
+          "description": "Joiner: constraints.",
+          "type": "string"
+        },
+        {
+          "const": "assembler",
+          "description": "Assembler: parts, bodies, assemblies.",
+          "type": "string"
+        }
+      ]
+    },
+    "Severity": {
+      "description": "Issue severity.",
+      "oneOf": [
+        {
+          "const": "error",
+          "description": "Blocks rendering (and, for P-class codes, the patch).",
+          "type": "string"
+        },
+        {
+          "const": "warning",
+          "description": "Does not block; sets `review_required`.",
+          "type": "string"
+        },
+        {
+          "const": "info",
+          "description": "Informational.",
+          "type": "string"
+        }
+      ]
+    },
+    "ValidationIssue": {
+      "additionalProperties": false,
+      "description": "ValidationIssue 2.0 (§9.1).",
+      "properties": {
+        "code": {
+          "description": "Issue code (see [`codes::Code`]); kept as a string so 1.0/kernel reports round-trip.",
+          "type": "string"
+        },
+        "feature_index": {
+          "default": null,
+          "description": "1.0 feature index, `null` in 2.0 issues.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "layer": {
+          "$ref": "#/$defs/Layer",
+          "default": "analytic",
+          "description": "Producing layer."
+        },
+        "message": {
+          "description": "Fixed-template message; may embed only ids, numbers and template text (§9.1).",
+          "type": "string"
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Role"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Role that should fix the issue."
+        },
+        "related": {
+          "default": [],
+          "description": "Other involved ids.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity",
+          "description": "Severity."
+        },
+        "target": {
+          "default": null,
+          "description": "Component/constraint/part id or `id:field` the issue is about.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "severity",
+        "code",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "`{valid, review_required, issues}` (same shape and rules as 1.0).",
+  "properties": {
+    "issues": {
+      "default": [],
+      "description": "Issues in emission order.",
+      "items": {
+        "$ref": "#/$defs/ValidationIssue"
+      },
+      "type": "array"
+    },
+    "review_required": {
+      "description": "Planner flag, or any assumption, or any `error`/`warning`.",
+      "type": "boolean"
+    },
+    "valid": {
+      "description": "No `error` issues.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "valid",
+    "review_required"
+  ],
+  "title": "ValidationReport",
+  "type": "object"
+}

@@ -10,7 +10,7 @@
 - **FastAPI 提供新前端**：`app/web_dist/index.html` 存在時在 `/` 提供（第 1 階段 1a 時不存在則沿用 `app/static/`；收尾時已移除該備援，見下方）。
 - **Schema 管線**：`scripts/export_schema.py` 輸出 `schemas/promptcad.schema.json`（`--check` 檢查漂移），`npm --prefix web run gen:types` 生成前端型別；CI 新增 schema 漂移檢查與前端 typecheck／test／build。
 - **Tauri v2 桌面外殼 `src-tauri/`**：啟動時在 `127.0.0.1` 的動態埠啟動 FastAPI sidecar（`app/sidecar.py`，以 `scripts/build_sidecar.py` 經 PyInstaller 打包），以一次性 Token 保護 API。`npm run tauri dev`／`npm run tauri build`。
-- **CadDocument 2.0 規格凍結**：[`docs/CAD_DSL_2.md`](docs/CAD_DSL_2.md)，以及 `examples/cad2/` 的兩份手寫範例與 `tests/test_cad2_examples.py` 紙上驗證。只是規格；沒有任何程式接受 2.0 文件，實作依 ADR 0010 在第 2 階段以 Rust 進行。
+- **CadDocument 2.0 規格凍結**：[`docs/CAD_DSL_2.md`](docs/CAD_DSL_2.md)，以及 `examples/cad2/` 的兩份手寫範例與 `tests/test_cad2_examples.py` 紙上驗證。只是規格；實作依 ADR 0010 在第 2 階段以 Rust 進行（見下方 Phase 2a）。
 - `pyproject.toml` 新增 `desktop` extra（PyInstaller）。
 
 第 1 階段 1b（CadQuery 打包）：
@@ -31,6 +31,21 @@
 - 只在 Windows x86_64（MSVC 工具鏈、WebView2）建置；三平台測試矩陣尚未建立。
 - 乾淨機器驗證以 `desktop-bundle.yml` 的實際執行結果為準：2026-11-26 於 GitHub `windows-latest`（Windows Server 2025，4 CPU）首次執行 [run 45723089074](https://github.com/stevenke1981/sicad/actions/runs/45723089074) 全數通過：建置與安裝後的 sidecar 皆在 isolated env 下通過 smoke（各觀察到 7 個 render worker，`foreign_processes=[]`）；安裝 sidecar 的 Job Object 中斷檢查 `KILL_CHECK_OK`；強制結束已安裝的 `promptcad-studio.exe` 後 sidecar 於 0.007 秒內結束（`job.rs` 實證，此步驟已改為必過）；安裝目錄含 `THIRD_PARTY_NOTICES.md`。量測：安裝檔 107.5 MiB、安裝後 554.1 MiB、READY 0.64–0.66 s、warm render 2.38 s、端到端 generate 2.42 s。
 - 檢視器只支援 STL；GLB、元件選取與 port 圖層尚未實作。
+
+## Unreleased / Phase 2a：Rust core
+
+這是 [ADR 0010](docs/adr/0010-migration-phases.md) 第 2 階段的第一個切片，尚未發佈；第 2 階段尚未結束（見 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)）。
+
+新增：
+
+- **`crates/promptcad-core/`**：獨立的 Rust library crate（不依賴 Tauri），依 [`docs/CAD_DSL_2.md`](docs/CAD_DSL_2.md) 實作 CadDocument 2.0 型別、運算式與綁定、port 表與求解器、分層驗證器、patch 引擎（含權限矩陣與復原）、op log、1.0 ↔ 2.0 轉接，以及 `promptcad-core` 命令列工具。驗證：`cd crates/promptcad-core && cargo test`。
+- **`schemas/cad2/`**：由 Rust 型別生成的 JSON Schema；`ci.yml` 新增 `core` job（fmt、clippy、test、schema 漂移檢查），該 job 尚未在 GitHub 上執行過。
+
+已知限制：
+
+- Rust core 尚未被 Tauri 外殼或 FastAPI 呼叫；應用程式與 Python 編譯器仍只接受 1.0。
+- Schema 來源尚未切換（仍是 `app/models/cad.py`），2.0 的 Pydantic／TypeScript 生成型別尚不存在。
+- Python `DesignValidator` 未移除；幾何等價測試、前端元件樹與 port 顯示尚未進行。
 
 ## v0.1.0 — 2026-07-30
 

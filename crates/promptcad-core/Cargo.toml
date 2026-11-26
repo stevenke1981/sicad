@@ -1,0 +1,27 @@
+[package]
+name = "promptcad-core"
+version = "0.1.0"
+description = "PromptCAD Rust core: CadDocument 2.0 model, validation, solver pre-pass and patch engine (ADR 0005)"
+license = "MIT"
+edition = "2021"
+rust-version = "1.90"
+publish = false
+# MSRV-aware dependency resolution (prefers versions compatible with rust-version).
+resolver = "3"
+
+[lib]
+name = "promptcad_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "promptcad-core"
+path = "src/bin/promptcad-core.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+schemars = "1"
+sha2 = "0.11"
+
+[dev-dependencies]
+proptest = "1"

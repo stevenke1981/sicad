@@ -121,3 +121,27 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
+
+  core:
+    # promptcad-core (ADR 0005, 0008): lint, tests, and the committed JSON Schemas under
+    # schemas/cad2 must match what the Rust types generate.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crates/promptcad-core
+    steps:
+      - uses: actions/checkout@v4
+      # rust-toolchain.toml at the repo root pins the Windows MSVC host; use the Linux stable toolchain.
+      - name: Use the host stable toolchain
+        run: echo "RUSTUP_TOOLCHAIN=stable" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/promptcad-core
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+      - name: Generated schemas under schemas/cad2 are up to date (ADR 0008)
+        run: cargo run --quiet -- schema --out-dir ../../schemas/cad2 --check

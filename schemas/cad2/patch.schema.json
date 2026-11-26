@@ -1,0 +1,1818 @@
+{
+  "$defs": {
+    "Assembly": {
+      "additionalProperties": false,
+      "description": "An assembly (§6.2).",
+      "properties": {
+        "children": {
+          "description": "1–32 N2 ids (parts or assemblies).",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "type": "array"
+        },
+        "id": {
+          "$ref": "#/$defs/Id",
+          "description": "N2 identifier."
+        },
+        "name": {
+          "description": "1–80 chars.",
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "children"
+      ],
+      "type": "object"
+    },
+    "Axis": {
+      "description": "A world/local coordinate axis, serialized as `\"x\"`, `\"y\"`, `\"z\"`.",
+      "oneOf": [
+        {
+          "const": "x",
+          "description": "X axis.",
+          "type": "string"
+        },
+        {
+          "const": "y",
+          "description": "Y axis.",
+          "type": "string"
+        },
+        {
+          "const": "z",
+          "description": "Z axis (default, matching 1.0 `HoleFeature.axis`).",
+          "type": "string"
+        }
+      ]
+    },
+    "AxisDir": {
+      "description": "A signed axis direction, serialized as `\"+x\"`, `\"-x\"`, … `\"-z\"` (spec §1.1).\n\nDeclaration order (`+x, -x, +y, -y, +z, -z`) is the canonical order used by §5.4.",
+      "oneOf": [
+        {
+          "const": "+x",
+          "description": "`+x`",
+          "type": "string"
+        },
+        {
+          "const": "-x",
+          "description": "`-x`",
+          "type": "string"
+        },
+        {
+          "const": "+y",
+          "description": "`+y`",
+          "type": "string"
+        },
+        {
+          "const": "-y",
+          "description": "`-y`",
+          "type": "string"
+        },
+        {
+          "const": "+z",
+          "description": "`+z`",
+          "type": "string"
+        },
+        {
+          "const": "-z",
+          "description": "`-z`",
+          "type": "string"
+        }
+      ]
+    },
+    "BodyOp": {
+      "additionalProperties": false,
+      "description": "`{op, component}` (§6.1).",
+      "properties": {
+        "component": {
+          "$ref": "#/$defs/Id",
+          "description": "Component id."
+        },
+        "op": {
+          "$ref": "#/$defs/BodyOpKind",
+          "description": "Boolean op."
+        }
+      },
+      "required": [
+        "op",
+        "component"
+      ],
+      "type": "object"
+    },
+    "BodyOpKind": {
+      "description": "Body boolean operation (§6.1).",
+      "oneOf": [
+        {
+          "const": "add",
+          "description": "Union with a Volume.",
+          "type": "string"
+        },
+        {
+          "const": "cut",
+          "description": "Subtract a `cut` Empty.",
+          "type": "string"
+        },
+        {
+          "const": "intersect",
+          "description": "Intersect with a Volume or `envelope` Empty.",
+          "type": "string"
+        }
+      ]
+    },
+    "ChamferFeature": {
+      "additionalProperties": false,
+      "description": "`{kind: \"chamfer\", distance, selector}` (1.0 `ChamferFeature`).",
+      "properties": {
+        "distance": {
+          "description": "`Dim`.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 100000.0,
+          "type": "number"
+        },
+        "kind": {
+          "$ref": "#/$defs/ChamferTag",
+          "default": "chamfer",
+          "description": "Always `\"chamfer\"`."
+        },
+        "selector": {
+          "$ref": "#/$defs/EdgeSelector",
+          "default": "vertical",
+          "description": "Edge selector."
+        }
+      },
+      "required": [
+        "distance"
+      ],
+      "type": "object"
+    },
+    "ChamferTag": {
+      "description": "`kind: \"chamfer\"`.",
+      "oneOf": [
+        {
+          "const": "chamfer",
+          "description": "`\"chamfer\"`",
+          "type": "string"
+        }
+      ]
+    },
+    "ComponentInput": {
+      "description": "Wire form of [`ComponentInput`] (no `provenance`).",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "const": "empty",
+              "type": "string"
+            },
+            "label": {
+              "default": null,
+              "maxLength": 80,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "role": {
+              "$ref": "#/$defs/EmptyRole"
+            },
+            "shape": {
+              "$ref": "#/$defs/EmptyShape"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "role",
+            "shape"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "const": "dot",
+              "type": "string"
+            },
+            "label": {
+              "default": null,
+              "maxLength": 80,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "shape": {
+              "$ref": "#/$defs/DotShape"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "shape"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "const": "line",
+              "type": "string"
+            },
+            "label": {
+              "default": null,
+              "maxLength": 80,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "shape": {
+              "$ref": "#/$defs/LineShape"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "shape"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "const": "plane",
+              "type": "string"
+            },
+            "label": {
+              "default": null,
+              "maxLength": 80,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "shape": {
+              "$ref": "#/$defs/PlaneShape"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "shape"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "const": "volume",
+              "type": "string"
+            },
+            "label": {
+              "default": null,
+              "maxLength": 80,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "shape": {
+              "$ref": "#/$defs/VolumeShape"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "shape"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Constraint": {
+      "additionalProperties": false,
+      "description": "A constraint (§5.1): `{id, kind, a, b, value, u, v, frame}`.",
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/PortRef",
+          "description": "First port (for `fixed`: the frame port)."
+        },
+        "b": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PortRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Second port; `null` exactly for `fixed`."
+        },
+        "frame": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Frame"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "`fixed` only (required there)."
+        },
+        "id": {
+          "$ref": "#/$defs/Id",
+          "description": "N1 identifier."
+        },
+        "kind": {
+          "$ref": "#/$defs/ConstraintKind",
+          "description": "Constraint kind."
+        },
+        "u": {
+          "default": null,
+          "description": "`Coord | null` — `on_face` only.",
+          "maximum": 100000.0,
+          "minimum": -100000.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "v": {
+          "default": null,
+          "description": "`Coord | null` — `on_face` only.",
+          "maximum": 100000.0,
+          "minimum": -100000.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "value": {
+          "default": null,
+          "description": "`Coord | null` — see [`ConstraintKind::uses_value`].",
+          "maximum": 100000.0,
+          "minimum": -100000.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "a"
+      ],
+      "type": "object"
+    },
+    "ConstraintKind": {
+      "description": "Constraint `kind` (§5.1).",
+      "oneOf": [
+        {
+          "const": "fixed",
+          "description": "Root a frame port at `frame`.",
+          "type": "string"
+        },
+        {
+          "const": "coincident",
+          "description": "point–point.",
+          "type": "string"
+        },
+        {
+          "const": "on_face",
+          "description": "point–face at `(u, v)`.",
+          "type": "string"
+        },
+        {
+          "const": "coaxial",
+          "description": "axis–axis.",
+          "type": "string"
+        },
+        {
+          "const": "mate",
+          "description": "face–face, opposite normals, gap `value ≥ 0`.",
+          "type": "string"
+        },
+        {
+          "const": "flush",
+          "description": "face–face, same normal, offset `value`.",
+          "type": "string"
+        },
+        {
+          "const": "distance",
+          "description": "point–face or face–face signed distance along `n_b`.",
+          "type": "string"
+        },
+        {
+          "const": "inside",
+          "description": "region–region containment (check only).",
+          "type": "string"
+        },
+        {
+          "const": "clearance",
+          "description": "region–region minimum gap ≥ `value` (check only).",
+          "type": "string"
+        }
+      ]
+    },
+    "DotShape": {
+      "description": "Dot shapes.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "`point` (no fields).",
+          "properties": {
+            "kind": {
+              "const": "point",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EdgeSelector": {
+      "description": "Edge selector for fillets and chamfers; default `vertical`.",
+      "oneOf": [
+        {
+          "const": "all",
+          "description": "`all`",
+          "type": "string"
+        },
+        {
+          "const": "vertical",
+          "description": "`vertical` (default)",
+          "type": "string"
+        },
+        {
+          "const": "top",
+          "description": "`top`",
+          "type": "string"
+        },
+        {
+          "const": "bottom",
+          "description": "`bottom`",
+          "type": "string"
+        }
+      ]
+    },
+    "EmptyRole": {
+      "description": "Empty `role` (§3.1), required on and exclusive to `kind = \"empty\"`.",
+      "oneOf": [
+        {
+          "const": "cut",
+          "description": "Subtracted from a part body.",
+          "type": "string"
+        },
+        {
+          "const": "reserve",
+          "description": "Space reserved for something (PCB, connector, …).",
+          "type": "string"
+        },
+        {
+          "const": "keep_out",
+          "description": "Space no solid may enter.",
+          "type": "string"
+        },
+        {
+          "const": "envelope",
+          "description": "Bounding envelope; may be `intersect`ed by several parts.",
+          "type": "string"
+        }
+      ]
+    },
+    "EmptyShape": {
+      "description": "Empty shapes, discriminated by `shape.kind`.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "`box`",
+          "properties": {
+            "height": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "box",
+              "type": "string"
+            },
+            "length": {
+              "description": "Along local X.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "width": {
+              "description": "Along local Y.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "length",
+            "width",
+            "height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`cylinder`",
+          "properties": {
+            "diameter": {
+              "description": "Diameter.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "height": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "cylinder",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "diameter",
+            "height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`hole`",
+          "properties": {
+            "axis": {
+              "$ref": "#/$defs/Axis",
+              "default": "z",
+              "description": "Local hole axis, default `z`."
+            },
+            "counterbore_depth": {
+              "description": "`Dim | null`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "counterbore_diameter": {
+              "description": "`Dim | null`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "countersink_angle": {
+              "description": "`0 < x < 180 | null`.",
+              "exclusiveMaximum": 180.0,
+              "exclusiveMinimum": 0.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "countersink_diameter": {
+              "description": "`Dim | null`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "depth": {
+              "description": "`Dim | null`; required for `blind`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "diameter": {
+              "description": "`Dim`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "hole_type": {
+              "$ref": "#/$defs/HoleType",
+              "default": "through",
+              "description": "Default `through`."
+            },
+            "kind": {
+              "const": "hole",
+              "type": "string"
+            },
+            "thread": {
+              "description": "`^M\\d{1,3}(\\.\\d)?(x\\d(\\.\\d{1,2})?)?$ | null`.",
+              "pattern": "^M\\d{1,3}(\\.\\d)?(x\\d(\\.\\d{1,2})?)?$",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "diameter",
+            "depth",
+            "counterbore_diameter",
+            "counterbore_depth",
+            "countersink_diameter",
+            "countersink_angle"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`of`",
+          "properties": {
+            "kind": {
+              "const": "of",
+              "type": "string"
+            },
+            "source": {
+              "$ref": "#/$defs/Id",
+              "description": "Volume `id`."
+            }
+          },
+          "required": [
+            "kind",
+            "source"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ExprText": {
+      "maxLength": 160,
+      "minLength": 1,
+      "type": "string"
+    },
+    "FieldRef": {
+      "pattern": "^[a-z][a-z0-9_]{0,31}:[a-z][a-z0-9_]{0,31}$",
+      "type": "string"
+    },
+    "FilletFeature": {
+      "additionalProperties": false,
+      "description": "`{kind: \"fillet\", radius, selector}` (1.0 `FilletFeature`).",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/FilletTag",
+          "default": "fillet",
+          "description": "Always `\"fillet\"`."
+        },
+        "radius": {
+          "description": "`Dim`.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 100000.0,
+          "type": "number"
+        },
+        "selector": {
+          "$ref": "#/$defs/EdgeSelector",
+          "default": "vertical",
+          "description": "Edge selector."
+        }
+      },
+      "required": [
+        "radius"
+      ],
+      "type": "object"
+    },
+    "FilletTag": {
+      "description": "`kind: \"fillet\"`.",
+      "oneOf": [
+        {
+          "const": "fillet",
+          "description": "`\"fillet\"`",
+          "type": "string"
+        }
+      ]
+    },
+    "Frame": {
+      "additionalProperties": false,
+      "description": "Wire form of [`Frame`] (also its JSON Schema).",
+      "properties": {
+        "origin": {
+          "items": {
+            "maximum": 100000.0,
+            "minimum": -100000.0,
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "x_axis": {
+          "$ref": "#/$defs/AxisDir"
+        },
+        "z_axis": {
+          "$ref": "#/$defs/AxisDir"
+        }
+      },
+      "required": [
+        "origin",
+        "x_axis",
+        "z_axis"
+      ],
+      "type": "object"
+    },
+    "HoleType": {
+      "description": "Hole subtype (1.0 `HoleType`); default `through`.",
+      "oneOf": [
+        {
+          "const": "through",
+          "description": "`through` (default)",
+          "type": "string"
+        },
+        {
+          "const": "blind",
+          "description": "`blind` — requires `depth`",
+          "type": "string"
+        },
+        {
+          "const": "clearance",
+          "description": "`clearance`",
+          "type": "string"
+        },
+        {
+          "const": "tapped",
+          "description": "`tapped`",
+          "type": "string"
+        },
+        {
+          "const": "counterbore",
+          "description": "`counterbore` — requires `counterbore_diameter` and `counterbore_depth`",
+          "type": "string"
+        },
+        {
+          "const": "countersink",
+          "description": "`countersink` — requires `countersink_diameter` and `countersink_angle`",
+          "type": "string"
+        }
+      ]
+    },
+    "Id": {
+      "maxLength": 32,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]{0,31}$",
+      "type": "string"
+    },
+    "LineShape": {
+      "description": "Line shapes (all derived components).",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "`segment`",
+          "properties": {
+            "end": {
+              "$ref": "#/$defs/Id",
+              "description": "End Dot."
+            },
+            "kind": {
+              "const": "segment",
+              "type": "string"
+            },
+            "start": {
+              "$ref": "#/$defs/Id",
+              "description": "Start Dot."
+            }
+          },
+          "required": [
+            "kind",
+            "start",
+            "end"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`polyline`",
+          "properties": {
+            "closed": {
+              "description": "Whether the polyline is closed.",
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "polyline",
+              "type": "string"
+            },
+            "points": {
+              "description": "Dot ids, 2–64.",
+              "items": {
+                "$ref": "#/$defs/Id"
+              },
+              "maxItems": 64,
+              "minItems": 2,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "points",
+            "closed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`arc`",
+          "properties": {
+            "end": {
+              "$ref": "#/$defs/Id",
+              "description": "End Dot."
+            },
+            "kind": {
+              "const": "arc",
+              "type": "string"
+            },
+            "start": {
+              "$ref": "#/$defs/Id",
+              "description": "Start Dot."
+            },
+            "through": {
+              "$ref": "#/$defs/Id",
+              "description": "A Dot the arc passes through."
+            }
+          },
+          "required": [
+            "kind",
+            "start",
+            "through",
+            "end"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`circle`",
+          "properties": {
+            "center": {
+              "$ref": "#/$defs/Id",
+              "description": "Center Dot."
+            },
+            "diameter": {
+              "description": "`Dim`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "circle",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "center",
+            "diameter"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Material": {
+      "description": "Part material (1.0 `Material`).",
+      "oneOf": [
+        {
+          "const": "aluminum",
+          "description": "`aluminum`",
+          "type": "string"
+        },
+        {
+          "const": "steel",
+          "description": "`steel`",
+          "type": "string"
+        },
+        {
+          "const": "stainless_steel",
+          "description": "`stainless_steel`",
+          "type": "string"
+        },
+        {
+          "const": "plastic",
+          "description": "`plastic`",
+          "type": "string"
+        },
+        {
+          "const": "wood",
+          "description": "`wood`",
+          "type": "string"
+        },
+        {
+          "const": "other",
+          "description": "`other`",
+          "type": "string"
+        }
+      ]
+    },
+    "Parameter": {
+      "additionalProperties": false,
+      "description": "A named parameter (§4.1). `name` is in namespace N3 and may not be `min` / `max`.",
+      "properties": {
+        "max": {
+          "default": null,
+          "description": "Optional upper bound.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "default": null,
+          "description": "Optional lower bound (`parameter_out_of_range` is a validator code).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "name": {
+          "$ref": "#/$defs/Id",
+          "description": "Parameter name (N3)."
+        },
+        "note": {
+          "default": null,
+          "description": "≤ 120 chars.",
+          "maxLength": 120,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "description": "Current value.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "type": "object"
+    },
+    "Part": {
+      "additionalProperties": false,
+      "description": "A part (§6.2).",
+      "properties": {
+        "body": {
+          "description": "Boolean recipe, 1–128 ops, first must be `add`.",
+          "items": {
+            "$ref": "#/$defs/BodyOp"
+          },
+          "maxItems": 128,
+          "minItems": 1,
+          "type": "array"
+        },
+        "chamfers": {
+          "default": [],
+          "description": "≤ 8.",
+          "items": {
+            "$ref": "#/$defs/ChamferFeature"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
+        "fillets": {
+          "default": [],
+          "description": "≤ 8.",
+          "items": {
+            "$ref": "#/$defs/FilletFeature"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
+        "id": {
+          "$ref": "#/$defs/Id",
+          "description": "N2 identifier."
+        },
+        "material": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Material"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Material or `null`."
+        },
+        "name": {
+          "description": "1–80 chars.",
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "quantity": {
+          "description": "1–999.",
+          "format": "uint32",
+          "maximum": 999,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "source": {
+          "$ref": "#/$defs/PartSource",
+          "description": "`made` / `purchased`."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "quantity",
+        "source",
+        "body"
+      ],
+      "type": "object"
+    },
+    "PartSource": {
+      "description": "Part source (§6.2).",
+      "oneOf": [
+        {
+          "const": "made",
+          "description": "Manufactured.",
+          "type": "string"
+        },
+        {
+          "const": "purchased",
+          "description": "Bought (BOM only, no manufacturing outputs).",
+          "type": "string"
+        }
+      ]
+    },
+    "PatchOp": {
+      "description": "A patch operation: closed union discriminated by `op` (§8.2).",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Add a component (`provenance` is stamped by the coordinator).",
+          "properties": {
+            "component": {
+              "$ref": "#/$defs/ComponentInput",
+              "description": "The component."
+            },
+            "op": {
+              "const": "add_component",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "component"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Remove a component (and bindings targeting it).",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id",
+              "description": "Component id."
+            },
+            "op": {
+              "const": "remove_component",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set a component numeric field or constraint `value`/`u`/`v`.",
+          "properties": {
+            "op": {
+              "const": "set_field",
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/FieldRef",
+              "description": "`id:field`."
+            },
+            "value": {
+              "description": "New value.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "op",
+            "target",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Add or replace the binding of `target`.",
+          "properties": {
+            "expr": {
+              "$ref": "#/$defs/ExprText",
+              "description": "Expression source."
+            },
+            "op": {
+              "const": "set_binding",
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/FieldRef",
+              "description": "`id:field`."
+            }
+          },
+          "required": [
+            "op",
+            "target",
+            "expr"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Remove the binding of `target` (the field keeps its cached value).",
+          "properties": {
+            "op": {
+              "const": "remove_binding",
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/FieldRef",
+              "description": "`id:field`."
+            }
+          },
+          "required": [
+            "op",
+            "target"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Add a constraint.",
+          "properties": {
+            "constraint": {
+              "$ref": "#/$defs/Constraint",
+              "description": "The constraint."
+            },
+            "op": {
+              "const": "add_constraint",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "constraint"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Remove a constraint (and bindings targeting it).",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id",
+              "description": "Constraint id."
+            },
+            "op": {
+              "const": "remove_constraint",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Add or replace a parameter by `name`.",
+          "properties": {
+            "op": {
+              "const": "set_parameter",
+              "type": "string"
+            },
+            "parameter": {
+              "$ref": "#/$defs/Parameter",
+              "description": "The parameter."
+            }
+          },
+          "required": [
+            "op",
+            "parameter"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Add a part.",
+          "properties": {
+            "op": {
+              "const": "add_part",
+              "type": "string"
+            },
+            "part": {
+              "$ref": "#/$defs/Part",
+              "description": "The part."
+            }
+          },
+          "required": [
+            "op",
+            "part"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Replace an existing part's `body`.",
+          "properties": {
+            "body": {
+              "description": "New body, 1–128 ops.",
+              "items": {
+                "$ref": "#/$defs/BodyOp"
+              },
+              "maxItems": 128,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": {
+              "const": "set_body",
+              "type": "string"
+            },
+            "part_id": {
+              "$ref": "#/$defs/Id",
+              "description": "Part id."
+            }
+          },
+          "required": [
+            "op",
+            "part_id",
+            "body"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Add an assembly.",
+          "properties": {
+            "assembly": {
+              "$ref": "#/$defs/Assembly",
+              "description": "The assembly."
+            },
+            "op": {
+              "const": "add_assembly",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "assembly"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Append an assumption.",
+          "properties": {
+            "op": {
+              "const": "add_assumption",
+              "type": "string"
+            },
+            "text": {
+              "$ref": "#/$defs/Text300",
+              "description": "1–300 chars."
+            }
+          },
+          "required": [
+            "op",
+            "text"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Remove an identical assumption (§8.7).",
+          "properties": {
+            "op": {
+              "const": "remove_assumption",
+              "type": "string"
+            },
+            "text": {
+              "$ref": "#/$defs/Text300",
+              "description": "1–300 chars."
+            }
+          },
+          "required": [
+            "op",
+            "text"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Append a note.",
+          "properties": {
+            "op": {
+              "const": "add_note",
+              "type": "string"
+            },
+            "text": {
+              "$ref": "#/$defs/Text300",
+              "description": "1–300 chars."
+            }
+          },
+          "required": [
+            "op",
+            "text"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PlaneShape": {
+      "description": "Plane shapes.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "`rect`",
+          "properties": {
+            "kind": {
+              "const": "rect",
+              "type": "string"
+            },
+            "length": {
+              "description": "Along local X.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "width": {
+              "description": "Along local Y.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "length",
+            "width"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`disc`",
+          "properties": {
+            "diameter": {
+              "description": "`Dim`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "disc",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "diameter"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`profile`",
+          "properties": {
+            "inners": {
+              "default": [],
+              "description": "Inner closed Lines (holes in the profile), ≤ 16.",
+              "items": {
+                "$ref": "#/$defs/Id"
+              },
+              "maxItems": 16,
+              "type": "array"
+            },
+            "kind": {
+              "const": "profile",
+              "type": "string"
+            },
+            "outer": {
+              "$ref": "#/$defs/Id",
+              "description": "Outer closed Line."
+            }
+          },
+          "required": [
+            "kind",
+            "outer"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`section`",
+          "properties": {
+            "kind": {
+              "const": "section",
+              "type": "string"
+            },
+            "offset": {
+              "description": "Local Z of the horizontal section (`Coord`).",
+              "maximum": 100000.0,
+              "minimum": -100000.0,
+              "type": "number"
+            },
+            "source": {
+              "$ref": "#/$defs/Id",
+              "description": "Volume id."
+            }
+          },
+          "required": [
+            "kind",
+            "source",
+            "offset"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PortRef": {
+      "pattern": "^[a-z][a-z0-9_]{0,31}\\.[a-z][a-z0-9_]{0,31}$",
+      "type": "string"
+    },
+    "Rationale": {
+      "maxLength": 500,
+      "minLength": 1,
+      "type": "string"
+    },
+    "Role": {
+      "description": "Agent roles (§8.1, §8.3). Used as issue `owner` and as the patch `agent`.",
+      "oneOf": [
+        {
+          "const": "space_planner",
+          "description": "Space planner: reserved-class Empties, parameters.",
+          "type": "string"
+        },
+        {
+          "const": "component_smith",
+          "description": "Component smith: Dots, Lines, Planes, Volumes, `cut` Empties.",
+          "type": "string"
+        },
+        {
+          "const": "joiner",
+          "description": "Joiner: constraints.",
+          "type": "string"
+        },
+        {
+          "const": "assembler",
+          "description": "Assembler: parts, bodies, assemblies.",
+          "type": "string"
+        }
+      ]
+    },
+    "Text300": {
+      "maxLength": 300,
+      "minLength": 1,
+      "type": "string"
+    },
+    "VolumeShape": {
+      "description": "Volume shapes.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "`plate`",
+          "properties": {
+            "kind": {
+              "const": "plate",
+              "type": "string"
+            },
+            "length": {
+              "description": "Along local X.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "thickness": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "width": {
+              "description": "Along local Y.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "length",
+            "width",
+            "thickness"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`cylinder`",
+          "properties": {
+            "diameter": {
+              "description": "Diameter.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "height": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "cylinder",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "diameter",
+            "height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`ring`",
+          "properties": {
+            "height": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "inner_diameter": {
+              "description": "Inner (bore) diameter, must be smaller than `outer_diameter`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "ring",
+              "type": "string"
+            },
+            "outer_diameter": {
+              "description": "Outer diameter.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "outer_diameter",
+            "inner_diameter",
+            "height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`l_bracket`",
+          "properties": {
+            "depth": {
+              "description": "Along local Y.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "l_bracket",
+              "type": "string"
+            },
+            "thickness": {
+              "description": "Plate thickness.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "vertical_height": {
+              "description": "Height of the upright above the base plate.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "width": {
+              "description": "Along local X.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "width",
+            "depth",
+            "vertical_height",
+            "thickness"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`enclosure`",
+          "properties": {
+            "height": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "enclosure",
+              "type": "string"
+            },
+            "length": {
+              "description": "Along local X.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "wall_thickness": {
+              "description": "Wall and floor thickness.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "width": {
+              "description": "Along local Y.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "length",
+            "width",
+            "height",
+            "wall_thickness"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`extrude`",
+          "properties": {
+            "height": {
+              "description": "`Dim`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "extrude",
+              "type": "string"
+            },
+            "profile": {
+              "$ref": "#/$defs/Id",
+              "description": "Plane id."
+            }
+          },
+          "required": [
+            "kind",
+            "profile",
+            "height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`revolve`",
+          "properties": {
+            "angle": {
+              "description": "Degrees, `0 < angle ≤ 360`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 360.0,
+              "type": "number"
+            },
+            "axis": {
+              "$ref": "#/$defs/Id",
+              "description": "`segment` Line id."
+            },
+            "kind": {
+              "const": "revolve",
+              "type": "string"
+            },
+            "profile": {
+              "$ref": "#/$defs/Id",
+              "description": "Plane id."
+            }
+          },
+          "required": [
+            "kind",
+            "profile",
+            "axis",
+            "angle"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A patch (§8.1).",
+  "properties": {
+    "agent": {
+      "$ref": "#/$defs/Role",
+      "description": "Submitting role."
+    },
+    "base_revision": {
+      "description": "Must equal the document's current `revision`.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "ops": {
+      "description": "1–64 ops, applied in order.",
+      "items": {
+        "$ref": "#/$defs/PatchOp"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "type": "array"
+    },
+    "rationale": {
+      "$ref": "#/$defs/Rationale",
+      "description": "1–500 chars."
+    },
+    "resolves": {
+      "description": "Issue codes this patch addresses, ≤ 16.",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 16,
+      "type": "array"
+    }
+  },
+  "required": [
+    "agent",
+    "base_revision",
+    "rationale",
+    "resolves",
+    "ops"
+  ],
+  "title": "Patch",
+  "type": "object"
+}

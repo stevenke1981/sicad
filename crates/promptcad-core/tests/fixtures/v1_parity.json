@@ -1,0 +1,2383 @@
+[
+ {
+  "name": "example_plate_four_holes",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "promptcad-plate",
+   "source_prompt": "鋁合金固定板，長120mm、寬60mm、厚10mm，四角 M6 通孔，孔中心離邊緣10mm，四角 R5。",
+   "unit": "mm",
+   "material": "aluminum",
+   "base": {
+    "kind": "plate",
+    "length": 120.0,
+    "width": 60.0,
+    "thickness": 10.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": -50.0,
+     "y": -20.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 6.6,
+     "hole_type": "clearance",
+     "depth": null,
+     "thread": "M6",
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    },
+    {
+     "kind": "hole",
+     "x": 50.0,
+     "y": -20.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 6.6,
+     "hole_type": "clearance",
+     "depth": null,
+     "thread": "M6",
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    },
+    {
+     "kind": "hole",
+     "x": 50.0,
+     "y": 20.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 6.6,
+     "hole_type": "clearance",
+     "depth": null,
+     "thread": "M6",
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    },
+    {
+     "kind": "hole",
+     "x": -50.0,
+     "y": 20.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 6.6,
+     "hole_type": "clearance",
+     "depth": null,
+     "thread": "M6",
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [
+    {
+     "kind": "fillet",
+     "radius": 5.0,
+     "selector": "vertical"
+    }
+   ],
+   "chamfers": [],
+   "assumptions": [
+    "M6 未指定攻牙，依一般間隙孔近似"
+   ],
+   "notes": [],
+   "planner": {
+    "planner": "rule",
+    "confidence": 0.92,
+    "review_required": true
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "thread_annotation_only",
+    "severity": "info",
+    "feature_index": 0
+   },
+   {
+    "code": "thread_annotation_only",
+    "severity": "info",
+    "feature_index": 1
+   },
+   {
+    "code": "thread_annotation_only",
+    "severity": "info",
+    "feature_index": 2
+   },
+   {
+    "code": "thread_annotation_only",
+    "severity": "info",
+    "feature_index": 3
+   },
+   {
+    "code": "assumption",
+    "severity": "info",
+    "feature_index": null
+   }
+  ]
+ },
+ {
+  "name": "test_overlapping_holes_are_error",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 5.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 10.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    },
+    {
+     "kind": "hole",
+     "x": 4.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 10.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "overlapping_holes",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "test_hole_outside_part_is_error",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 5.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 19.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 6.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "hole_outside_part",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "test_vertical_plate_fillet_can_equal_half_thickness",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 5.0
+   },
+   "holes": [],
+   "fillets": [
+    {
+     "kind": "fillet",
+     "radius": 5.0,
+     "selector": "vertical"
+    }
+   ],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": []
+ },
+ {
+  "name": "test_blind_depth_equal_to_material_is_blocked",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 5.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 4.0,
+     "hole_type": "blind",
+     "depth": 5.0,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "blind_depth_exceeds_material",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "test_counterbore_effective_diameter_respects_edge",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 5.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 15.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 4.0,
+     "hole_type": "counterbore",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": 12.0,
+     "counterbore_depth": 2.0,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "hole_outside_part",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "plate_clean_through",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 5.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 4.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": []
+ },
+ {
+  "name": "plate_low_edge_clearance",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 5.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 17.5,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 4.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "low_edge_clearance",
+    "severity": "warning",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "plate_extreme_aspect_ratio",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 2000.0,
+    "width": 1.0,
+    "thickness": 1.0
+   },
+   "holes": [],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "extreme_aspect_ratio",
+    "severity": "warning",
+    "feature_index": null
+   }
+  ]
+ },
+ {
+  "name": "plate_fillet_all_too_large",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 5.0
+   },
+   "holes": [],
+   "fillets": [
+    {
+     "kind": "fillet",
+     "radius": 3.0,
+     "selector": "all"
+    }
+   ],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "fillet_too_large",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "plate_fillet_vertical_too_large",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 5.0
+   },
+   "holes": [],
+   "fillets": [
+    {
+     "kind": "fillet",
+     "radius": 15.0,
+     "selector": "vertical"
+    },
+    {
+     "kind": "fillet",
+     "radius": 2.0,
+     "selector": "top"
+    }
+   ],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "fillet_too_large",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "plate_chamfer_top_too_large",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 5.0
+   },
+   "holes": [],
+   "fillets": [],
+   "chamfers": [
+    {
+     "kind": "chamfer",
+     "distance": 2.5,
+     "selector": "top"
+    }
+   ],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "chamfer_too_large",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "plate_counterbore_depth",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 5.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 4.0,
+     "hole_type": "counterbore",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": 8.0,
+     "counterbore_depth": 5.0,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "counterbore_depth_exceeds_material",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "plate_countersink_depth",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 2.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 4.0,
+     "hole_type": "countersink",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": 10.0,
+     "countersink_angle": 90.0
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "countersink_depth_exceeds_material",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "plate_countersink_ok",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 10.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 4.0,
+     "hole_type": "countersink",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": 8.0,
+     "countersink_angle": 90.0
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": []
+ },
+ {
+  "name": "plate_tapped_without_thread",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 5.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 5.0,
+     "hole_type": "tapped",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "tapped_hole_without_thread",
+    "severity": "warning",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "plate_tapped_with_thread",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 5.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 5.0,
+     "hole_type": "tapped",
+     "depth": null,
+     "thread": "M6",
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "thread_annotation_only",
+    "severity": "info",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "plate_thread_normalized",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 5.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 5.0,
+     "hole_type": "tapped",
+     "depth": null,
+     "thread": " m6x1 ",
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "thread_annotation_only",
+    "severity": "info",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "plate_thread_invalid",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 5.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 5.0,
+     "hole_type": "tapped",
+     "depth": null,
+     "thread": "M6 tapped",
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "tapped_hole_without_thread",
+    "severity": "warning",
+    "feature_index": 0
+   }
+  ],
+  "raw_issues": [
+   {
+    "code": "thread_annotation_only",
+    "severity": "info",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "plate_x_axis_blind_too_deep",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 10.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 5.0,
+     "axis": "x",
+     "diameter": 4.0,
+     "hole_type": "blind",
+     "depth": 45.0,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "blind_depth_exceeds_material",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "plate_y_axis_hole_outside",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 10.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 9.0,
+     "axis": "y",
+     "diameter": 4.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "hole_outside_part",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "plate_y_axis_low_edge",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 10.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 7.5,
+     "axis": "y",
+     "diameter": 4.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "low_edge_clearance",
+    "severity": "warning",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "plate_three_holes_two_overlaps",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 80.0,
+    "width": 40.0,
+    "thickness": 5.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 6.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    },
+    {
+     "kind": "hole",
+     "x": 5.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 6.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    },
+    {
+     "kind": "hole",
+     "x": 10.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 6.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "overlapping_holes",
+    "severity": "error",
+    "feature_index": 0
+   },
+   {
+    "code": "overlapping_holes",
+    "severity": "error",
+    "feature_index": 1
+   }
+  ]
+ },
+ {
+  "name": "plate_overlap_ignores_other_axis",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 10.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 4.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    },
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 5.0,
+     "axis": "x",
+     "diameter": 4.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": []
+ },
+ {
+  "name": "plate_assumptions",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "plate",
+    "length": 40.0,
+    "width": 30.0,
+    "thickness": 5.0
+   },
+   "holes": [],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [
+    "a",
+    "b"
+   ],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "assumption",
+    "severity": "info",
+    "feature_index": null
+   },
+   {
+    "code": "assumption",
+    "severity": "info",
+    "feature_index": null
+   }
+  ]
+ },
+ {
+  "name": "cylinder_z_outside",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "cylinder",
+    "diameter": 20.0,
+    "height": 10.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 8.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 6.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "hole_outside_part",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "cylinder_z_low_edge",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "cylinder",
+    "diameter": 20.0,
+    "height": 10.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 6.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 6.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "low_edge_clearance",
+    "severity": "warning",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "cylinder_z_clean",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "cylinder",
+    "diameter": 20.0,
+    "height": 10.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 6.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": []
+ },
+ {
+  "name": "cylinder_x_axis_blind_too_deep",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "cylinder",
+    "diameter": 20.0,
+    "height": 30.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 15.0,
+     "axis": "x",
+     "diameter": 4.0,
+     "hole_type": "blind",
+     "depth": 20.0,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "blind_depth_exceeds_material",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "cylinder_y_axis_outside",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "cylinder",
+    "diameter": 20.0,
+    "height": 10.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 9.0,
+     "axis": "y",
+     "diameter": 4.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "hole_outside_part",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "cylinder_vertical_fillet_too_large",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "cylinder",
+    "diameter": 20.0,
+    "height": 10.0
+   },
+   "holes": [],
+   "fillets": [
+    {
+     "kind": "fillet",
+     "radius": 10.0,
+     "selector": "vertical"
+    }
+   ],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "fillet_too_large",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "cylinder_z_blind_too_deep",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "cylinder",
+    "diameter": 20.0,
+    "height": 10.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 4.0,
+     "hole_type": "blind",
+     "depth": 12.0,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "blind_depth_exceeds_material",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "ring_hole_in_inner_void",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "ring",
+    "outer_diameter": 40.0,
+    "inner_diameter": 20.0,
+    "height": 5.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 6.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "hole_in_inner_void",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "ring_hole_intersects_inner_void",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "ring",
+    "outer_diameter": 40.0,
+    "inner_diameter": 20.0,
+    "height": 5.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 10.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 6.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "hole_intersects_inner_void",
+    "severity": "warning",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "ring_hole_clean",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "ring",
+    "outer_diameter": 40.0,
+    "inner_diameter": 20.0,
+    "height": 5.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 15.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 4.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": []
+ },
+ {
+  "name": "ring_hole_outside",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "ring",
+    "outer_diameter": 40.0,
+    "inner_diameter": 20.0,
+    "height": 5.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 19.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 4.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "hole_outside_part",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "ring_x_axis_hole",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "ring",
+    "outer_diameter": 40.0,
+    "inner_diameter": 20.0,
+    "height": 5.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 2.5,
+     "axis": "x",
+     "diameter": 2.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": []
+ },
+ {
+  "name": "ring_chamfer_all_too_large",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "ring",
+    "outer_diameter": 40.0,
+    "inner_diameter": 20.0,
+    "height": 5.0
+   },
+   "holes": [],
+   "fillets": [],
+   "chamfers": [
+    {
+     "kind": "chamfer",
+     "distance": 3.0,
+     "selector": "all"
+    }
+   ],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "chamfer_too_large",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "lbracket_thin",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "l_bracket",
+    "width": 40.0,
+    "depth": 30.0,
+    "vertical_height": 30.0,
+    "thickness": 1.5
+   },
+   "holes": [],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "thin_bracket",
+    "severity": "warning",
+    "feature_index": null
+   }
+  ]
+ },
+ {
+  "name": "lbracket_x_axis_blind_too_deep",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "l_bracket",
+    "width": 40.0,
+    "depth": 30.0,
+    "vertical_height": 30.0,
+    "thickness": 3.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": -13.5,
+     "z": 20.0,
+     "axis": "x",
+     "diameter": 2.0,
+     "hole_type": "blind",
+     "depth": 40.0,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "low_edge_clearance",
+    "severity": "warning",
+    "feature_index": 0
+   },
+   {
+    "code": "blind_depth_exceeds_material",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "lbracket_z_blind_too_deep",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "l_bracket",
+    "width": 40.0,
+    "depth": 30.0,
+    "vertical_height": 30.0,
+    "thickness": 3.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 5.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 4.0,
+     "hole_type": "blind",
+     "depth": 3.0,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "blind_depth_exceeds_material",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "lbracket_y_counterbore_too_deep",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "l_bracket",
+    "width": 40.0,
+    "depth": 30.0,
+    "vertical_height": 30.0,
+    "thickness": 3.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 20.0,
+     "axis": "y",
+     "diameter": 4.0,
+     "hole_type": "counterbore",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": 8.0,
+     "counterbore_depth": 3.0,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "counterbore_depth_exceeds_material",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "lbracket_z_outside",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "l_bracket",
+    "width": 40.0,
+    "depth": 30.0,
+    "vertical_height": 30.0,
+    "thickness": 3.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 19.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 4.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "hole_outside_part",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "enclosure_thin_wall",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "enclosure",
+    "length": 100.0,
+    "width": 70.0,
+    "height": 30.0,
+    "wall_thickness": 0.6
+   },
+   "holes": [],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "thin_wall",
+    "severity": "warning",
+    "feature_index": null
+   }
+  ]
+ },
+ {
+  "name": "enclosure_z_blind_too_deep",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "enclosure",
+    "length": 100.0,
+    "width": 70.0,
+    "height": 30.0,
+    "wall_thickness": 2.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 0.0,
+     "axis": "z",
+     "diameter": 4.0,
+     "hole_type": "blind",
+     "depth": 2.0,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "blind_depth_exceeds_material",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "enclosure_x_hole_zero_clearance",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "enclosure",
+    "length": 100.0,
+    "width": 70.0,
+    "height": 30.0,
+    "wall_thickness": 2.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 33.0,
+     "z": 15.0,
+     "axis": "x",
+     "diameter": 4.0,
+     "hole_type": "through",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": null,
+     "counterbore_depth": null,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "low_edge_clearance",
+    "severity": "warning",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "enclosure_chamfer_bottom_too_large",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "enclosure",
+    "length": 100.0,
+    "width": 70.0,
+    "height": 30.0,
+    "wall_thickness": 2.0
+   },
+   "holes": [],
+   "fillets": [],
+   "chamfers": [
+    {
+     "kind": "chamfer",
+     "distance": 15.0,
+     "selector": "bottom"
+    }
+   ],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "chamfer_too_large",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "enclosure_x_counterbore_too_deep",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "enclosure",
+    "length": 100.0,
+    "width": 70.0,
+    "height": 30.0,
+    "wall_thickness": 2.0
+   },
+   "holes": [
+    {
+     "kind": "hole",
+     "x": 0.0,
+     "y": 0.0,
+     "z": 15.0,
+     "axis": "x",
+     "diameter": 4.0,
+     "hole_type": "counterbore",
+     "depth": null,
+     "thread": null,
+     "counterbore_diameter": 8.0,
+     "counterbore_depth": 3.0,
+     "countersink_diameter": null,
+     "countersink_angle": null
+    }
+   ],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "counterbore_depth_exceeds_material",
+    "severity": "error",
+    "feature_index": 0
+   }
+  ]
+ },
+ {
+  "name": "enclosure_extreme_aspect_ratio",
+  "spec": {
+   "schema_version": "1.0",
+   "name": "parity",
+   "source_prompt": "parity case",
+   "unit": "mm",
+   "material": null,
+   "base": {
+    "kind": "enclosure",
+    "length": 3000.0,
+    "width": 2.5,
+    "height": 2.0,
+    "wall_thickness": 0.5
+   },
+   "holes": [],
+   "fillets": [],
+   "chamfers": [],
+   "assumptions": [],
+   "notes": [],
+   "planner": {
+    "planner": "test",
+    "confidence": 1.0,
+    "review_required": false
+   }
+  },
+  "expected_issues": [
+   {
+    "code": "thin_wall",
+    "severity": "warning",
+    "feature_index": null
+   },
+   {
+    "code": "extreme_aspect_ratio",
+    "severity": "warning",
+    "feature_index": null
+   }
+  ]
+ }
+]

@@ -10,4 +10,6 @@ ruff check .
 pytest
 ```
 
+修改 `crates/promptcad-core/`（Rust core）時，另在該目錄執行 `cargo fmt --check`、`cargo clippy --all-targets -- -D warnings` 與 `cargo test`。
+
 提交內容不要包含 API Key、私有模型、加工客戶資料或 `generated/` 產物。

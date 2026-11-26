@@ -203,3 +203,24 @@
 - **授權聲明**：提交的 `THIRD_PARTY_NOTICES.md` 為 Windows 權威版，可由鎖檔重現，Windows CI 改為 `--check --strict`（必過），上一筆紀錄「CI 不跑 `--check`」的限制就此解除；macOS／Linux 於 CI 以 `--strict` 重生並隨包發佈。`build_sidecar.py` 驗證確實未凍結的套件（trame*、wslink、aiohttp 及其相依、matplotlib、scipy 等）不再列入，Python 套件由 60 個降為 39 個。
 - **VTK 精簡**：`build_sidecar.py` 依 CadQuery 實際載入的 `vtkmodules` 與原生相依閉包刪除未使用的 VTK 檔案，Windows onedir 目標 ≤ 460 MiB（量測見 `PROJECT_STATUS.md`）。
 - **仍未達成**：macOS／Linux 的實際執行結果尚待 `desktop-bundle.yml` 首次三平台執行；在此之前三平台測試矩陣視為「已實作、待驗證」。
+
+### 2026-11-26：第 2 階段 2a — Rust core crate
+
+已完成的內容：獨立 crate `crates/promptcad-core/`（不依賴 Tauri；`cargo test` 於本機通過 253 個測試，`cargo fmt --check` 與 `cargo clippy -D warnings` 通過）依 [`../CAD_DSL_2.md`](../CAD_DSL_2.md) 實作 CadDocument 2.0 型別、運算式與綁定、port 表與求解器、分層驗證器、patch 引擎（含 §8.5 權限矩陣與復原）、op log、1.0 ↔ 2.0 轉接，以及 `promptcad-core` 命令列工具；JSON Schema 由 Rust 型別生成並提交於 `schemas/cad2/`；`ci.yml` 新增 `core` job（`cargo fmt --check`、`clippy`、`cargo test`、schema 漂移檢查）。細節見 `PROJECT_STATUS.md`。
+
+對照第 2 階段的完成條件：
+
+- **所有 `examples/generated/` 的 1.0 文件經 adapter 後輸出等價幾何**：**部分達成**。`examples/generated/` 目前只有 `plate-four-holes` 一份；它可經 `upgrade_1_to_2` 升級並通過 2.0 驗證，`downgrade_2_to_1` 往返後與原文件一致（`crates/promptcad-core/tests/migrate_roundtrip.rs`、`migrate_upgrade.rs`）。但「1.0 直接輸出與經轉接後輸出在 CadQuery 上幾何等價（體積、包圍盒）」的測試尚未進行，Python 編譯器也尚不接受 2.0，因此幾何等價尚未驗證。
+- **Python 與 Rust 驗證器對既有測試案例判定一致後，移除 Python 端的設計驗證邏輯**：**部分達成**。一致性已驗證：49 個案例（`tests/fixtures/v1_parity.json`，由 `gen_v1_parity.py` 實際執行 Python `DesignValidator` 產生）在 Rust 驗證器得到相同判定（`tests/validate_parity_v1.rs`）。移除未做：Rust core 尚未接入執行中的系統，`app/services/validator.py` 仍是實際使用的驗證器。已知差異：升級後的文件若 1.0 螺紋無效，回報 `tapped_hole_without_thread` 而非 1.0 的 `thread_annotation_only`。
+- **CI 的 schema 生成比對檢查已啟用**：**部分達成**。`ci.yml` 的 `core` job 含 `cargo run -- schema --out-dir ../../schemas/cad2 --check`，但此 job 尚未在 GitHub 上執行過，且比對的只是 Rust → JSON Schema；Pydantic 與 TypeScript 的生成物尚不存在（見下一項）。
+- **REST API 與 CLI 在伺服器模式下仍可用**：**達成（但屬未變動）**。Python 的 REST API、`promptcad` CLI 與 1.0 流程完全未修改；相容層（讓 2.0 流程接受 1.0 文件）尚不存在，因為 Rust core 尚未被伺服器呼叫。
+
+第 2 階段「內容」中尚未開始或未完成的項目：
+
+- **Schema 來源切換為 Rust、Pydantic 與 TypeScript 皆為生成物**：**未達成**。來源仍是 `app/models/cad.py`；2.0 的 Pydantic／TypeScript 生成型別不存在。
+- **編譯器改為接受 2.0 的已驗證規格**：**未達成**。
+- **前端元件樹、屬性編輯、檢視器的元件選取與 port 顯示**：**未開始**。
+- **決定伺服器模式下 Rust core 的宿主形式（新增 ADR）**：**未達成**。
+- 核心層（kernel）驗證代碼未實作，屬於 sidecar 的工作。
+
+結論：第 2 階段尚未結束，本 ADR 的階段順序不變。下一步依序為把 Rust core 接進 Tauri 命令並以新 ADR 決定伺服器宿主、切換 schema 來源並生成 Pydantic／TypeScript、讓 Python 編譯器接受 2.0 並完成幾何等價測試，之後才移除 Python 驗證器並開始前端元件樹。
