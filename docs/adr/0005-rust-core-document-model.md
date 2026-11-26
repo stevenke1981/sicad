@@ -94,4 +94,19 @@
 
 ## 回顧紀錄
 
-（尚無）
+### 2026-11-26：第 2 階段 2a — Rust core crate 實作
+
+`crates/promptcad-core/` 已實作（`cargo test` 於本機通過 253 個測試）。逐項對照驗收條件：
+
+- **Rust core crate 可在沒有 Tauri 與 Python 的環境下建置並通過測試**：**達成**。crate 不依賴 Tauri，自有 `Cargo.lock`；`cd crates/promptcad-core && cargo test` 通過。唯一與 Python 有關的是 `tests/fixtures/gen_v1_parity.py`，它只用於重新產生已提交的 `v1_parity.json`，執行 `cargo test` 不需要 Python。CI 的 `core` job 已加入但尚未在 GitHub 上執行。
+- **`examples/generated/` 的所有 1.0 文件經 adapter 轉為 2.0 並通過驗證，輸出幾何與原流程一致**：**部分達成**。`examples/generated/` 只有 `plate-four-holes`；升級後通過驗證（`tests/migrate_upgrade.rs`），往返不變式有屬性測試（`tests/migrate_roundtrip.rs`）。幾何一致（CadQuery 上的體積、包圍盒比對）**尚未驗證**，因為 Python 編譯器尚不接受 2.0。
+- **無效 patch 不會改變文件狀態，且回傳結構化診斷**：**達成**。patch 以原子方式套用，拒絕時回傳拒絕原因與 issue 清單，文件不變（`tests/patch_engine.rs`、`tests/patch_permissions.rs`，後者逐格檢查 §8.5 權限矩陣）。限制：`human` 來源不受權限矩陣與 `annotation_only_removal` 限制。
+- **任一已套用的 patch 可復原，復原後文件與套用前逐位元組相同（正規化序列化後）**：**達成**。`tests/patch_engine.rs` 的 `undo_restores_the_pre_image_byte_for_byte` 與 `tests/oplog.rs`（含 proptest 與重播）驗證。復原是在 op log 追加一筆還原前一修訂號的新紀錄；沒有 redo。
+- **`DesignValidator` 的既有測試案例在 Rust 驗證器上得到相同的 error／warning 判定**：**達成（限於 1.0 規則的 49 個案例）**。`tests/validate_parity_v1.rs` 對照由實際執行 Python 驗證器產生的 `tests/fixtures/v1_parity.json`。已知差異：升級後的文件若 1.0 螺紋無效，回報 `tapped_hole_without_thread` 而非 `thread_annotation_only`（thread 已被 §10.1 正規化設為 null）。
+
+其餘對應 ADR 內容的狀態：
+
+- 2.0 型別、運算式與綁定、port 表與求解器（輸出與 `examples/cad2/` 兩份 `expected_resolved` 一致，`tests/solver_golden.rs`）、分層驗證器、patch 引擎、op log 與 1.0 ↔ 2.0 轉接皆已實作。
+- 解析檢查對 `extrude`、`revolve` 與沉頭孔錐體使用保守的外包圖元：可能漏報，不會憑空產生 issue。核心層（kernel）驗證代碼未實作，屬於 sidecar 的工作。
+- Rust core 尚未接入 Tauri 命令或 FastAPI 伺服器；伺服器宿主形式仍待新 ADR（本 ADR 的回顧條件之一）。Python 驗證器尚未移除，兩套驗證邏輯目前並存。
+

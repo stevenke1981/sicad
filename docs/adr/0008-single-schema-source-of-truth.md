@@ -101,4 +101,12 @@ Rust 型別（serde + schemars）
 
 ## 回顧紀錄
 
-（尚無）
+### 2026-11-26：第 2 階段 2a — Rust → JSON Schema 與 CI 漂移檢查
+
+部分實作，單一事實來源尚未切換：
+
+- **已完成**：CadDocument 2.0 的 Rust 型別（serde + schemars，`deny_unknown_fields`）可匯出 JSON Schema。`promptcad-core schema --out-dir <dir> [--check]` 輸出 `schemas/cad2/` 的五份檔案（`cad-document-1`、`cad-document-2`、`patch`、`resolved`、`validation-report` 的 `*.schema.json`），已提交進版控；`--check` 在漂移時失敗，`ci.yml` 的 `core` job 於 `cargo test` 之後執行（測試見 `crates/promptcad-core/tests/schema_export.rs`、`cli_schema.rs`）。`core` job 尚未在 GitHub 上執行過。
+- **尚未完成**：由 `schemas/cad2/` 生成 Pydantic 與 TypeScript 型別、單一指令重新生成三者、三端往返測試，以及 LLM planner 改用管線產生的 schema，均未實作。
+- **執行中的 1.0 應用程式不變**：來源仍是 `app/models/cad.py`，其 JSON Schema 由 `scripts/export_schema.py` 匯出為 `schemas/promptcad.schema.json`，前端型別由它生成（第 1 階段的過渡安排）。`app/models/cad.py` 尚未被取代，repo 中仍有手寫的 1.0 文件模型型別。
+- 本 ADR 的驗收項目因此皆尚未全部達成；2.0 的 Rust → JSON Schema 與漂移檢查是其中第一步。
+

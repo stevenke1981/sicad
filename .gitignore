@@ -19,3 +19,6 @@ app/web_dist/
 node_modules/
 src-tauri/target/
 src-tauri/binaries/
+
+# Rust core crate build output (ADR 0005)
+crates/promptcad-core/target/

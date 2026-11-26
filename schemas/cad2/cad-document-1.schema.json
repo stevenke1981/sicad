@@ -1,0 +1,647 @@
+{
+  "$defs": {
+    "Axis": {
+      "description": "A world/local coordinate axis, serialized as `\"x\"`, `\"y\"`, `\"z\"`.",
+      "oneOf": [
+        {
+          "const": "x",
+          "description": "X axis.",
+          "type": "string"
+        },
+        {
+          "const": "y",
+          "description": "Y axis.",
+          "type": "string"
+        },
+        {
+          "const": "z",
+          "description": "Z axis (default, matching 1.0 `HoleFeature.axis`).",
+          "type": "string"
+        }
+      ]
+    },
+    "BaseFeature": {
+      "description": "1.0 `BaseFeature`, discriminated by `kind`.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "`plate`",
+          "properties": {
+            "kind": {
+              "const": "plate",
+              "type": "string"
+            },
+            "length": {
+              "description": "Along local X.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "thickness": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "width": {
+              "description": "Along local Y.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "length",
+            "width",
+            "thickness"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`cylinder`",
+          "properties": {
+            "diameter": {
+              "description": "Diameter.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "height": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "cylinder",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "diameter",
+            "height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`ring`",
+          "properties": {
+            "height": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "inner_diameter": {
+              "description": "Inner (bore) diameter, must be smaller than `outer_diameter`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "ring",
+              "type": "string"
+            },
+            "outer_diameter": {
+              "description": "Outer diameter.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "outer_diameter",
+            "inner_diameter",
+            "height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`l_bracket`",
+          "properties": {
+            "depth": {
+              "description": "Along local Y.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "l_bracket",
+              "type": "string"
+            },
+            "thickness": {
+              "description": "Plate thickness.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "vertical_height": {
+              "description": "Height of the upright above the base plate.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "width": {
+              "description": "Along local X.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "width",
+            "depth",
+            "vertical_height",
+            "thickness"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`enclosure`",
+          "properties": {
+            "height": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "enclosure",
+              "type": "string"
+            },
+            "length": {
+              "description": "Along local X.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "wall_thickness": {
+              "description": "Wall and floor thickness.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "width": {
+              "description": "Along local Y.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "length",
+            "width",
+            "height",
+            "wall_thickness"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ChamferFeature": {
+      "additionalProperties": false,
+      "description": "`{kind: \"chamfer\", distance, selector}` (1.0 `ChamferFeature`).",
+      "properties": {
+        "distance": {
+          "description": "`Dim`.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 100000.0,
+          "type": "number"
+        },
+        "kind": {
+          "$ref": "#/$defs/ChamferTag",
+          "default": "chamfer",
+          "description": "Always `\"chamfer\"`."
+        },
+        "selector": {
+          "$ref": "#/$defs/EdgeSelector",
+          "default": "vertical",
+          "description": "Edge selector."
+        }
+      },
+      "required": [
+        "distance"
+      ],
+      "type": "object"
+    },
+    "ChamferTag": {
+      "description": "`kind: \"chamfer\"`.",
+      "oneOf": [
+        {
+          "const": "chamfer",
+          "description": "`\"chamfer\"`",
+          "type": "string"
+        }
+      ]
+    },
+    "EdgeSelector": {
+      "description": "Edge selector for fillets and chamfers; default `vertical`.",
+      "oneOf": [
+        {
+          "const": "all",
+          "description": "`all`",
+          "type": "string"
+        },
+        {
+          "const": "vertical",
+          "description": "`vertical` (default)",
+          "type": "string"
+        },
+        {
+          "const": "top",
+          "description": "`top`",
+          "type": "string"
+        },
+        {
+          "const": "bottom",
+          "description": "`bottom`",
+          "type": "string"
+        }
+      ]
+    },
+    "FilletFeature": {
+      "additionalProperties": false,
+      "description": "`{kind: \"fillet\", radius, selector}` (1.0 `FilletFeature`).",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/FilletTag",
+          "default": "fillet",
+          "description": "Always `\"fillet\"`."
+        },
+        "radius": {
+          "description": "`Dim`.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 100000.0,
+          "type": "number"
+        },
+        "selector": {
+          "$ref": "#/$defs/EdgeSelector",
+          "default": "vertical",
+          "description": "Edge selector."
+        }
+      },
+      "required": [
+        "radius"
+      ],
+      "type": "object"
+    },
+    "FilletTag": {
+      "description": "`kind: \"fillet\"`.",
+      "oneOf": [
+        {
+          "const": "fillet",
+          "description": "`\"fillet\"`",
+          "type": "string"
+        }
+      ]
+    },
+    "HoleFeature": {
+      "additionalProperties": false,
+      "description": "1.0 `HoleFeature`.",
+      "properties": {
+        "axis": {
+          "$ref": "#/$defs/Axis",
+          "default": "z",
+          "description": "Hole axis, default `z`."
+        },
+        "counterbore_depth": {
+          "default": null,
+          "description": "`Dim | null`.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 100000.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "counterbore_diameter": {
+          "default": null,
+          "description": "`Dim | null`.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 100000.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "countersink_angle": {
+          "default": null,
+          "description": "`0 < x < 180 | null`.",
+          "exclusiveMaximum": 180.0,
+          "exclusiveMinimum": 0.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "countersink_diameter": {
+          "default": null,
+          "description": "`Dim | null`.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 100000.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "depth": {
+          "default": null,
+          "description": "`Dim | null`.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 100000.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "diameter": {
+          "description": "`Dim`.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 100000.0,
+          "type": "number"
+        },
+        "hole_type": {
+          "$ref": "#/$defs/HoleType",
+          "default": "through",
+          "description": "Default `through`."
+        },
+        "kind": {
+          "$ref": "#/$defs/HoleTag",
+          "default": "hole",
+          "description": "Always `\"hole\"`."
+        },
+        "thread": {
+          "default": null,
+          "description": "Free text, ≤ 32 chars.",
+          "maxLength": 32,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "x": {
+          "default": 0.0,
+          "description": "`Coord`, default 0.",
+          "maximum": 100000.0,
+          "minimum": -100000.0,
+          "type": "number"
+        },
+        "y": {
+          "default": 0.0,
+          "description": "`Coord`, default 0.",
+          "maximum": 100000.0,
+          "minimum": -100000.0,
+          "type": "number"
+        },
+        "z": {
+          "default": 0.0,
+          "description": "`Coord`, default 0.",
+          "maximum": 100000.0,
+          "minimum": -100000.0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "diameter"
+      ],
+      "type": "object"
+    },
+    "HoleTag": {
+      "description": "`kind: \"hole\"` of a 1.0 hole.",
+      "oneOf": [
+        {
+          "const": "hole",
+          "description": "`\"hole\"`",
+          "type": "string"
+        }
+      ]
+    },
+    "HoleType": {
+      "description": "Hole subtype (1.0 `HoleType`); default `through`.",
+      "oneOf": [
+        {
+          "const": "through",
+          "description": "`through` (default)",
+          "type": "string"
+        },
+        {
+          "const": "blind",
+          "description": "`blind` — requires `depth`",
+          "type": "string"
+        },
+        {
+          "const": "clearance",
+          "description": "`clearance`",
+          "type": "string"
+        },
+        {
+          "const": "tapped",
+          "description": "`tapped`",
+          "type": "string"
+        },
+        {
+          "const": "counterbore",
+          "description": "`counterbore` — requires `counterbore_diameter` and `counterbore_depth`",
+          "type": "string"
+        },
+        {
+          "const": "countersink",
+          "description": "`countersink` — requires `countersink_diameter` and `countersink_angle`",
+          "type": "string"
+        }
+      ]
+    },
+    "Material": {
+      "description": "Part material (1.0 `Material`).",
+      "oneOf": [
+        {
+          "const": "aluminum",
+          "description": "`aluminum`",
+          "type": "string"
+        },
+        {
+          "const": "steel",
+          "description": "`steel`",
+          "type": "string"
+        },
+        {
+          "const": "stainless_steel",
+          "description": "`stainless_steel`",
+          "type": "string"
+        },
+        {
+          "const": "plastic",
+          "description": "`plastic`",
+          "type": "string"
+        },
+        {
+          "const": "wood",
+          "description": "`wood`",
+          "type": "string"
+        },
+        {
+          "const": "other",
+          "description": "`other`",
+          "type": "string"
+        }
+      ]
+    },
+    "PlannerMetadata": {
+      "additionalProperties": false,
+      "description": "`{planner, confidence, review_required}` (1.0 `PlannerMetadata`).",
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "description": "`0 ≤ x ≤ 1`, default 1.",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "planner": {
+          "description": "Planner name, 1–64 chars.",
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "review_required": {
+          "default": false,
+          "description": "Planner's own review flag, default `false`.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "planner"
+      ],
+      "type": "object"
+    },
+    "SchemaVersion1": {
+      "description": "`schema_version: \"1.0\"`.",
+      "oneOf": [
+        {
+          "const": "1.0",
+          "description": "`\"1.0\"`",
+          "type": "string"
+        }
+      ]
+    },
+    "Unit": {
+      "description": "The unit literal `\"mm\"`.",
+      "oneOf": [
+        {
+          "const": "mm",
+          "description": "`\"mm\"`",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "CadDocument 1.0 (`app/models/cad.py::CadDocument`).",
+  "properties": {
+    "assumptions": {
+      "default": [],
+      "description": "≤ 32.",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "type": "array"
+    },
+    "base": {
+      "$ref": "#/$defs/BaseFeature",
+      "description": "The single base solid."
+    },
+    "chamfers": {
+      "default": [],
+      "description": "≤ 8.",
+      "items": {
+        "$ref": "#/$defs/ChamferFeature"
+      },
+      "maxItems": 8,
+      "type": "array"
+    },
+    "fillets": {
+      "default": [],
+      "description": "≤ 8.",
+      "items": {
+        "$ref": "#/$defs/FilletFeature"
+      },
+      "maxItems": 8,
+      "type": "array"
+    },
+    "holes": {
+      "default": [],
+      "description": "≤ 64.",
+      "items": {
+        "$ref": "#/$defs/HoleFeature"
+      },
+      "maxItems": 64,
+      "type": "array"
+    },
+    "material": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Material"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Default `null`."
+    },
+    "name": {
+      "default": "promptcad-part",
+      "description": "1–80 chars, default `\"promptcad-part\"`.",
+      "maxLength": 80,
+      "minLength": 1,
+      "type": "string"
+    },
+    "notes": {
+      "default": [],
+      "description": "≤ 32.",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "type": "array"
+    },
+    "planner": {
+      "$ref": "#/$defs/PlannerMetadata",
+      "description": "Planner metadata."
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion1",
+      "default": "1.0",
+      "description": "`\"1.0\"`."
+    },
+    "source_prompt": {
+      "description": "1–20000 chars.",
+      "maxLength": 20000,
+      "minLength": 1,
+      "type": "string"
+    },
+    "unit": {
+      "$ref": "#/$defs/Unit",
+      "default": "mm",
+      "description": "`\"mm\"`."
+    }
+  },
+  "required": [
+    "source_prompt",
+    "base",
+    "planner"
+  ],
+  "title": "CadDocument1",
+  "type": "object"
+}

@@ -5,6 +5,8 @@
 > **實作位置：** 依 [ADR 0010](adr/0010-migration-phases.md) 第 2 階段與 [ADR 0005](adr/0005-rust-core-document-model.md)、[ADR 0008](adr/0008-single-schema-source-of-truth.md)，2.0 的型別、驗證器、求解前處理與 patch 引擎在 **Rust core**（`serde` + `schemars`）實作，Pydantic 與 TypeScript 型別由其生成。**不在 Python 實作 2.0。** 概念文件中的 `app/models/cad2.py`、`app/services/migrate.py`、`app/services/solver.py`、`app/services/expr.py`、`app/services/ports.py` 等 Python 提案檔名一律作廢。
 >
 > 1.0 格式見 [`CAD_DSL.md`](CAD_DSL.md)，不受本文影響；v0.1.0 的程式只接受 1.0。
+>
+> 非規範性註記：Rust core 的實作位於 [`crates/promptcad-core/`](../crates/promptcad-core/)（第 2 階段 2a，尚未被應用程式呼叫）。
 
 ---
 

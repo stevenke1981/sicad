@@ -1,6 +1,6 @@
-# Project Status — v0.1.0（含未發佈的第 1 階段切片）
+# Project Status — v0.1.0（含未發佈的第 1、2 階段切片）
 
-版本號仍為 0.1.0。下方「v0.1.0 可用功能」是已發佈的 MVP；「第 1 階段切片（Unreleased）」是依 [ADR 0010](docs/adr/0010-migration-phases.md) 第 1 階段加入、尚未發佈的部分。
+版本號仍為 0.1.0。下方「v0.1.0 可用功能」是已發佈的 MVP；「第 1 階段切片（Unreleased）」與「第 2 階段切片（Unreleased / Phase 2a）」是依 [ADR 0010](docs/adr/0010-migration-phases.md) 第 1、2 階段加入、尚未發佈的部分。
 
 ## v0.1.0 可用功能
 
@@ -63,6 +63,49 @@
 
 最大的組成：`vtk.libs` 264 MiB、`OCP` 90 MiB、`cadquery_ocp.libs` 62 MiB、`vtkmodules` 42 MiB、`casadi` 24 MiB。VTK 約佔 56%，是之後縮小體積最大的槓桿。
 
+## 第 2 階段切片（Unreleased / Phase 2a：Rust core）
+
+獨立的 library crate `crates/promptcad-core/`（不依賴 Tauri，自有 `Cargo.lock`；相依 serde、serde_json、schemars、sha2，開發相依 proptest），依 [`docs/CAD_DSL_2.md`](docs/CAD_DSL_2.md) 實作 [ADR 0010](docs/adr/0010-migration-phases.md) 第 2 階段的 Rust core。此切片**尚未被 Tauri 外殼或 FastAPI 伺服器呼叫**，執行中的應用程式仍只接受 CadDocument 1.0。
+
+| 項目 | 位置 | 狀態 |
+|---|---|---|
+| 文件模型（CadDocument 2.0／1.0、id 與參照、24 個軸對齊朝向、issue 與 §9.2 代碼表、patch 型別、`resolved.json` 型別；serde + schemars、`deny_unknown_fields`）、欄位處理、正規化序列化與 SHA-256 | `crates/promptcad-core/src/model/`、`fields.rs`、`canonical.rs` | 已實作 |
+| 封閉文法的運算式解析與綁定求值（§4） | `src/expr.rs`、`src/bindings.rs` | 已實作 |
+| port 表（§3.4）、朝向與位移的不動點求解器、孔方向與切削體（§5、§7） | `src/ports.rs`、`src/solver/` | 已實作；對 `examples/cad2/` 兩份範例的輸出與 `expected_resolved` 一致 |
+| 分層驗證器（schema → 結構 → 綁定 → 求解 → 設計規則） | `src/validate/` | 已實作；1.0 規則對 Python `DesignValidator` 做 49 個案例的差異測試 |
+| patch 引擎（原子套用、§8.5 權限矩陣、拒絕原因、provenance 標記、復原）與 op log（append-only JSONL、重播） | `src/patch_engine/`、`src/oplog.rs` | 已實作 |
+| 1.0 ↔ 2.0 轉接（`upgrade_1_to_2` 為全函式、`downgrade_2_to_1` 為部分函式） | `src/migrate.rs` | 已實作；往返不變式有屬性測試 |
+| 命令列工具 `promptcad-core`（`schema --out-dir … [--check]`，另有 `validate`、`solve`、`upgrade`、`downgrade`、`normalize`、`apply-patch`；用法見 `crates/promptcad-core/README.md`） | `src/bin/promptcad-core.rs` | 已實作 |
+| 由 Rust 型別生成的 JSON Schema | `schemas/cad2/`（`cad-document-1`／`cad-document-2`／`patch`／`resolved`／`validation-report` 五份 `*.schema.json`） | 已實作；`cargo run -- schema --check` 檢查漂移 |
+| CI `core` job（`cargo fmt --check`、`clippy -D warnings`、`cargo test`、schema 漂移檢查） | `.github/workflows/ci.yml` | 已加入；**尚未在 GitHub 上執行過** |
+
+### 第 2 階段 2a 狀態（2026-11-26）
+
+此切片已實作的是 Rust core 本身；第 2 階段尚未結案。
+
+尚未完成：
+
+- Rust core 尚未接進 Tauri 命令或 FastAPI 伺服器；伺服器模式下 Rust core 的宿主形式仍需新增 ADR。
+- **Schema 來源尚未切換**：執行中的應用程式仍以 `app/models/cad.py` 為來源；2.0 的 Pydantic 與 TypeScript 生成型別尚不存在（目前只有 `schemas/cad2/` 的 JSON Schema 與漂移檢查）。
+- Python 編譯器不接受 2.0；Python `DesignValidator` 未移除。
+- 前端的元件樹與 port 顯示尚未開始。
+- 1.0 直接輸出與經轉接後輸出的幾何等價測試（CadQuery 上的體積、包圍盒比對）尚未進行。
+- 核心層（kernel）驗證代碼未實作，屬於 sidecar 的工作。
+
+規格留白處的實作決定與已知限制：
+
+- 已綁定欄位的快取值不一致以 `binding_eval_error` 回報（§9.2 沒有專用代碼）。
+- schema 違規以拒絕原因代碼 `schema_invalid` 的 issue 呈現，包含組裝巢狀深度超過 4。
+- `extrude`、`revolve` 與沉頭孔錐體的解析檢查使用保守的外包圖元：可能漏報，不會憑空產生 issue。
+- 復原是在 op log 追加一筆還原前一修訂號的新紀錄；沒有 redo。
+- `human` 來源不受權限矩陣與 `annotation_only_removal` 限制；角色 §8.3 子集之外的 op 以 `schema_invalid` 拒絕。
+- `resolves` 的每一項必須是 §9.2 的代碼（否則 `schema_invalid`）；元件工匠的 `set_parameter` 修正 patch 另須有至少一項代碼確實出現在套用前的驗證報告中（否則 `permission_denied`），比 §8.5 的字面更嚴格。
+- 孔本身有 `fixed` 時姿態以該 `frame` 為準（§5.4 第 1 步先於第 3 步）；以 Dot 定位的孔才跟隨所屬零件 `body[0]` 的姿態（含衍生 Volume）。
+- 區域無法解出的 `inside`／`clearance` 約束（例如不屬於任何零件的貫穿孔）不產生問題。
+- `arc` 沒有 plane port，`circle` 的法線假設為 `+z`，`revolve` 只有 `origin` 與外包區域。
+- `Resolved.ports` 只含被約束引用的 port 與各元件的 frame port。
+- 升級後的文件若 1.0 螺紋無效，回報 `tapped_hole_without_thread`，而非 1.0 的 `thread_annotation_only`（§10.1 正規化已將 thread 設為 null）。
+
 ## 已驗證
 
 v0.1.0 發行包：
@@ -86,6 +129,13 @@ v0.1.0 發行包：
 - 建置環境鎖檔：`tests/test_desktop_lock.py`（純函式）；`ci.yml` 的 `lock-check` job 執行 `scripts/desktop_lock.py --check`。
 - 桌面驗證腳本：`tests/test_frozen_kill_check.py` 等純函式測試在 `ci.yml` 執行；實際的隔離環境 smoke 與 Job Object 終止檢查只在 `desktop-bundle.yml` 對已安裝的 sidecar 執行。
 
+第 2 階段 2a 切片在 `crates/promptcad-core/` 內以 `cargo test` 驗收（2026-11-26 於本機 Windows 實際執行）：
+
+- 共 253 個測試通過、0 失敗（單元測試加 19 個整合測試檔，含命令列測試 `tests/cli_commands.rs` 與審查後的回歸測試 `tests/solver_regressions.rs`、`tests/patch_regressions.rs`）。屬性測試使用 proptest。
+- `cargo fmt --check` 與 `cargo clippy --all-targets -- -D warnings` 通過。
+- Python 差異測試：`tests/fixtures/v1_parity.json` 的 49 個案例由 `tests/fixtures/gen_v1_parity.py` 實際執行 Python `DesignValidator` 產生，`tests/validate_parity_v1.rs` 比對 Rust 驗證器的判定。
+- CI 的 `core` job 尚未在 GitHub 上執行。
+
 ## 封裝環境限制
 
 建立 v0.1.0 發行包的執行環境沒有 Docker、CadQuery、OpenSCAD 或 Conda，因此沒有在該環境中實際執行 OpenCascade 生成 STEP／STL／DXF。專案的 Dockerfile 與 Conda 環境已固定 CadQuery 2.8.0。桌面版自第 1 階段 1b 起以 pip 安裝的 `cadquery==2.8.0`（`.venv-desktop`）打包，已在 Windows 上實際產生 STEP／STL／DXF；`.venv-desktop` 現由 `requirements/desktop-*.txt` 的雜湊鎖檔安裝（cadquery-ocp 7.9.3.1.1、vtk 9.6.2、casadi 3.8.2、nlopt 2.11.0、numpy 2.5.5、PyInstaller 6.22.3，三平台相同）。
@@ -95,7 +145,12 @@ v0.1.0 發行包：
 依 [ADR 0010](docs/adr/0010-migration-phases.md)：
 
 1. 完成第 1 階段：取得 `desktop-bundle.yml` 三平台矩陣的執行結果，依 CI 的 `--strict` 失敗補齊 unix 原生函式庫分類，macOS／Linux 的參考項目連續兩次全綠後改為必過（ADR 0011）。
-2. 第 2 階段：Rust core 實作 CadDocument 2.0（依 [`docs/CAD_DSL_2.md`](docs/CAD_DSL_2.md)）、驗證器、patch 引擎與 1.0 → 2.0 adapter；前端加入元件樹與 port 顯示。
+2. 完成第 2 階段：Rust core（CadDocument 2.0、驗證器、patch 引擎、op log、1.0 → 2.0 adapter）已於 `crates/promptcad-core/` 實作（見上方 Phase 2a）。剩餘項目：
+   - 把 Rust core 接進 Tauri 命令，並以新 ADR 決定伺服器模式下的宿主形式。
+   - 切換 schema 來源：由 Rust 生成 Pydantic 與 TypeScript 型別，`app/models/cad.py` 僅保留 1.0 相容用途或被生成檔取代（ADR 0008）。
+   - Python 編譯器改為接受已驗證的 2.0 規格，並完成 1.0 直接輸出與經轉接輸出的幾何等價測試（CadQuery）。
+   - 在實際系統中確認 Python 與 Rust 驗證器判定一致後，移除 Python 端的設計驗證邏輯。
+   - 前端的元件樹與 port 顯示。
 3. 第 3 階段：約束求解器評估（[ADR 0007](docs/adr/0007-constraint-solver.md)）與多 agent 編排。
 
 仍保留的 1.0 功能構想（將併入 2.0 的對應階段）：
