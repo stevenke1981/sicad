@@ -151,3 +151,9 @@ cadquery-ocp 的 `manylinux_2_31` 決定 Python 端的下限為 glibc 2.31；但
 ## 回顧紀錄
 
 〈Accepted 之後的補充，只增不改。〉
+
+- **2026-11-26：首次三平台實測。** 2026-11-26 [run 45748851297](https://github.com/stevenke1981/sicad/actions/runs/45748851297) 三平台全數通過（Windows x86_64、macOS arm64、Linux x86_64／ubuntu-22.04）：各平台打包後與安裝後的 sidecar 都通過四種格式的 smoke 測試；sidecar 模式的中斷檢查 `KILL_CHECK_OK`（Unix 兩種變體各 3 次）；強制結束已安裝的外殼後 sidecar 分別於 0.016 s（Windows）、0.241 s（macOS）、0.218 s（Linux）內結束。實際磁碟大小（`du`）：Windows onedir 404.6 MiB／安裝後 409 MiB；macOS onedir 603 MB／.app 997 MB（.dmg 216 MiB）；Linux onedir 783 MB／安裝後 1.3 GB（.deb 309 MiB、AppImage 282 MiB）。macOS／Linux 安裝後變大是因為 Tauri 打包資源時把 onedir 內的符號連結展開成實體檔案。
+  - 首輪發現並修正：Unix venv 的 `bin/python` 是符號連結，授權聲明產生器 `resolve()` 後探測到基底 Python（改用 `absolute()`）；Linux `comm` 截成 15 字元使 smoke 監看誤判；macOS／Linux wheel 多帶的原生函式庫補上分類（其中 cadquery-ocp 的 Linux wheel 隨附 **JBIG-KIT（GPL-2.0-or-later）**，需在公開發布前評估）。
+  - **外殼被強制結束時 sidecar 殘留**的根因：stdin-EOF 監看在送出訊號前先寫 stderr，而 stderr 的讀取端就是已死的外殼，`BrokenPipeError` 使監看執行緒在送出訊號前結束。sidecar 模式的檢查沒抓到，因為測試程式持續讀 stderr。已改為記錄失敗不影響送出訊號，並加回歸測試。
+  - 外殼模式的中斷檢查在 macOS／Linux 仍為參考性質（continue-on-error），依計畫連續兩次通過後改為必過。
+  - 待辦：Unix 安裝後體積（保留符號連結或 strip 除錯符號）；sidecar 先崩潰時孤兒 render worker（`waitid(WNOWAIT)`）；在 CI 自動比對 `.deb` 相依與 manifest 的 `external_system_libs`（首輪為 `libGL.so.1`、`libxcb.so.1`，已對應 `libgl1`、`libxcb1`）。

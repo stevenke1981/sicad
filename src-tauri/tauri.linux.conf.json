@@ -4,7 +4,7 @@
     "targets": ["deb", "appimage"],
     "linux": {
       "deb": {
-        "depends": ["libgl1", "libx11-6", "libxext6", "libxrender1"]
+        "depends": ["libgl1", "libx11-6", "libxcb1", "libxext6", "libxrender1"]
       }
     }
   }

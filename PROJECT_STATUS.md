@@ -44,7 +44,7 @@
 尚未達成：
 
 - **三平台測試矩陣**：已實作（ADR 0011）：`desktop-bundle.yml` 為 `windows-latest`／`macos-latest`／`ubuntu-22.04` 矩陣，`ci.yml` 的 `desktop` job 為三平台 `cargo fmt`／`clippy`／`test`。macOS／Linux 的外殼模式終止檢查、安裝後 smoke、`.dmg`、AppImage 先列為參考（`continue-on-error`），連續兩次全綠後改為必過。
-  - 跨平台 desktop-bundle 執行結果：（待整合者填入跨平台 desktop-bundle 執行結果）
+  - 跨平台 desktop-bundle 執行結果：2026-11-26 [run 45748851297](https://github.com/stevenke1981/sicad/actions/runs/45748851297) 三平台全數通過（Windows x86_64、macOS arm64、Linux x86_64／ubuntu-22.04）：各平台打包後與安裝後的 sidecar 都通過四種格式的 smoke 測試；sidecar 模式的中斷檢查 `KILL_CHECK_OK`（Unix 兩種變體各 3 次）；強制結束已安裝的外殼後 sidecar 分別於 0.016 s（Windows）、0.241 s（macOS）、0.218 s（Linux）內結束。實際磁碟大小（`du`）：Windows onedir 404.6 MiB／安裝後 409 MiB；macOS onedir 603 MB／.app 997 MB（.dmg 216 MiB）；Linux onedir 783 MB／安裝後 1.3 GB（.deb 309 MiB、AppImage 282 MiB）。macOS／Linux 安裝後變大是因為 Tauri 打包資源時把 onedir 內的符號連結展開成實體檔案。
 - **乾淨機器驗證**：已改由 GitHub `windows-latest` 上的 `desktop-bundle.yml` 執行（隔離環境 smoke、Job Object 終止檢查、安裝後檢查授權聲明存在且大於 10 KB），尚待第一次完整執行的結果。
   - desktop-bundle 執行結果：2026-11-26 於 GitHub `windows-latest`（Windows Server 2025，4 CPU）首次執行 [run 45723089074](https://github.com/stevenke1981/sicad/actions/runs/45723089074) 全數通過：建置與安裝後的 sidecar 皆在 isolated env 下通過 smoke（各觀察到 7 個 render worker，`foreign_processes=[]`）；安裝 sidecar 的 Job Object 中斷檢查 `KILL_CHECK_OK`；強制結束已安裝的 `promptcad-studio.exe` 後 sidecar 於 0.007 秒內結束（`job.rs` 實證，此步驟已改為必過）；安裝目錄含 `THIRD_PARTY_NOTICES.md`。量測：安裝檔 107.5 MiB、安裝後 554.1 MiB、READY 0.64–0.66 s、warm render 2.38 s、端到端 generate 2.42 s。
 - 3D 檢視器的實際繪製尚未以畫面確認（STL 已成功取得）。
