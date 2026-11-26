@@ -20,6 +20,7 @@
 | [0008](0008-single-schema-source-of-truth.md) | 以 Rust serde 型別作為 schema 單一事實來源 | Accepted | 2026-11-17 |
 | [0009](0009-agent-orchestration.md) | Agent 編排：Claude API tool use + structured outputs，僅輸出 patch JSON | Accepted | 2026-11-17 |
 | [0010](0010-migration-phases.md) | 四階段遷移路線 | Accepted | 2026-11-17 |
+| [0011](0011-cross-platform-desktop.md) | 桌面版三平台（Windows、macOS、Linux） | Accepted | 2026-11-26 |
 
 ## 決策之間的關係
 
@@ -30,6 +31,7 @@
                                      └─→ 0009 Agent 編排
 0006 OCCT／Python sidecar ←─ 0002（sidecar 機制）、0008（生成 Pydantic）
 0010 遷移階段：排定以上全部的落地順序
+0011 三平台桌面版：延伸 0006／0010 的 sidecar 打包到 macOS 與 Linux
 ```
 
 ## 流程

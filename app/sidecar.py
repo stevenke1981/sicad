@@ -20,6 +20,11 @@ to stdout::
 
 Everything else (uvicorn logs, errors) goes to stderr so stdout stays machine readable.
 
+On macOS/Linux the shell also passes ``--exit-on-stdin-eof`` and keeps the write end of a
+stdin pipe: when the shell exits or crashes the pipe closes and the sidecar stops its whole
+process group (see :mod:`app.parent_watch`). On Windows the flag is accepted but ignored
+(the shell's Job Object does the same job).
+
 When the first argument is ``--render-worker`` the process instead runs one CadQuery job
 and exits (see :mod:`app.render_worker`); the frozen renderer spawns it that way because a
 PyInstaller build has no separate ``python.exe``.
@@ -91,6 +96,12 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         action="store_true",
         help="development only: start even when PROMPTCAD_API_TOKEN is unset",
     )
+    parser.add_argument(
+        "--exit-on-stdin-eof",
+        action="store_true",
+        help="unix: stop this process group when stdin (the shell's pipe) reaches EOF; "
+        "ignored on Windows",
+    )
     args = parser.parse_args(argv)
     if not 0 <= args.port <= 65535:
         parser.error("--port must be between 0 and 65535")
@@ -110,6 +121,20 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     args = _parse_args(arguments)
 
+    watch = None
+    if args.exit_on_stdin_eof:
+        # Before the heavy imports, so a shell that dies during startup still takes us down.
+        from app.parent_watch import install
+
+        watch = install()
+    try:
+        return _serve(args)
+    finally:
+        if watch is not None:
+            watch.finish()
+
+
+def _serve(args: argparse.Namespace) -> int:
     import uvicorn
 
     from app.core.config import Settings

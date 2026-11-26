@@ -1,7 +1,7 @@
 # Tauri on Windows needs the MSVC toolchain (WebView2 / windows-rs); this machine's
 # default host is x86_64-pc-windows-gnu, so pin MSVC at the repo root so both `cargo` in src-tauri/ and the
 # root `npm run tauri` CLI (which reads the host triple) agree on MSVC.
-# Phase 1 targets Windows only (ADR 0010); revisit when the 3-platform matrix lands.
+# desktop bundles target Windows, macOS and Linux; non-Windows CI sets RUSTUP_TOOLCHAIN=stable (ADR 0011).
 [toolchain]
 channel = "stable-x86_64-pc-windows-msvc"
 profile = "minimal"

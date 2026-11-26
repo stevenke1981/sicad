@@ -60,7 +60,9 @@ fn ensure_sidecar_onedir() {
         if !exe_ok || !internal.is_dir() {
             panic!(
                 "sidecar onedir {} is missing, an empty placeholder, or lacks {}/; build it \
-                 first with `.venv-desktop/Scripts/python.exe scripts/build_sidecar.py`",
+                 first with `python scripts/build_sidecar.py` from the build venv \
+                 (`.venv-desktop/Scripts/python.exe` on Windows, `.venv-desktop/bin/python` \
+                 elsewhere)",
                 exe.display(),
                 SIDECAR_INTERNAL
             );

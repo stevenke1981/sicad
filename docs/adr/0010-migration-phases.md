@@ -195,3 +195,11 @@
 - **仍未達成**：三平台測試矩陣（目前只在 Windows x86_64 建置）。乾淨機器驗證的結論以 `desktop-bundle.yml` 的實際執行結果為準。
 
 結論：除三平台測試矩陣與乾淨機器驗證的 CI 結果外，第 1 階段的完成條件均已達成。
+
+### 2026-11-26：三平台矩陣、VTK 精簡與建置環境鎖版
+
+- **三平台測試矩陣**：依 [0011](0011-cross-platform-desktop.md) 實作。`desktop-bundle.yml` 改為 `windows-latest`、`macos-latest`（arm64）、`ubuntu-22.04` 三平台矩陣（`fail-fast: false`）；`ci.yml` 的 `desktop` job 改為三平台的 `cargo fmt`／`clippy`／`test`。macOS 產生 `.app`（ad-hoc 簽章）與 `.dmg`，Linux 產生 `.deb` 與 AppImage；unix 的「關閉外殼即終止 sidecar」以 stdin EOF + 行程群組實作（Windows 維持 Job Object）。首次執行的判定分級見 0011：三平台必過的項目為鎖檔安裝、凍結與精簡、onedir smoke、sidecar 模式終止檢查、授權聲明 `--strict` 與 `.exe`／`.app`／`.deb`；macOS／Linux 的外殼模式終止檢查、安裝後 smoke、`.dmg`、AppImage 先列為參考，連續兩次全綠後改為必過。
+- **建置環境鎖版**：`.venv-desktop` 改由 `requirements/desktop-{windows-x86_64,macos-arm64,linux-x86_64}.txt`（`scripts/desktop_lock.py` 以 `uv pip compile --generate-hashes` 在同一台機器產生）以 `uv pip sync --require-hashes` 安裝；`ci.yml` 新增 `lock-check` job。以鎖檔在另一個目錄重建的環境，`uv pip freeze` 與本機 `.venv-desktop` 完全相同（70 個套件，不含 editable 的本專案）。
+- **授權聲明**：提交的 `THIRD_PARTY_NOTICES.md` 為 Windows 權威版，可由鎖檔重現，Windows CI 改為 `--check --strict`（必過），上一筆紀錄「CI 不跑 `--check`」的限制就此解除；macOS／Linux 於 CI 以 `--strict` 重生並隨包發佈。`build_sidecar.py` 驗證確實未凍結的套件（trame*、wslink、aiohttp 及其相依、matplotlib、scipy 等）不再列入，Python 套件由 60 個降為 39 個。
+- **VTK 精簡**：`build_sidecar.py` 依 CadQuery 實際載入的 `vtkmodules` 與原生相依閉包刪除未使用的 VTK 檔案，Windows onedir 目標 ≤ 460 MiB（量測見 `PROJECT_STATUS.md`）。
+- **仍未達成**：macOS／Linux 的實際執行結果尚待 `desktop-bundle.yml` 首次三平台執行；在此之前三平台測試矩陣視為「已實作、待驗證」。

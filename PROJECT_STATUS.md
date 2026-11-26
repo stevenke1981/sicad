@@ -28,6 +28,8 @@
 | 乾淨機器驗證（隔離環境 smoke、Job Object 終止檢查） | `scripts/frozen_smoke.py --isolated-env`、`scripts/frozen_kill_check.py`、`.github/workflows/desktop-bundle.yml` | 已實作；在 GitHub `windows-latest` 上執行 |
 | 第三方授權聲明 | `scripts/gen_third_party_notices.py`、`THIRD_PARTY_NOTICES.md`、`src-tauri/tauri.conf.json` | 已完成；隨安裝包安裝到 `<安裝目錄>\THIRD_PARTY_NOTICES.md` |
 | 2D 預覽可讀性 | `web/src/components/SvgPreview.tsx`、`web/src/styles.css` | 已完成；`model.svg` 以紙色底顯示，`preview.svg` 不變 |
+| 三平台桌面版（ADR 0011） | `src-tauri/tauri.{macos,linux}.conf.json`、`src-tauri/src/sidecar.rs`、`app/parent_watch.py`、`.github/workflows/desktop-bundle.yml` | 已實作、待 CI 驗證：Windows NSIS、macOS `.app`／`.dmg`（ad-hoc 簽章）、Linux `.deb`／AppImage；unix 以 stdin EOF + 行程群組終止 sidecar |
+| 建置環境鎖版 | `scripts/desktop_lock.py`、`scripts/desktop_env.py`、`requirements/desktop-*.txt`、`ci.yml`（`lock-check`） | 已完成：三平台雜湊鎖檔，`uv pip sync --require-hashes`；以鎖檔重建的環境與 `.venv-desktop` 的 `uv pip freeze` 完全相同 |
 
 ### 第 1 階段狀態（2026-11-26）
 
@@ -35,13 +37,14 @@
 
 - **conda-pack 與 PyInstaller**：選定 PyInstaller onedir，**負責人已於 2026-11-26 簽核**（見 ADR 0006、0010 回顧紀錄）。
 - **`app/static/` 已移除**（負責人核准）：未建置前端時 `/` 回傳 503 說明頁；Docker 映像以多階段建置內含前端。
-- **第三方授權聲明**：`THIRD_PARTY_NOTICES.md` 由 `scripts/gen_third_party_notices.py --strict` 產生並隨安裝包發佈；LGPL 元件（OCCT／OCP、casadi、NLopt）可在 `<安裝目錄>\sidecar\_internal\` 替換。
+- **第三方授權聲明**：`THIRD_PARTY_NOTICES.md` 由 `scripts/gen_third_party_notices.py --strict` 產生並隨安裝包發佈；LGPL 元件（OCCT／OCP、casadi、NLopt）可在 `<安裝目錄>\sidecar\_internal\` 替換。提交的檔案為 Windows 權威版，可由鎖檔重現，Windows CI 以 `--check --strict` 把關；macOS／Linux 於 CI 重新產生並隨包發佈（ADR 0011）。`build_sidecar.py` 確認未凍結的套件不再列入（Python 套件 60 → 39 個）。
 - **CadQuery 投影 SVG 在深色主題下不易閱讀**：`model.svg` 改以紙色底顯示。
 - **關閉外殼時中斷進行中的渲染**：新增 `scripts/frozen_kill_check.py` 實測（Job Object 關閉後 sidecar 與 render worker 須在 5 秒內結束；`--shell-exe` 另以已安裝的外殼驗證，首次執行通過後已改為必過），在 `desktop-bundle.yml` 中執行；結果併入下方的乾淨機器驗證。
 
 尚未達成：
 
-- **三平台測試矩陣**：只在 Windows x86_64 建置；macOS、Linux 尚未建立。
+- **三平台測試矩陣**：已實作（ADR 0011）：`desktop-bundle.yml` 為 `windows-latest`／`macos-latest`／`ubuntu-22.04` 矩陣，`ci.yml` 的 `desktop` job 為三平台 `cargo fmt`／`clippy`／`test`。macOS／Linux 的外殼模式終止檢查、安裝後 smoke、`.dmg`、AppImage 先列為參考（`continue-on-error`），連續兩次全綠後改為必過。
+  - 跨平台 desktop-bundle 執行結果：2026-11-26 [run 45748851297](https://github.com/stevenke1981/sicad/actions/runs/45748851297) 三平台全數通過（Windows x86_64、macOS arm64、Linux x86_64／ubuntu-22.04）：各平台打包後與安裝後的 sidecar 都通過四種格式的 smoke 測試；sidecar 模式的中斷檢查 `KILL_CHECK_OK`（Unix 兩種變體各 3 次）；強制結束已安裝的外殼後 sidecar 分別於 0.016 s（Windows）、0.241 s（macOS）、0.218 s（Linux）內結束。實際磁碟大小（`du`）：Windows onedir 404.6 MiB／安裝後 409 MiB；macOS onedir 603 MB／.app 997 MB（.dmg 216 MiB）；Linux onedir 783 MB／安裝後 1.3 GB（.deb 309 MiB、AppImage 282 MiB）。macOS／Linux 安裝後變大是因為 Tauri 打包資源時把 onedir 內的符號連結展開成實體檔案。
 - **乾淨機器驗證**：已改由 GitHub `windows-latest` 上的 `desktop-bundle.yml` 執行（隔離環境 smoke、Job Object 終止檢查、安裝後檢查授權聲明存在且大於 10 KB），尚待第一次完整執行的結果。
   - desktop-bundle 執行結果：2026-11-26 於 GitHub `windows-latest`（Windows Server 2025，4 CPU）首次執行 [run 45723089074](https://github.com/stevenke1981/sicad/actions/runs/45723089074) 全數通過：建置與安裝後的 sidecar 皆在 isolated env 下通過 smoke（各觀察到 7 個 render worker，`foreign_processes=[]`）；安裝 sidecar 的 Job Object 中斷檢查 `KILL_CHECK_OK`；強制結束已安裝的 `promptcad-studio.exe` 後 sidecar 於 0.007 秒內結束（`job.rs` 實證，此步驟已改為必過）；安裝目錄含 `THIRD_PARTY_NOTICES.md`。量測：安裝檔 107.5 MiB、安裝後 554.1 MiB、READY 0.64–0.66 s、warm render 2.38 s、端到端 generate 2.42 s。
 - 3D 檢視器的實際繪製尚未以畫面確認（STL 已成功取得）。
@@ -76,21 +79,22 @@ v0.1.0 發行包：
 - `ruff check .`。
 - `python scripts/export_schema.py --check` 與 `npm --prefix web run gen:types` 後 `git diff --exit-code`（schema 漂移檢查）。
 - `npm --prefix web run typecheck`、`test`、`build`。
-- `src-tauri` 的 `cargo fmt --check`、`cargo clippy -D warnings`、`cargo test`（CI 的 `windows-latest` `desktop` job）。
+- `src-tauri` 的 `cargo fmt --check`、`cargo clippy -D warnings`、`cargo test`（CI 的 `desktop` job，`windows-latest`／`macos-latest`／`ubuntu-22.04` 三平台）。
 - 桌面安裝包：`scripts/frozen_smoke.py` 以凍結後的 sidecar 對五種基體 × 六種孔型實際渲染 STEP／STL／DXF／SVG（手動或 `v*` tag 觸發 `.github/workflows/desktop-bundle.yml`）。
 - 前端服務：`tests/test_frontend_serving.py` 檢查建置產物的提供、路徑穿越防護，以及未建置時的 503 說明頁；CI 的 `docker` job 建置映像並確認 `/` 回傳含 `id="root"` 的新前端。
-- 授權聲明：`tests/test_third_party_notices.py`（純函式、假資料，不需 CadQuery）；`desktop-bundle.yml` 以 `--strict` 重新產生聲明檔。
+- 授權聲明：`tests/test_third_party_notices.py`（純函式、假資料，不需 CadQuery；含 unix 原生函式庫路徑的辨識與正規化）；`desktop-bundle.yml` 在 Windows 以 `--check --strict` 比對提交的檔案，在 macOS／Linux 以 `--strict` 重新產生。
+- 建置環境鎖檔：`tests/test_desktop_lock.py`（純函式）；`ci.yml` 的 `lock-check` job 執行 `scripts/desktop_lock.py --check`。
 - 桌面驗證腳本：`tests/test_frozen_kill_check.py` 等純函式測試在 `ci.yml` 執行；實際的隔離環境 smoke 與 Job Object 終止檢查只在 `desktop-bundle.yml` 對已安裝的 sidecar 執行。
 
 ## 封裝環境限制
 
-建立 v0.1.0 發行包的執行環境沒有 Docker、CadQuery、OpenSCAD 或 Conda，因此沒有在該環境中實際執行 OpenCascade 生成 STEP／STL／DXF。專案的 Dockerfile 與 Conda 環境已固定 CadQuery 2.8.0。桌面版自第 1 階段 1b 起以 pip 安裝的 `cadquery==2.8.0`（`.venv-desktop`）打包，已在 Windows 上實際產生 STEP／STL／DXF。
+建立 v0.1.0 發行包的執行環境沒有 Docker、CadQuery、OpenSCAD 或 Conda，因此沒有在該環境中實際執行 OpenCascade 生成 STEP／STL／DXF。專案的 Dockerfile 與 Conda 環境已固定 CadQuery 2.8.0。桌面版自第 1 階段 1b 起以 pip 安裝的 `cadquery==2.8.0`（`.venv-desktop`）打包，已在 Windows 上實際產生 STEP／STL／DXF；`.venv-desktop` 現由 `requirements/desktop-*.txt` 的雜湊鎖檔安裝（cadquery-ocp 7.9.3.1.1、vtk 9.6.2、casadi 3.8.2、nlopt 2.11.0、numpy 2.5.5、PyInstaller 6.22.3，三平台相同）。
 
 ## 下一階段
 
 依 [ADR 0010](docs/adr/0010-migration-phases.md)：
 
-1. 完成第 1 階段：取得 `desktop-bundle.yml` 在 `windows-latest` 上的乾淨機器驗證結果、建立三平台測試矩陣；視需要以 VTK／casadi 替身縮小體積。
+1. 完成第 1 階段：取得 `desktop-bundle.yml` 三平台矩陣的執行結果，依 CI 的 `--strict` 失敗補齊 unix 原生函式庫分類，macOS／Linux 的參考項目連續兩次全綠後改為必過（ADR 0011）。
 2. 第 2 階段：Rust core 實作 CadDocument 2.0（依 [`docs/CAD_DSL_2.md`](docs/CAD_DSL_2.md)）、驗證器、patch 引擎與 1.0 → 2.0 adapter；前端加入元件樹與 port 顯示。
 3. 第 3 階段：約束求解器評估（[ADR 0007](docs/adr/0007-constraint-solver.md)）與多 agent 編排。
 

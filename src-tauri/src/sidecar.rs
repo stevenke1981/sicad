@@ -9,9 +9,20 @@
 //! 0010 Phase 1b) shipped as a Tauri resource: `src-tauri/binaries/promptcad-sidecar/` is
 //! installed as `<resource_dir>/sidecar/` (see `bundle.resources` in tauri.conf.json).
 //!
+//! Kill-on-close (the sidecar tree must never outlive the shell, even if the shell crashes):
+//!
+//! * Windows: a `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` Job Object (`job.rs`); stdin is null.
+//! * Unix (ADR 0011): the sidecar runs in its own process group (`process_group(0)`) with a
+//!   stdin pipe whose write end only the shell holds, and gets `--exit-on-stdin-eof`. When
+//!   the shell exits or is killed the kernel closes the pipe; the sidecar sees EOF and takes
+//!   its group (itself plus the render workers) down (`app/parent_watch.py`). A normal
+//!   [`Sidecar::shutdown`] closes the pipe the same way, waits up to [`UNIX_EXIT_GRACE`] and
+//!   then `SIGKILL`s the group as a fallback.
+//!
 //! The pure helpers at the top (`parse_ready_line`, `generate_token`, `split_command_line`,
-//! `bundled_candidates`, `select_sidecar`) carry the unit tests; the process code below them
-//! is exercised by running the app.
+//! `bundled_candidates`, `select_sidecar`, `sidecar_args`, `kill_group_target`,
+//! `wait_or_kill`) carry the unit tests; the process code below them is exercised by running
+//! the app and by `scripts/frozen_kill_check.py`.
 
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader, Read};
@@ -20,6 +31,8 @@ use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+#[cfg(any(unix, test))]
+use std::time::Instant;
 
 use serde::Serialize;
 
@@ -42,6 +55,15 @@ pub const ENV_CORS_ORIGINS: &str = "PROMPTCAD_CORS_ORIGINS";
 
 /// Fixed sidecar arguments: loopback only, OS-assigned port.
 pub const SIDECAR_ARGS: [&str; 4] = ["--host", "127.0.0.1", "--port", "0"];
+/// Unix only: tells the sidecar to stop its process group when its stdin pipe reaches EOF
+/// (`app/sidecar.py`, `app/parent_watch.py`). Never passed on Windows (Job Object instead).
+pub const EXIT_ON_STDIN_EOF_FLAG: &str = "--exit-on-stdin-eof";
+/// Unix shutdown: how long the sidecar gets to stop its group after the pipe closes before
+/// the shell `SIGKILL`s the group itself. The sidecar's own grace period is 2 s.
+#[cfg(any(unix, test))]
+pub const UNIX_EXIT_GRACE: Duration = Duration::from_secs(3);
+#[cfg(unix)]
+const UNIX_EXIT_POLL: Duration = Duration::from_millis(50);
 
 /// Bootloader of the onedir sidecar (no target-triple suffix; that was the onefile layout).
 #[cfg(windows)]
@@ -188,6 +210,86 @@ pub fn cors_origins() -> String {
     origins.join(",")
 }
 
+/// Arguments appended after the launch's own args (the dev override's `-m app.sidecar`):
+/// the fixed loopback/port pair and, on unix, [`EXIT_ON_STDIN_EOF_FLAG`].
+pub fn sidecar_args(unix: bool) -> Vec<&'static str> {
+    let mut args = SIDECAR_ARGS.to_vec();
+    if unix {
+        args.push(EXIT_ON_STDIN_EOF_FLAG);
+    }
+    args
+}
+
+/// The `kill(2)` target that signals the process group led by `pid`: `-pid`.
+///
+/// `None` for pids that would make the negated value mean something else: 0 (`kill(0)` is
+/// the caller's own group), 1 (`kill(-1)` is every process we may signal) and values that do
+/// not fit a positive `pid_t`.
+#[cfg(any(unix, test))]
+pub fn kill_group_target(pid: u32) -> Option<i32> {
+    match i32::try_from(pid) {
+        Ok(p) if p > 1 => Some(-p),
+        _ => None,
+    }
+}
+
+/// Unix shutdown policy, with the clock and the process injected so it is unit-testable.
+///
+/// Polls `exited` every `poll` until it returns `true` or `grace` has elapsed; in the latter
+/// case calls `kill` once. Returns `true` when the process exited by itself. `exited` must not
+/// reap anything the caller still wants to signal by pid; `Child::try_wait` is fine because
+/// `kill` is only called while the child is still unreaped, so its pid (= the group id) cannot
+/// have been reused.
+#[cfg(any(unix, test))]
+pub fn wait_or_kill(
+    mut exited: impl FnMut() -> bool,
+    kill: impl FnOnce(),
+    grace: Duration,
+    poll: Duration,
+    mut now: impl FnMut() -> Instant,
+    mut sleep: impl FnMut(Duration),
+) -> bool {
+    let deadline = now() + grace;
+    loop {
+        if exited() {
+            return true;
+        }
+        let current = now();
+        if current >= deadline {
+            kill();
+            return false;
+        }
+        sleep(poll.min(deadline - current));
+    }
+}
+
+/// `SIGKILL` for the sidecar's process group (pgid = its pid, see `process_group(0)`).
+#[cfg(unix)]
+mod unix {
+    use std::io;
+
+    /// Sends `SIGKILL` to the process group led by `pid`. An already empty group (`ESRCH`)
+    /// is success.
+    pub fn kill_process_group(pid: u32) -> io::Result<()> {
+        let Some(target) = super::kill_group_target(pid) else {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("refusing to signal process group of pid {pid}"),
+            ));
+        };
+        // SAFETY: kill(2) has no memory-safety preconditions; `target` is a negative pgid.
+        if unsafe { libc::kill(target, libc::SIGKILL) } == 0 {
+            return Ok(());
+        }
+        let err = io::Error::last_os_error();
+        if err.raw_os_error() == Some(libc::ESRCH) {
+            Ok(())
+        } else {
+            Err(err)
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------------------
 // Process management
 // ---------------------------------------------------------------------------------------
@@ -200,9 +302,15 @@ pub struct Sidecar {
     /// shutdown and also if the shell itself crashes.
     #[cfg(windows)]
     _job: Option<crate::job::KillOnCloseJob>,
+    /// The only write end of the sidecar's stdin pipe (std creates it `O_CLOEXEC`, so no
+    /// other child of the shell inherits it). Closing it, explicitly or because the shell
+    /// died, is the sidecar's signal to stop its process group.
+    #[cfg(unix)]
+    stdin: Option<std::process::ChildStdin>,
 }
 
 impl Sidecar {
+    #[cfg(not(unix))]
     pub fn shutdown(mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
@@ -210,6 +318,38 @@ impl Sidecar {
         if let Some(job) = self._job.take() {
             job.terminate();
         }
+    }
+
+    /// Closes the stdin pipe, gives the sidecar [`UNIX_EXIT_GRACE`] to stop its group, then
+    /// `SIGKILL`s the group (sidecar + render workers) if it is still running.
+    #[cfg(unix)]
+    pub fn shutdown(mut self) {
+        drop(self.stdin.take());
+        let pid = self.child.id();
+        let child = &mut self.child;
+        let exited = wait_or_kill(
+            // An error means the child is gone or not ours to wait for: never signal it.
+            || !matches!(child.try_wait(), Ok(None)),
+            || {
+                if let Err(e) = unix::kill_process_group(pid) {
+                    eprintln!("[promptcad] warning: cannot kill sidecar process group {pid}: {e}");
+                }
+            },
+            UNIX_EXIT_GRACE,
+            UNIX_EXIT_POLL,
+            Instant::now,
+            std::thread::sleep,
+        );
+        if !exited {
+            eprintln!(
+                "[promptcad] sidecar did not exit within {}s of closing its stdin; killed its \
+                 process group",
+                UNIX_EXIT_GRACE.as_secs()
+            );
+        }
+        // Reaps the child; a no-op signal-wise once it has been reaped by `try_wait`.
+        let _ = self.child.kill();
+        let _ = self.child.wait();
     }
 }
 
@@ -301,7 +441,7 @@ pub fn start(app_data_dir: &Path, resource_dir: &Path) -> Result<(Sidecar, Backe
 
     let mut cmd = Command::new(&launch.program);
     cmd.args(&launch.args)
-        .args(SIDECAR_ARGS)
+        .args(sidecar_args(cfg!(unix)))
         .current_dir(&launch.cwd)
         .env(ENV_API_TOKEN, &token)
         .env(ENV_DATA_DIR, &data_dir)
@@ -310,7 +450,6 @@ pub fn start(app_data_dir: &Path, resource_dir: &Path) -> Result<(Sidecar, Backe
         .env("PYTHONIOENCODING", "utf-8")
         .env_remove(SIDECAR_CMD_ENV)
         .env_remove(SIDECAR_CWD_ENV)
-        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
@@ -319,9 +458,23 @@ pub fn start(app_data_dir: &Path, resource_dir: &Path) -> Result<(Sidecar, Backe
         use std::os::windows::process::CommandExt;
         const CREATE_SUSPENDED: u32 = 0x0000_0004;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.stdin(Stdio::null());
         // Start suspended so the process is inside the job before it can spawn children.
         cmd.creation_flags(CREATE_SUSPENDED | CREATE_NO_WINDOW);
     }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        // Held by `Sidecar::stdin`; EOF on it is the sidecar's exit signal.
+        cmd.stdin(Stdio::piped());
+        // New process group led by the sidecar (pgid = its pid), inherited by the render
+        // workers, so one `kill(-pid)` reaches the whole tree and never the shell's group.
+        cmd.process_group(0);
+    }
+
+    #[cfg(not(any(windows, unix)))]
+    cmd.stdin(Stdio::null());
 
     let mut child = cmd
         .spawn()
@@ -350,6 +503,8 @@ pub fn start(app_data_dir: &Path, resource_dir: &Path) -> Result<(Sidecar, Backe
         job
     };
 
+    #[cfg(unix)]
+    let stdin = child.stdin.take();
     let sidecar_stdout = child.stdout.take().expect("stdout is piped");
     let sidecar_stderr = child.stderr.take().expect("stderr is piped");
 
@@ -387,6 +542,8 @@ pub fn start(app_data_dir: &Path, resource_dir: &Path) -> Result<(Sidecar, Backe
         child,
         #[cfg(windows)]
         _job: job,
+        #[cfg(unix)]
+        stdin,
     };
 
     match rx.recv_timeout(READY_TIMEOUT) {
@@ -619,6 +776,129 @@ mod tests {
         assert!(select_sidecar(&[])
             .unwrap_err()
             .starts_with("sidecar not found"));
+    }
+
+    #[test]
+    fn sidecar_args_add_stdin_eof_flag_only_on_unix() {
+        assert_eq!(
+            sidecar_args(false),
+            vec!["--host", "127.0.0.1", "--port", "0"]
+        );
+        assert_eq!(
+            sidecar_args(true),
+            vec!["--host", "127.0.0.1", "--port", "0", "--exit-on-stdin-eof"]
+        );
+        // The flag matches what app/sidecar.py parses.
+        assert_eq!(EXIT_ON_STDIN_EOF_FLAG, "--exit-on-stdin-eof");
+    }
+
+    #[test]
+    fn kill_group_target_never_means_own_group_or_everyone() {
+        assert_eq!(kill_group_target(4242), Some(-4242));
+        assert_eq!(kill_group_target(2), Some(-2));
+        assert_eq!(kill_group_target(i32::MAX as u32), Some(-i32::MAX));
+        // kill(0) = our own group, kill(-1) = every process we may signal.
+        assert_eq!(kill_group_target(0), None);
+        assert_eq!(kill_group_target(1), None);
+        assert_eq!(kill_group_target(i32::MAX as u32 + 1), None);
+        assert_eq!(kill_group_target(u32::MAX), None);
+    }
+
+    /// A fake clock that advances only when `sleep` is called.
+    struct FakeClock {
+        start: Instant,
+        elapsed: std::cell::Cell<Duration>,
+    }
+
+    impl FakeClock {
+        fn new() -> Self {
+            Self {
+                start: Instant::now(),
+                elapsed: std::cell::Cell::new(Duration::ZERO),
+            }
+        }
+        fn now(&self) -> Instant {
+            self.start + self.elapsed.get()
+        }
+        fn sleep(&self, d: Duration) {
+            self.elapsed.set(self.elapsed.get() + d);
+        }
+    }
+
+    #[test]
+    fn wait_or_kill_returns_early_when_the_sidecar_exits() {
+        let clock = FakeClock::new();
+        let mut polls = 0;
+        let mut killed = false;
+        let exited = wait_or_kill(
+            || {
+                polls += 1;
+                polls == 4
+            },
+            || killed = true,
+            UNIX_EXIT_GRACE,
+            Duration::from_millis(50),
+            || clock.now(),
+            |d| clock.sleep(d),
+        );
+        assert!(exited);
+        assert!(!killed);
+        assert_eq!(polls, 4);
+        assert_eq!(clock.elapsed.get(), Duration::from_millis(150));
+    }
+
+    #[test]
+    fn wait_or_kill_kills_once_at_the_deadline() {
+        let clock = FakeClock::new();
+        let mut polls = 0;
+        let mut kills = 0;
+        let exited = wait_or_kill(
+            || {
+                polls += 1;
+                false
+            },
+            || kills += 1,
+            Duration::from_millis(120),
+            Duration::from_millis(50),
+            || clock.now(),
+            |d| clock.sleep(d),
+        );
+        assert!(!exited);
+        assert_eq!(kills, 1);
+        // Polls at 0, 50, 100 and (clamped sleep) 120 ms, then kills: never sleeps past grace.
+        assert_eq!(polls, 4);
+        assert_eq!(clock.elapsed.get(), Duration::from_millis(120));
+    }
+
+    #[test]
+    fn wait_or_kill_checks_once_even_with_zero_grace() {
+        let clock = FakeClock::new();
+        let mut kills = 0;
+        assert!(wait_or_kill(
+            || true,
+            || kills += 1,
+            Duration::ZERO,
+            Duration::from_millis(50),
+            || clock.now(),
+            |d| clock.sleep(d),
+        ));
+        assert_eq!(kills, 0);
+        assert!(!wait_or_kill(
+            || false,
+            || kills += 1,
+            Duration::ZERO,
+            Duration::from_millis(50),
+            || clock.now(),
+            |d| clock.sleep(d),
+        ));
+        assert_eq!(kills, 1);
+        assert_eq!(clock.elapsed.get(), Duration::ZERO);
+    }
+
+    #[test]
+    fn unix_grace_outlasts_the_sidecar_own_grace() {
+        // app/parent_watch.py GRACE_SECONDS = 2.0: the sidecar SIGKILLs its own group first.
+        assert!(UNIX_EXIT_GRACE > Duration::from_secs(2));
     }
 
     #[test]

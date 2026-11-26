@@ -296,6 +296,9 @@ def test_pruned_dists_match_build_sidecar():
     build_sidecar = _load("build_sidecar")
     assert set(gen.PRUNED_DISTS.values()) <= set(build_sidecar.PRUNED_MODULES)
     assert not (gen.BUILD_ONLY_DISTS & set(gen.PRUNED_DISTS))
+    sidecar_pruned = {gen.normalize_name(d) for d in getattr(build_sidecar, "PRUNED_DISTS", ())}
+    assert sidecar_pruned == gen.SIDECAR_PRUNED_DISTS
+    assert not (sidecar_pruned & set(gen.REQUIRED_PYTHON_DISTS))
 
 
 def test_tauri_resource_mapping_exists():
@@ -310,3 +313,176 @@ def test_tauri_resource_mapping_exists():
     assert "## LGPL 元件與替換權利" in text
     for link in set(re.findall(r"\]\(#(l-[0-9a-f]{12})\)", text)):
         assert f'<a id="{link}"></a>' in text
+
+
+# --------------------------------------------------------------------------------------
+# Cross-platform (ADR 0011): unix vendored libraries, platform wording, sidecar pruning
+
+
+def test_is_vendored_lib_sample_paths():
+    yes = [
+        "cadquery_ocp.libs/TKernel-0123456789abcdef0123456789abcdef.dll",  # delvewheel
+        "numpy.libs/libscipy_openblas64_-6bb31eeb.so",  # auditwheel
+        "cadquery_ocp.libs/libTKernel-1a2b3c4d.so.7.9.3",
+        "numpy.libs/libgfortran-040039e1.so.5.0.0",
+        "numpy/.dylibs/libgfortran.5.dylib",  # delocate
+        "casadi/.dylibs/libc++.1.0.dylib",
+        "vtkmodules/libvtkCommonCore-9.6.so",  # in-package (vtk on Linux)
+        "vtkmodules/libvtkCommonCore-9.6.9.6.dylib",
+        "casadi/libcasadi.so.3.7",
+    ]
+    no = [
+        "casadi/libcasadi.dll",  # in-package Windows DLLs: covered by the dist entry
+        "cadquery_ocp.libs/.load-order-cadquery_ocp-7.9.3.1.1",
+        "OCP.cpython-312-x86_64-linux-gnu.so",
+        "vtkmodules/vtkCommonCore.cpython-312-darwin.so",
+        "vtkmodules/libvtkfoo.abi3.so",
+        "casadi/_casadi.so",  # extension module, no lib prefix
+        "numpy/core/_multiarray_umath.cpython-312-x86_64-linux-gnu.so",
+        "libtop.so",  # not inside a package
+        "pkg/libnotes.txt",
+        "pkg/library.py",
+    ]
+    for path in yes:
+        assert gen.is_vendored_lib(tuple(path.split("/"))), path
+    for path in no:
+        assert not gen.is_vendored_lib(tuple(path.split("/"))), path
+
+
+def test_normalize_and_classify_unix_libs():
+    cases = {
+        "TKernel-0123456789abcdef0123456789abcdef.dll": "tkernel",
+        "vtkCommonCore-9.6.2.dll": "vtkcommoncore",
+        "libgomp-a34b3233.so.1.0.0": "libgomp",
+        "libgfortran.5.dylib": "libgfortran",
+        "libTKernel-1a2b3c4d.so.7.9.3": "libtkernel",
+        "libvtkCommonCore-9.6.so": "libvtkcommoncore",
+        "libvtkCommonCore-9.6.9.6.dylib": "libvtkcommoncore",
+        "libIex-3_2.so.31": "libiex",
+        "libpng16-1b2c3d4e.so.16.43.0": "libpng16",
+        "libscipy_openblas64_-6bb31eeb.so": "libscipy_openblas64_",
+    }
+    for name, stem in cases.items():
+        assert gen.normalize_lib_stem(name) == stem, name
+    assert gen.normalize_dll_stem is gen.normalize_lib_stem
+
+    def licence(name):
+        hit = gen.classify_dll(name)
+        return hit and hit[1]
+
+    assert licence("libTKernel-1a2b3c4d.so.7.9.3").startswith("LGPL-2.1-only")  # lib prefix off
+    assert licence("libvtkCommonCore-9.6.so") == "BSD-3-Clause"
+    assert licence("libpng16-1b2c3d4e.so.16.43.0") == "libpng-2.0"  # as-is first
+    assert licence("libgomp-a34b3233.so.1.0.0") == "GPL-3.0-or-later WITH GCC-exception-3.1"
+    assert licence("libquadmath.0.dylib") == "LGPL-2.1-or-later"
+    assert licence("libomp.dylib") == "Apache-2.0 WITH LLVM-exception"
+    assert licence("libz-eb09ad1d.so.1.2.13") == "Zlib"
+    assert licence("libcasadi_nlpsol_ipopt.so.3.7") == "LGPL-3.0-or-later"
+    assert licence("libscipy_openblas64_-6bb31eeb.so").startswith("BSD-3-Clause")
+    assert gen.classify_dll("libunheardof-0123abcd.so.1") is None
+    # the lib-prefix fallback is unix-only: Windows stems keep their exact meaning
+    assert gen.classify_dll("libtiff.dll") is None
+    assert gen.classify_dll("tiff.dll")[1] == "libtiff"
+
+
+def _linux_probe(*extra):
+    probe = _probe(
+        _dist(
+            "numpy",
+            "2.5.5",
+            expr="BSD-3-Clause",
+            libs=["libgfortran-040039e1.so.5.0.0", "libscipy_openblas64_-6bb31eeb.so"],
+        ),
+        *extra,
+    )
+    probe["platform"] = "linux"
+    for dist in probe["dists"]:
+        if dist["name"] == "vtk":
+            dist["libs"] = ["libvtkCommonCore-9.6.so"]
+        if dist["name"] == "cadquery-ocp":
+            dist["libs"] = ["libTKernel-1a2b3c4d.so.7.9.3"]
+    return probe
+
+
+def test_linux_render_uses_unix_paths(tmp_path):
+    collected = _collected(tmp_path, _linux_probe())
+    assert collected.target.key == "linux"
+    assert gen.strict_errors(collected) == []
+    text = gen.render(collected)
+    lgpl = text.split("## LGPL 元件與替換權利", 1)[1].split("\n## ", 1)[0]
+    assert "sidecar/_internal/" in lgpl and "sidecar\\_internal\\" not in lgpl
+    assert "libTK*.so*" in lgpl and "TK*.dll" not in lgpl
+    assert "`promptcad-sidecar` 或 `promptcad-studio`" in lgpl
+    assert "Linux x86_64 .deb" in text
+    assert "x86_64-unknown-linux-gnu" in text
+    native = text.split("## Python wheel 隨附的原生函式庫", 1)[1].split("\n## ", 1)[0]
+    assert "auditwheel" in native and "`libgfortran`" in native
+    hand = {c.name for c in collected.hand}
+    assert not any("Microsoft" in n or "NSIS" in n for n in hand)
+    assert "Open CASCADE Technology (OCCT)" in hand
+
+
+def test_macos_target_and_default_platform(tmp_path):
+    probe = _probe()
+    probe["platform"] = "darwin"
+    text = gen.render(_collected(tmp_path, probe))
+    assert "PromptCAD Studio.app/Contents/Resources/sidecar/_internal/" in text
+    assert "aarch64-apple-darwin" in text and "libTK*.dylib" in text
+    # fakes without "platform" (and the committed file) are the Windows notices
+    windows = gen.render(_collected(tmp_path))
+    assert "Windows x64 NSIS" in windows and "x86_64-pc-windows-msvc" in windows
+    assert "`sidecar\\_internal\\cadquery_ocp.libs\\TK*.dll`" in windows
+    assert gen.target_for(None).key == "win32"
+    assert gen.target_for("linux2").key == "linux"
+
+
+def test_sidecar_pruned_dists_are_filtered(tmp_path, monkeypatch):
+    probe = _probe(_dist("trame-vtk", "2.11.17", expr="BSD-3-Clause"), _dist("wslink", expr="BSD"))
+    monkeypatch.setattr(gen, "SIDECAR_PRUNED_DISTS", frozenset())
+    assert "trame-vtk" in {c.name for c in gen.python_components(probe)}
+    monkeypatch.setattr(gen, "SIDECAR_PRUNED_DISTS", frozenset({"trame-vtk", "wslink"}))
+    names = {c.name for c in gen.python_components(probe)}
+    assert "trame-vtk" not in names and "wslink" not in names
+    text = gen.render(_collected(tmp_path, probe))
+    assert "trame-vtk" in text.split("排除的模組（", 1)[1].split("）", 1)[0]
+
+
+def test_load_sidecar_pruned_dists(tmp_path):
+    literal = _write(
+        tmp_path / "a" / "build_sidecar.py", 'PRUNED_DISTS = ("Trame_VTK", "wslink")\n'
+    )
+    assert gen._load_sidecar_pruned_dists(literal) == (frozenset({"trame-vtk", "wslink"}), "")
+    missing = _write(tmp_path / "b" / "build_sidecar.py", "PRUNED_MODULES = ('scipy',)\n")
+    assert gen._load_sidecar_pruned_dists(missing) == (frozenset(), "")
+    computed = _write(
+        tmp_path / "c" / "build_sidecar.py",
+        "BASE = ('aiohttp',)\nPRUNED_DISTS: tuple[str, ...] = BASE + ('wslink',)\n",
+    )
+    assert gen._load_sidecar_pruned_dists(computed) == (frozenset({"aiohttp", "wslink"}), "")
+    broken = _write(tmp_path / "d" / "build_sidecar.py", "PRUNED_DISTS = (\n")
+    names, error = gen._load_sidecar_pruned_dists(broken)
+    assert names == frozenset() and "SyntaxError" in error
+    # the real build_sidecar loads cleanly (whether or not it defines PRUNED_DISTS yet)
+    assert gen.SIDECAR_PRUNED_ERROR == ""
+    assert not (gen.SIDECAR_PRUNED_DISTS & {"cadquery", "cadquery-ocp", "vtk", "casadi"})
+
+
+def test_probe_runs_and_reports_platform():
+    compile(gen.PY_PROBE, "<probe>", "exec")
+    probe = gen.run_python_probe(sys.executable)
+    assert probe["platform"] == sys.platform
+    assert probe["python_version"].count(".") == 2
+    assert all(isinstance(d["libs"], list) for d in probe["dists"])
+
+
+def test_unix_cadquery_ocp_libs_and_casadi_fallback():
+    probe = {
+        "dists": [
+            {"name": "cadquery-ocp", "version": "7.9.3.1.1", "libs": ["libjbig-0f1087b4.so.0"]},
+            {"name": "casadi", "version": "3.8.2", "libs": ["libCbc.so.3", "libipopt.3.dylib"]},
+        ]
+    }
+    by_file = {d.file: d for d in gen.vendored_dlls(probe)}
+    assert by_file["libjbig-0f1087b4.so.0"].license == "GPL-2.0-or-later"
+    assert by_file["libCbc.so.3"].label and "EPL-2.0" in by_file["libCbc.so.3"].license
+    assert by_file["libipopt.3.dylib"].label is not None

@@ -1,15 +1,19 @@
 name: desktop-bundle
 
-# Builds the Windows NSIS installer with the frozen CadQuery sidecar (ADR 0010 Phase 1b) and
-# validates it the way a clean machine would see it (Windows Sandbox is not available, so a
-# fresh windows-latest runner stands in):
-#   - frozen smoke with --isolated-env (system-only PATH, no PYTHON*/VIRTUAL_ENV/CONDA*, and a
-#     watcher that fails on any process spawned from outside the bundle) against the built
-#     onedir and the installed sidecar;
-#   - the Job Object kill check against the installed sidecar (required) and against the
-#     installed shell (required; first passed on run 45723089074);
-#   - THIRD_PARTY_NOTICES.md regenerated with --strict and asserted in the install dir.
-# Uploads the measurements, the notices and the installer. No signing, no release.
+# Builds the desktop bundle with the frozen CadQuery sidecar on three platforms (ADR 0010
+# Phase 1b, ADR 0011) and validates it the way a clean machine would see it:
+#   - every OS (required): build venv installed from the hashed lock
+#     (requirements/desktop-<os>.txt), freeze + VTK prune, frozen smoke on the built onedir,
+#     sidecar-mode kill check, THIRD_PARTY_NOTICES.md --strict, `tauri build` (.exe / .app /
+#     .deb);
+#   - Windows only (required): notices --check against the committed file, frozen smoke with
+#     --isolated-env (system-only PATH + spawn watcher) on the built onedir and the installed
+#     sidecar, installed layout, Job Object kill check on the installed sidecar and shell
+#     (first passed on run 45723089074), onedir <= 460 MiB;
+#   - macOS / Linux (informational, continue-on-error until two green runs): .dmg, AppImage,
+#     installed-bundle smoke, shell-mode kill check, --isolated-env watcher.
+# Windows Sandbox is not available, so fresh hosted runners stand in for clean machines.
+# Uploads per-OS measurements, notices and bundles. No signing (macOS: ad-hoc "-"), no release.
 on:
   workflow_dispatch:
   push:
@@ -17,17 +21,45 @@ on:
 
 jobs:
   bundle:
-    runs-on: windows-latest
-    timeout-minutes: 90
+    name: bundle (${{ matrix.key }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            key: windows-x86_64
+          - os: macos-latest
+            key: macos-arm64
+          # cadquery-ocp wheels are manylinux_2_31: ubuntu-22.04 (glibc 2.35) is the oldest
+          # hosted runner that installs them; the .deb inherits that glibc floor.
+          - os: ubuntu-22.04
+            key: linux-x86_64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
     defaults:
       run:
-        shell: pwsh
+        shell: bash
     steps:
       - uses: actions/checkout@v4
+
+      # rust-toolchain.toml pins stable-x86_64-pc-windows-msvc for the Windows host; other
+      # OSes override it before any rustup call (dtolnay/rust-toolchain included).
+      - name: Platform environment
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            echo "VENV_PY=.venv-desktop/Scripts/python.exe" >> "$GITHUB_ENV"
+          else
+            echo "VENV_PY=.venv-desktop/bin/python" >> "$GITHUB_ENV"
+            echo "RUSTUP_TOOLCHAIN=stable" >> "$GITHUB_ENV"
+          fi
+
+      # Exact patch release: the committed (Windows) THIRD_PARTY_NOTICES.md records it.
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.12.10"
       - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.9"  # pinned: desktop_lock.py --check diffs uv output
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -42,34 +74,86 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Desktop build venv (.venv-desktop with cadquery + PyInstaller)
-        run: python scripts/desktop_env.py
+      - name: Linux system packages (WebKitGTK, bundling tools, Xvfb, GL)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
+            patchelf libxdo-dev libssl-dev xvfb libgl1 libfuse2
+
+      - name: Desktop build venv from the hashed lock (.venv-desktop)
+        run: |
+          python scripts/desktop_env.py --python 3.12.10
+          mkdir -p build/sidecar
+          uv pip freeze --python "$VENV_PY" | tee build/sidecar/desktop-freeze.txt
       - name: npm ci (web)
         run: npm ci --prefix web
       - name: npm ci (Tauri CLI)
         run: npm ci
-      - name: Freeze sidecar (onedir)
-        timeout-minutes: 20
-        run: .venv-desktop\Scripts\python.exe scripts\build_sidecar.py
+
+      # Windows steps keep their pwsh commands (and gates) from the single-OS workflow.
+      - name: Freeze sidecar (onedir + VTK prune, <= 460 MiB)
+        if: runner.os == 'Windows'
+        timeout-minutes: 25
+        shell: pwsh
+        run: .venv-desktop\Scripts\python.exe scripts\build_sidecar.py --max-mib 460
+      - name: Freeze sidecar (onedir + VTK prune)
+        if: runner.os != 'Windows'
+        timeout-minutes: 25
+        run: '"$VENV_PY" scripts/build_sidecar.py'
       - name: Frozen smoke (built onedir, isolated env)
+        if: runner.os == 'Windows'
         timeout-minutes: 20
+        shell: pwsh
         run: .venv-desktop\Scripts\python.exe scripts\frozen_smoke.py --isolated-env
+      - name: Frozen smoke (built onedir)
+        if: runner.os != 'Windows'
+        timeout-minutes: 20
+        run: '"$VENV_PY" scripts/frozen_smoke.py'
+      - name: Frozen smoke (built onedir, isolated env) [informational]
+        if: runner.os != 'Windows'
+        continue-on-error: true
+        timeout-minutes: 20
+        run: '"$VENV_PY" scripts/frozen_smoke.py --isolated-env'
+
+      # Unix kill-on-close: --exit-on-stdin-eof + process group, variants "pipe" and "holder"
+      # (scripts/frozen_kill_check.py). Windows runs the Job Object check on the installed
+      # sidecar below instead.
+      - name: Kill check, sidecar mode (built onedir)
+        if: runner.os != 'Windows'
+        timeout-minutes: 15
+        run: >-
+          "$VENV_PY" scripts/frozen_kill_check.py
+          --exe src-tauri/binaries/promptcad-sidecar/promptcad-sidecar
+          --json build/sidecar/kill-check.json
 
       # Before `tauri build`: the bundle ships THIRD_PARTY_NOTICES.md as a resource, so it must
       # describe exactly what is being frozen (.venv-desktop, web/node_modules, Cargo.lock).
-      - name: Third-party notices (strict)
-        run: .venv-desktop\Scripts\python.exe scripts\gen_third_party_notices.py --python .venv-desktop/Scripts/python.exe --strict
+      # Windows: the committed file must already match (reproducible via the lock). macOS /
+      # Linux: regenerated in place for this bundle (paths, vendored libs), not committed.
+      - name: Third-party notices (Windows, --check --strict vs committed)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .venv-desktop\Scripts\python.exe scripts\gen_third_party_notices.py --python .venv-desktop/Scripts/python.exe --check --strict
+      - name: Third-party notices (regenerate, --strict)
+        if: runner.os != 'Windows'
+        run: '"$VENV_PY" scripts/gen_third_party_notices.py --python "$VENV_PY" --strict'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: third-party-notices
+          name: third-party-notices-${{ matrix.key }}
           path: THIRD_PARTY_NOTICES.md
           if-no-files-found: warn
 
+      # ------------------------------------------------------------------------- Windows
       - name: Tauri build (NSIS)
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: npm run tauri build
       - name: Locate installer
+        if: runner.os == 'Windows'
         id: installer
+        shell: pwsh
         run: |
           $exe = Get-ChildItem src-tauri/target/release/bundle/nsis/*.exe | Select-Object -First 1
           if (-not $exe) { throw "no NSIS installer produced" }
@@ -77,8 +161,10 @@ jobs:
           Write-Host "installer: $($exe.FullName) ($([math]::Round($exe.Length / 1MB, 1)) MiB)"
 
       - name: Silent install
+        if: runner.os == 'Windows'
         id: install
         timeout-minutes: 15
+        shell: pwsh
         run: |
           $dest = Join-Path $env:RUNNER_TEMP "promptcad-install"
           # NSIS: /D= must be the LAST argument and must NOT be quoted, even if the path has
@@ -110,6 +196,8 @@ jobs:
           Get-ChildItem $dest
 
       - name: Installed layout (sidecar, licence notices)
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           $dest = "${{ steps.install.outputs.dir }}"
           $sidecar = Get-Item (Join-Path $dest "sidecar\promptcad-sidecar.exe")
@@ -124,7 +212,9 @@ jobs:
           Write-Host "THIRD_PARTY_NOTICES.md: $size bytes"
 
       - name: Frozen smoke + measurements (installed sidecar, isolated env)
+        if: runner.os == 'Windows'
         timeout-minutes: 20
+        shell: pwsh
         run: |
           $dest = "${{ steps.install.outputs.dir }}"
           .venv-desktop\Scripts\python.exe scripts\frozen_smoke.py --measure --isolated-env `
@@ -135,7 +225,9 @@ jobs:
           Get-Content build/sidecar/measurements.md >> $env:GITHUB_STEP_SUMMARY
 
       - name: Job Object kill check (installed sidecar)
+        if: runner.os == 'Windows'
         timeout-minutes: 15
+        shell: pwsh
         run: |
           $dest = "${{ steps.install.outputs.dir }}"
           .venv-desktop\Scripts\python.exe scripts\frozen_kill_check.py `
@@ -145,24 +237,174 @@ jobs:
       # Launches the installed GUI shell on the runner, force-kills it and asserts its sidecar
       # dies with it (src-tauri/src/job.rs). Proven on hosted runners since run 45723089074.
       - name: Job Object kill check (installed shell)
+        if: runner.os == 'Windows'
         timeout-minutes: 10
+        shell: pwsh
         run: |
           .venv-desktop\Scripts\python.exe scripts\frozen_kill_check.py `
             --shell-exe "${{ steps.install.outputs.app }}" --json build/sidecar/kill-check-shell.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # --------------------------------------------------------------------------- macOS
+      # src-tauri/tauri.macos.conf.json: targets app + dmg, ad-hoc signing ("-"), macOS 11+.
+      # The .app is required; the .dmg (hdiutil on a headless runner) is informational.
+      - name: Tauri build (.app)
+        if: runner.os == 'macOS'
+        run: npm run tauri build -- --bundles app
+      - name: Locate and install .app
+        if: runner.os == 'macOS'
+        id: mac_install
+        run: |
+          src=$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app' -print -quit)
+          test -n "$src" || { echo "::error::no .app produced"; exit 1; }
+          dest="$RUNNER_TEMP/Applications"
+          mkdir -p "$dest"
+          ditto "$src" "$dest/$(basename "$src")"   # keeps symlinks, modes and the signature
+          app="$dest/$(basename "$src")"
+          bin=$(find "$app/Contents/MacOS" -maxdepth 1 -type f -perm -u+x -print -quit)
+          sidecar="$app/Contents/Resources/sidecar/promptcad-sidecar"
+          test -x "$bin" || { echo "::error::no executable in $app/Contents/MacOS"; exit 1; }
+          test -x "$sidecar" || { echo "::error::installed sidecar not executable: $sidecar"; exit 1; }
+          test -s "$sidecar" || { echo "::error::installed sidecar is an empty placeholder"; exit 1; }
+          test -d "$app/Contents/Resources/sidecar/_internal" || { echo "::error::no _internal/"; exit 1; }
+          notices="$app/Contents/Resources/THIRD_PARTY_NOTICES.md"
+          test "$(wc -c < "$notices")" -gt 10240 || { echo "::error::$notices missing or too small"; exit 1; }
+          codesign --verify --verbose=2 "$app" || echo "::warning::codesign --verify failed (ad-hoc)"
+          echo "app=$app" >> "$GITHUB_OUTPUT"
+          echo "bin=$bin" >> "$GITHUB_OUTPUT"
+          echo "sidecar=$sidecar" >> "$GITHUB_OUTPUT"
+          echo "disk usage (du, symlinks not followed):"
+          du -sh src-tauri/binaries/promptcad-sidecar "$app" | tee -a "$GITHUB_STEP_SUMMARY"
+          mkdir -p build/bundle
+          tar -czf "build/bundle/PromptCAD-Studio-${{ matrix.key }}.app.tar.gz" \
+            -C "$(dirname "$src")" "$(basename "$src")"
+      - name: Tauri build (.dmg) [informational]
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        run: |
+          npm run tauri build -- --bundles dmg
+          dmg=$(find src-tauri/target/release/bundle/dmg -maxdepth 1 -name '*.dmg' -print -quit)
+          test -n "$dmg"
+          mnt=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$dmg"
+          trap 'hdiutil detach "$mnt" || true' EXIT
+          test -x "$(find "$mnt" -maxdepth 1 -name '*.app' -print -quit)/Contents/Resources/sidecar/promptcad-sidecar"
+      - name: Frozen smoke + measurements (installed .app) [informational]
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        timeout-minutes: 20
+        run: |
+          "$VENV_PY" scripts/frozen_smoke.py --measure \
+            --exe "${{ steps.mac_install.outputs.sidecar }}" \
+            --installer "build/bundle/PromptCAD-Studio-${{ matrix.key }}.app.tar.gz" \
+            --installed-dir "${{ steps.mac_install.outputs.app }}"
+          cat build/sidecar/measurements.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Kill check, shell mode (installed .app) [informational]
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        timeout-minutes: 10
+        run: >-
+          "$VENV_PY" scripts/frozen_kill_check.py
+          --shell-exe "${{ steps.mac_install.outputs.bin }}"
+          --json build/sidecar/kill-check-shell.json
+
+      # --------------------------------------------------------------------------- Linux
+      # src-tauri/tauri.linux.conf.json: targets deb + appimage. The .deb is required and
+      # installed with apt (pulls deb.depends); the AppImage (linuxdeploy) is informational.
+      - name: Tauri build (.deb)
+        if: runner.os == 'Linux'
+        run: npm run tauri build -- --bundles deb
+      - name: Install .deb
+        if: runner.os == 'Linux'
+        id: deb_install
+        run: |
+          deb=$(find src-tauri/target/release/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)
+          test -n "$deb" || { echo "::error::no .deb produced"; exit 1; }
+          pkg=$(dpkg-deb -f "$deb" Package)
+          mkdir -p build/bundle
+          cp "$deb" build/bundle/
+          sudo apt-get install -y "./build/bundle/$(basename "$deb")"
+          files="$RUNNER_TEMP/deb-files.txt"
+          dpkg -L "$pkg" > "$files"   # thousands of _internal entries: no early-exit pipes
+          bin=$(grep -m1 '^/usr/bin/' "$files")
+          sidecar=$(grep -m1 '/sidecar/promptcad-sidecar$' "$files")
+          notices=$(grep -m1 '/THIRD_PARTY_NOTICES.md$' "$files")
+          test -x "$bin" || { echo "::error::installed shell not executable: $bin"; exit 1; }
+          test -x "$sidecar" || { echo "::error::installed sidecar not executable: $sidecar"; exit 1; }
+          test -s "$sidecar" || { echo "::error::installed sidecar is an empty placeholder"; exit 1; }
+          test -d "$(dirname "$sidecar")/_internal" || { echo "::error::no _internal/"; exit 1; }
+          test "$(wc -c < "$notices")" -gt 10240 || { echo "::error::$notices too small"; exit 1; }
+          echo "deb=build/bundle/$(basename "$deb")" >> "$GITHUB_OUTPUT"
+          echo "bin=$bin" >> "$GITHUB_OUTPUT"
+          echo "sidecar=$sidecar" >> "$GITHUB_OUTPUT"
+          echo "dir=$(dirname "$(dirname "$sidecar")")" >> "$GITHUB_OUTPUT"
+          echo "disk usage (du, symlinks not followed):"
+          du -sh src-tauri/binaries/promptcad-sidecar "$(dirname "$sidecar")" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Tauri build (AppImage) [informational]
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        run: |
+          npm run tauri build -- --bundles appimage
+          ls -l src-tauri/target/release/bundle/appimage/*.AppImage
+      - name: Frozen smoke + measurements (installed .deb) [informational]
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        timeout-minutes: 20
+        run: |
+          "$VENV_PY" scripts/frozen_smoke.py --measure \
+            --exe "${{ steps.deb_install.outputs.sidecar }}" \
+            --installer "${{ steps.deb_install.outputs.deb }}" \
+            --installed-dir "${{ steps.deb_install.outputs.dir }}"
+          cat build/sidecar/measurements.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Kill check, shell mode (installed .deb, Xvfb) [informational]
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        timeout-minutes: 10
+        run: >-
+          xvfb-run -a "$VENV_PY" scripts/frozen_kill_check.py
+          --shell-exe "${{ steps.deb_install.outputs.bin }}"
+          --json build/sidecar/kill-check-shell.json
+
+      # ------------------------------------------------------------------------- uploads
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: sidecar-measurements
+          name: sidecar-measurements-${{ matrix.key }}
           path: |
+            build/sidecar/bundle-manifest.json
+            build/sidecar/desktop-freeze.txt
             build/sidecar/measurements.json
             build/sidecar/measurements.md
             build/sidecar/kill-check.json
             build/sidecar/kill-check-shell.json
           if-no-files-found: warn
       - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
         with:
           name: promptcad-studio-windows-installer
           path: src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: promptcad-studio-${{ matrix.key }}-app
+          path: build/bundle/*.app.tar.gz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS' && always()
+        with:
+          name: promptcad-studio-${{ matrix.key }}-dmg
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
+        with:
+          name: promptcad-studio-${{ matrix.key }}-deb
+          path: build/bundle/*.deb
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux' && always()
+        with:
+          name: promptcad-studio-${{ matrix.key }}-appimage
+          path: src-tauri/target/release/bundle/appimage/*.AppImage
+          if-no-files-found: warn
