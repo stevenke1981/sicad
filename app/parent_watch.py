@@ -46,7 +46,12 @@ _KILLPG: Kill | None = getattr(os, "killpg", None)
 
 
 def _stderr_log(message: str) -> None:
-    print(f"promptcad-sidecar: {message}", file=sys.stderr, flush=True)
+    # stderr is a pipe read by the shell. Once the shell is gone that write raises
+    # BrokenPipeError (Python ignores SIGPIPE), and must never stop the watch from signalling.
+    try:
+        print(f"promptcad-sidecar: {message}", file=sys.stderr, flush=True)
+    except (OSError, ValueError):
+        pass
 
 
 def wait_for_eof(stream: Any) -> None:
@@ -123,7 +128,7 @@ class StdinEofWatch:
         with self._lock:
             self.triggered = True
             finishing = self._finished.is_set()
-        self._log(f"stdin closed (the shell is gone); stopping {self.kind} {self.target}")
+        self._safe_log(f"stdin closed (the shell is gone); stopping {self.kind} {self.target}")
         if finishing:  # the main thread is already returning: no grace left
             self._signal(SIGKILL)
             return
@@ -143,6 +148,14 @@ class StdinEofWatch:
         if triggered:
             self._signal(SIGKILL)
 
+    def _safe_log(self, message: str) -> None:
+        # The shell reads our stderr; after it dies a log write can raise. Logging is best
+        # effort: the signals below are the point of this thread.
+        try:
+            self._log(message)
+        except Exception:  # noqa: BLE001
+            pass
+
     def _signal(self, sig: int) -> None:
         self.sent.append(sig)
         try:
@@ -153,7 +166,7 @@ class StdinEofWatch:
         except ProcessLookupError:
             pass
         except OSError as exc:
-            self._log(f"cannot send signal {sig} to {self.kind} {self.target}: {exc}")
+            self._safe_log(f"cannot send signal {sig} to {self.kind} {self.target}: {exc}")
 
 
 def install(

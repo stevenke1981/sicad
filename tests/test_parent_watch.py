@@ -308,3 +308,36 @@ def test_exit_while_pipe_open_keeps_exit_code():
     err = proc.stderr.read() if proc.stderr else b""
     assert proc.returncode == 7, err.decode(errors="replace")
     assert b"Fatal Python error" not in err
+
+
+def test_watch_still_signals_when_logging_raises():
+    # Regression: the shell reads the sidecar's stderr, so after the shell dies the "stdin
+    # closed" log line raised BrokenPipeError and the thread died before sending any signal.
+    sent = []
+
+    def broken_log(message):
+        raise BrokenPipeError(32, "Broken pipe")
+
+    watch = pw.StdinEofWatch(
+        io.BytesIO(b""),
+        pid=4242,
+        pgid=4242,
+        killpg=lambda target, sig: sent.append((target, sig)),
+        kill=lambda target, sig: sent.append((target, sig)),
+        grace=0.01,
+        log=broken_log,
+    )
+    watch.run()
+    assert [sig for _, sig in sent] == [pw.SIGTERM, pw.SIGKILL]
+
+
+def test_stderr_log_swallows_broken_pipe(monkeypatch):
+    class Broken:
+        def write(self, _):
+            raise BrokenPipeError(32, "Broken pipe")
+
+        def flush(self):
+            raise BrokenPipeError(32, "Broken pipe")
+
+    monkeypatch.setattr(sys, "stderr", Broken())
+    pw._stderr_log("hello")  # must not raise
