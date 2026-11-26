@@ -273,6 +273,8 @@ jobs:
           echo "app=$app" >> "$GITHUB_OUTPUT"
           echo "bin=$bin" >> "$GITHUB_OUTPUT"
           echo "sidecar=$sidecar" >> "$GITHUB_OUTPUT"
+          echo "disk usage (du, symlinks not followed):"
+          du -sh src-tauri/binaries/promptcad-sidecar "$app" | tee -a "$GITHUB_STEP_SUMMARY"
           mkdir -p build/bundle
           tar -czf "build/bundle/PromptCAD-Studio-${{ matrix.key }}.app.tar.gz" \
             -C "$(dirname "$src")" "$(basename "$src")"
@@ -336,6 +338,8 @@ jobs:
           echo "bin=$bin" >> "$GITHUB_OUTPUT"
           echo "sidecar=$sidecar" >> "$GITHUB_OUTPUT"
           echo "dir=$(dirname "$(dirname "$sidecar")")" >> "$GITHUB_OUTPUT"
+          echo "disk usage (du, symlinks not followed):"
+          du -sh src-tauri/binaries/promptcad-sidecar "$(dirname "$sidecar")" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Tauri build (AppImage) [informational]
         if: runner.os == 'Linux'
         continue-on-error: true

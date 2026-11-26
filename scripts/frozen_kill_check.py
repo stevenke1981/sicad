@@ -818,6 +818,60 @@ def run_unix_sidecar_check(
     return results
 
 
+def _run_text(cmd: list[str]) -> str:
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=30, check=False)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return f"{' '.join(cmd)}: {exc}"
+    return (out.stdout + out.stderr).strip()
+
+
+def linux_pipe_holders(pid: int, proc_root: Path = Path("/proc")) -> list[str]:
+    """Processes holding the pipe on ``pid``'s fd 0, with their fd and access mode."""
+    try:
+        target = os.readlink(proc_root / str(pid) / "fd" / "0")
+    except OSError as exc:
+        return [f"cannot read fd 0 of {pid}: {exc}"]
+    rows = [f"pid {pid} fd 0 -> {target}"]
+    for entry in sorted(proc_root.iterdir(), key=lambda e: e.name):
+        if not entry.name.isdigit():
+            continue
+        try:
+            fds = list((entry / "fd").iterdir())
+        except OSError:
+            continue
+        for fd in fds:
+            try:
+                if os.readlink(fd) != target:
+                    continue
+                flags = (entry / "fdinfo" / fd.name).read_text().split("flags:", 1)[1].split()[0]
+                mode = {0: "r", 1: "w", 2: "rw"}.get(int(flags, 8) & 3, "?")
+                comm = (entry / "comm").read_text().strip()
+            except (OSError, IndexError, ValueError):
+                continue
+            rows.append(f"  holder pid {entry.name} ({comm}) fd {fd.name} mode {mode}")
+    return rows
+
+
+def unix_shell_diagnostics(sidecar_pid: int, shell_log: Path) -> str:
+    """Evidence for a sidecar that outlived its shell: who holds its stdin pipe, the group, and
+    the shell's log tail (which includes the sidecar's forwarded stderr)."""
+    parts = ["--- diagnostics ---"]
+    if sys.platform.startswith("linux"):
+        parts += linux_pipe_holders(sidecar_pid)
+    else:
+        parts.append(_run_text(["lsof", "-nP", "-a", "-p", str(sidecar_pid), "-d", "0"]))
+        parts.append(_run_text(["sh", "-c", "lsof -nP 2>/dev/null | grep -E 'PIPE|pipe' | head -80"]))
+    parts.append(_run_text(["ps", "-o", "pid,ppid,pgid,stat,command", "-g", str(sidecar_pid)]))
+    try:
+        tail = shell_log.read_text(encoding="utf-8", errors="replace").splitlines()[-80:]
+    except OSError as exc:
+        tail = [f"cannot read shell log: {exc}"]
+    parts.append("--- shell log (tail) ---")
+    parts += tail
+    return "\n".join(parts)
+
+
 def run_unix_shell_check(
     shell_exe: Path, sidecar_dir: Path | None, sidecar_timeout: float, settle: float
 ) -> dict[str, Any]:
@@ -828,15 +882,21 @@ def run_unix_shell_check(
         raise KillCheckFailure("no display for the shell: run this script under `xvfb-run -a`")
     if sidecar_dir is None:
         sidecar_dir = sidecar_dir_for_shell(shell_exe, sys.platform)
+    # The shell forwards the sidecar's stderr ("[sidecar] ...") to its own: keep it for the
+    # failure report instead of discarding it.
+    shell_log = tempfile.NamedTemporaryFile(  # noqa: SIM115 - Popen writes to it, closed below
+        prefix="promptcad-shell-", suffix=".log", delete=False
+    )
     proc = subprocess.Popen(
         [str(shell_exe)],
         cwd=shell_exe.parent,
         env=fs._base_env(isolated=True),
         stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=shell_log,
+        stderr=subprocess.STDOUT,
         start_new_session=True,  # keep our terminal's signals away from the GUI
     )
+    shell_log.close()
     shell_created = fs.describe_process(proc.pid)[0]
     shell = UnixTracked(proc.pid, shell_exe.name, "shell", shell_created, proc)
     sidecar: UnixTracked | None = None
@@ -880,6 +940,7 @@ def run_unix_shell_check(
         survivors = wait_unix_gone([sidecar], EXIT_DEADLINE_SECONDS)
         elapsed = time.perf_counter() - started
         if survivors:
+            print(unix_shell_diagnostics(sidecar.pid, Path(shell_log.name)), flush=True)
             raise KillCheckFailure(
                 f"the sidecar (pid {sidecar.pid}) outlived the killed shell by "
                 f"{EXIT_DEADLINE_SECONDS:.0f}s: the stdin-EOF watch did not fire"
