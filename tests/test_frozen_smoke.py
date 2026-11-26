@@ -243,3 +243,13 @@ def test_sidecar_stop_closes_held_stdin(tmp_path):
     sidecar.stop()
     assert proc.poll() is not None
     assert proc.stdin.closed
+
+
+def test_truncated_linux_comm_without_path_is_not_foreign():
+    # A render worker that exits before /proc/<pid>/exe is read shows only its 15-byte comm.
+    tree = [
+        fs.ProcInfo(pid=10, ppid=1, name=fs.EXE_NAME[:15], path=None, created=None),
+        fs.ProcInfo(pid=11, ppid=1, name="curl", path=None, created=None),
+    ]
+    foreign = fs.foreign_processes(tree, "/opt/app/sidecar", "/")
+    assert [f["pid"] for f in foreign] == [11]

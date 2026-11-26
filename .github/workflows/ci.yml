@@ -82,6 +82,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.9"  # pinned: desktop_lock.py --check diffs uv output
       - run: uv run --no-project --python 3.12 python scripts/desktop_lock.py --check
 
   desktop:

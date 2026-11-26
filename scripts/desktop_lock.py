@@ -131,6 +131,15 @@ def check(uv: str, requirements_dir: Path = REQUIREMENTS_DIR) -> list[str]:
             _compile(uv, target, fresh, upgrade=False)
             old = _normalized(committed.read_text(encoding="utf-8"))
             new = _normalized(fresh.read_text(encoding="utf-8"))
+            if old != new and pins(old) == pins(new):
+                # Same versions, different bytes: a wheel was uploaded later for a pinned
+                # version (new hash) or uv changed its formatting. Not a dependency change.
+                print(
+                    f"warning: {committed.name}: hashes or formatting drifted, pins unchanged; "
+                    f"refresh with {CUSTOM_COMPILE_COMMAND} --upgrade when convenient",
+                    file=sys.stderr,
+                )
+                continue
             if old != new:
                 diff = difflib.unified_diff(
                     old.splitlines(),

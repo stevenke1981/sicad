@@ -181,6 +181,10 @@ def install(
     if stream is None:
         stdin = sys.stdin
         stream = getattr(stdin, "buffer", None) if stdin is not None else None
+        # Read the unbuffered FileIO: a daemon thread blocked in BufferedReader.read holds its
+        # lock, and CPython aborts at shutdown ("could not acquire lock ... at interpreter
+        # shutdown", exit 139) when the sidecar exits while the shell still holds the pipe.
+        stream = getattr(stream, "raw", stream)
     if stream is None:
         log(f"{FLAG}: no stdin to watch; the sidecar will not stop with the shell")
         return None

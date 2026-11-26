@@ -120,6 +120,8 @@ PromptCAD Studio 本身以 MIT 授權釋出（見 `LICENSE`）。
 
 以下 DLL 由 wheel 以 delvewheel 打包在 `<套件>.libs/`，隨 sidecar 安裝於 `sidecar\_internal\`。授權依各上游專案；授權全文若未隨 wheel 提供，請見上游網站。
 
+本表依建置環境中已安裝的 wheel 產生，是實際安裝包的**超集**：建置時會刪除用不到的 VTK 函式庫（例如 gl2ps、OpenXR、Viskores 與大部分 VTK 模組），實際保留與刪除的檔案記錄在建置輸出 `build/sidecar/bundle-manifest.json` 的 `kept_native`／`removed_native`。
+
 | 元件 | 授權 | 來源 wheel | 檔案 |
 |---|---|---|---|
 | FreeImage | FreeImage OR GPL-2.0-only OR GPL-3.0-only | cadquery-ocp 7.9.3.1.1 | `freeimage` |

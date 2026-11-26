@@ -58,6 +58,8 @@ jobs:
         with:
           python-version: "3.12.10"
       - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.9"  # pinned: desktop_lock.py --check diffs uv output
       - uses: actions/setup-node@v4
         with:
           node-version: "24"

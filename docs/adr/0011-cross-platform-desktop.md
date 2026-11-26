@@ -77,6 +77,14 @@ cadquery-ocp 的 `manylinux_2_31` 決定 Python 端的下限為 glibc 2.31；但
 - **macOS／Linux 參考（`continue-on-error: true`）**：外殼模式的終止檢查（Linux 以 `xvfb-run -a` 執行）、已安裝安裝包的 smoke、`.dmg`、AppImage、`--isolated-env` 監看。連續兩次全綠後改為必過。
 - `ci.yml` 的 `desktop` job 改為三平台矩陣執行 `cargo fmt`／`clippy`／`test`（Linux 先安裝 WebKitGTK 開發套件）；非 Windows 的 job 設定 `RUSTUP_TOOLCHAIN=stable`，`rust-toolchain.toml` 維持 Windows MSVC。
 
+### 8. VTK 替身模組與修剪
+
+- **問題**：OCP 的 `OCP/IVtk*/__init__.py` 以 `try: import vtk` 檢查 VTK 是否存在，而 VTK 套件的 `vtk.py` 會一次載入全部 VTK 模組，使 PyInstaller 收集全部 163 個模組（`vtk.libs` 264 MiB）。CadQuery 本身只使用 `vtkmodules.*`。
+- **做法**：`build_sidecar.py` 在建置時產生 `build/sidecar/vtk_shim/vtk.py`（只 `import vtkmodules.vtkCommonCore`），並放在 PyInstaller 搜尋路徑最前面；保留集合由實際執行一次 STEP/STL/DXF/SVG 匯出觀察 `sys.modules` 而得，再以原生相依閉包（`scripts/native_deps.py`：pefile／`otool -L`／`readelf -d`）刪除閉包外、且檔名為 VTK／Viskores 的函式庫。建置會確認打包內的 `vtk` 確實是替身，並在 VTK 依賴解析不到、或超過 `--max-mib` 時失敗。
+- **結果**：Windows onedir 547.5 → 402.4 MiB。
+- **後果**：打包內無法 import `cadquery.vis`、`cadquery.fig` 與 `cadquery.occ_impl.jupyter_tools`（互動視覺化，生成的 `model.py` 不使用）。`--no-prune` 可跳過刪除（仍使用替身）。若日後 CadQuery 升級後在 `import cadquery` 時就載入 `vis`，因保留集合是實際觀察的，只會讓體積變大，不會壞掉；四種格式的 smoke 測試仍是最終把關。
+- **已知限制**：Unix 上若 sidecar 先自行崩潰，外殼的 `try_wait` 會先回收它，之後不再對行程群組送 SIGKILL，仍在執行的 render worker 可能殘留（Windows 由 Job Object 處理）。下一輪改以 `waitid(WNOWAIT)` 保留殭屍行程後無條件 kill 群組。
+
 ## 考慮過的替代方案
 
 | 方案 | 優點 | 缺點 | 結論 |

@@ -132,6 +132,14 @@ def test_check_detects_drift(tmp_path, monkeypatch):
     problems = lock.check("uv", reqs)
     assert len(problems) == 3 and "+foo==2.0" in problems[0]
 
+    def rehash(uv, target, out, upgrade):
+        out.write_text(out.read_text().replace("foo==2.0", "foo==1.0").replace(":aa", ":bb"))
+
+    for target in lock.TARGETS:  # back to 1.0
+        (reqs / target.filename).write_text("# h\n#    x\nfoo==1.0 \\\n    --hash=sha256:aa\n")
+    monkeypatch.setattr(lock, "_compile", rehash)
+    assert lock.check("uv", reqs) == []  # hash-only drift is a warning, not a failure
+
     (reqs / lock.TARGETS[0].filename).unlink()
     assert "missing" in lock.check("uv", reqs)[0]
 

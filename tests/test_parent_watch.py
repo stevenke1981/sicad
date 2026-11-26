@@ -10,6 +10,7 @@ import io
 import os
 import sys
 import threading
+from pathlib import Path
 
 import pytest
 
@@ -280,3 +281,30 @@ def test_signal_constants():
     assert pw.SIGKILL == 9
     assert pw.SIGTERM == 15
     assert pw.FLAG == "--exit-on-stdin-eof"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the stdin watch is unix-only")
+def test_exit_while_pipe_open_keeps_exit_code():
+    # Regression: a daemon thread blocked in BufferedReader.read made CPython abort at
+    # shutdown (exit 139) when main returned while the shell still held the pipe.
+    import subprocess
+
+    code = (
+        "import sys, time; from app import parent_watch; "
+        "parent_watch.install(log=lambda m: None); time.sleep(0.3); sys.exit(7)"
+    )
+    proc = subprocess.Popen(
+        [sys.executable, "-c", code],
+        stdin=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=str(Path(__file__).resolve().parents[1]),
+        start_new_session=True,
+    )
+    try:
+        proc.wait(timeout=20)  # the write end stays open: no EOF reaches the child
+    finally:
+        assert proc.stdin is not None
+        proc.stdin.close()
+    err = proc.stderr.read() if proc.stderr else b""
+    assert proc.returncode == 7, err.decode(errors="replace")
+    assert b"Fatal Python error" not in err

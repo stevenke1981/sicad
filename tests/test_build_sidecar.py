@@ -435,3 +435,27 @@ def test_tree_stats_matches_frozen_smoke(tmp_path):
 def test_compute_keep_set_requires_models(tmp_path):
     with pytest.raises(build_sidecar.BuildError, match="no example"):
         build_sidecar.compute_keep_set(tmp_path, models=[])
+
+
+def test_prune_bundle_refuses_on_unresolved_vtk_dependency(tmp_path):
+    onedir = _bundle(
+        tmp_path,
+        {
+            "promptcad-sidecar": b"e",
+            "_internal/vtkmodules/vtkCommonCore.cpython-312-x86_64-linux-gnu.so": b"c",
+            # file name differs from the soname the extension records
+            "_internal/vtkmodules/libvtkCommonCore-9.6.so.1.2": b"C",
+            "_internal/vtkmodules/libvtkIOMovie-9.6.so.1": b"M",
+        },
+    )
+    deps = {
+        "promptcad-sidecar": ["libc.so.6"],
+        "vtkCommonCore.cpython-312-x86_64-linux-gnu.so": ["libvtkCommonCore-9.6.so.1"],
+        "libvtkCommonCore-9.6.so.1.2": ["libc.so.6"],
+        "libvtkIOMovie-9.6.so.1": ["libc.so.6"],
+    }
+    with pytest.raises(build_sidecar.BuildError, match="libvtkCommonCore-9.6.so.1"):
+        build_sidecar.prune_bundle(
+            onedir, ["vtkmodules.vtkCommonCore"], kind=nd.ELF, deps_of=lambda p: deps[p.name]
+        )
+    assert (onedir / "_internal/vtkmodules/libvtkIOMovie-9.6.so.1").exists()

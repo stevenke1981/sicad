@@ -448,6 +448,17 @@ def prune_bundle(
     if reach.errors:
         rows = "\n".join(f"  {_rel(p, onedir)}: {e}" for p, e in sorted(reach.errors.items()))
         raise BuildError(f"cannot read native dependencies (use --no-prune to skip):\n{rows}")
+    missing_vtk = sorted(
+        dep for dep in reach.unresolved if is_vtk_native(native_deps.dep_key(dep, kind), kind)
+    )
+    if missing_vtk:
+        # A VTK library is needed but no bundle file matched its name (e.g. an ELF soname that
+        # differs from the file name). The closure would under-reach and delete needed files.
+        rows = "\n".join(f"  {dep}" for dep in missing_vtk)
+        raise BuildError(
+            "VTK dependencies not found in the bundle under their recorded names "
+            f"(use --no-prune to skip):\n{rows}"
+        )
     reached_real = {_real(p) for p in reach.reached}
 
     doomed_lib = [

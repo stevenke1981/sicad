@@ -1000,6 +1000,10 @@ def _native_section(dlls: list[VendoredDll], target: Target = TARGETS["win32"]) 
         intro
         + f"`{target.internal()}`。授權依各上游專案；授權全文若未隨 wheel 提供，請見上游網站。",
         "",
+        "本表依建置環境中已安裝的 wheel 產生，是實際安裝包的**超集**：建置時會刪除用不到的 VTK "
+        "函式庫（例如 gl2ps、OpenXR、Viskores 與大部分 VTK 模組），實際保留與刪除的檔案記錄在建置輸出 "
+        "`build/sidecar/bundle-manifest.json` 的 `kept_native`／`removed_native`。",
+        "",
         "| 元件 | 授權 | 來源 wheel | 檔案 |",
         "|---|---|---|---|",
     ]
@@ -1163,7 +1167,9 @@ def collect(probe: Mapping, lock: Mapping, web_dir: Path, cargo_meta: Mapping) -
 
 def run_python_probe(python: str) -> dict:
     if Path(python).exists():  # CreateProcess does not resolve relative "a/b/python.exe"
-        python = str(Path(python).resolve())
+        # absolute(), not resolve(): a unix venv's bin/python is a symlink to the base
+        # interpreter, and following it would probe the base install instead of the venv.
+        python = str(Path(python).absolute())
     proc = subprocess.run(
         [python, "-I", "-c", PY_PROBE],
         capture_output=True,

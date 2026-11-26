@@ -351,7 +351,10 @@ def foreign_processes(
         if is_python_image(proc.name):
             reason = "python interpreter"
         elif proc.path is None:
-            if proc.name.lower() not in (EXE_NAME.lower(), *SYSTEM_HELPER_IMAGES):
+            # Linux truncates comm to 15 bytes ("promptcad-sidec"); a short-lived render worker
+            # may exit before /proc/<pid>/exe can be read, leaving only that truncated name.
+            own = {EXE_NAME.lower(), EXE_NAME.lower()[:LINUX_COMM_LEN]}
+            if proc.name.lower() not in (*own, *SYSTEM_HELPER_IMAGES):
                 reason = "image path unavailable"
         elif not is_within(proc.path, sidecar_dir):
             helper = proc.name.lower() in SYSTEM_HELPER_IMAGES and is_within(proc.path, system32)
