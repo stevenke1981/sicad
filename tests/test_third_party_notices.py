@@ -473,3 +473,16 @@ def test_probe_runs_and_reports_platform():
     assert probe["platform"] == sys.platform
     assert probe["python_version"].count(".") == 2
     assert all(isinstance(d["libs"], list) for d in probe["dists"])
+
+
+def test_unix_cadquery_ocp_libs_and_casadi_fallback():
+    probe = {
+        "dists": [
+            {"name": "cadquery-ocp", "version": "7.9.3.1.1", "libs": ["libjbig-0f1087b4.so.0"]},
+            {"name": "casadi", "version": "3.8.2", "libs": ["libCbc.so.3", "libipopt.3.dylib"]},
+        ]
+    }
+    by_file = {d.file: d for d in gen.vendored_dlls(probe)}
+    assert by_file["libjbig-0f1087b4.so.0"].license == "GPL-2.0-or-later"
+    assert by_file["libCbc.so.3"].label and "EPL-2.0" in by_file["libCbc.so.3"].license
+    assert by_file["libipopt.3.dylib"].label is not None

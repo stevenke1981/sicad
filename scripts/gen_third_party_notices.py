@@ -262,7 +262,27 @@ VENDORED_DLLS: tuple[tuple[str, str, str], ...] = (
     ("raw_r", "LibRaw", "LGPL-2.1-only OR CDDL-1.0"),
     ("tbb*", "oneTBB", "Apache-2.0"),
     ("openblas*", "OpenBLAS", "BSD-3-Clause"),
+    # first macOS / Linux CI --strict runs (cadquery-ocp wheels)
+    ("fmt", "{fmt}", "MIT"),
+    ("jpegxr", "jxrlib（JPEG XR）", "BSD-2-Clause"),
+    ("jxrglue", "jxrlib（JPEG XR）", "BSD-2-Clause"),
+    ("fontconfig", "Fontconfig", "HPND-sell-variant"),
+    ("half", "OpenEXR（Half）", "BSD-3-Clause"),
+    ("ilmimf*", "OpenEXR（IlmImf）", "BSD-3-Clause"),
+    ("jbig", "JBIG-KIT（libjbig，經 libtiff 載入）", "GPL-2.0-or-later"),
+    ("uuid", "libuuid（util-linux）", "BSD-3-Clause"),
 )
+
+# Dists whose own package directory carries many native plugins built from bundled third-party
+# projects (casadi: Ipopt, Cbc/Clp/Osi, HiGHS, MUMPS, BLASFEO, ...). Their licence texts ship in
+# the dist's own entry, so unmatched in-package libraries fall back to this classification
+# instead of failing --strict one file at a time.
+DIST_LIB_FALLBACK: Mapping[str, tuple[str, str]] = {
+    "casadi": (
+        "CasADi 隨附的求解器與外掛（授權全文見 casadi 條目）",
+        "LGPL-3.0-or-later AND EPL-2.0 AND LicenseRef-CasADi-bundled",
+    ),
+}
 
 LICENSE_FILE_RE = re.compile(r"^(licen[cs]e|copying|notice|unlicense|copyright)([.\-_].*)?$", re.I)
 COPYLEFT_RE = re.compile(r"\b(A?GPL|LGPL|MPL|EPL|CDDL)")
@@ -630,7 +650,7 @@ def vendored_dlls(probe: Mapping) -> list[VendoredDll]:
     out = []
     for dist in shipped_python_dists(probe.get("dists", [])):
         for lib in dist.get("libs") or []:
-            hit = classify_dll(lib)
+            hit = classify_dll(lib) or DIST_LIB_FALLBACK.get(normalize_name(dist["name"]))
             out.append(
                 VendoredDll(
                     dist=dist["name"],

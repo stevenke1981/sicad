@@ -158,6 +158,8 @@ def _spawn_ready_with_pipe(tmp_path: Path) -> subprocess.Popen[str]:
 def _reap(proc: subprocess.Popen[str]) -> str:
     if proc.poll() is None:
         proc.kill()
+    if proc.stdin is not None and proc.stdin.closed:
+        proc.stdin = None  # communicate() would flush the closed pipe (ValueError on POSIX)
     _out, err = proc.communicate(timeout=30)
     return err
 
