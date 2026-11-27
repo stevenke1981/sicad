@@ -1,6 +1,7 @@
 import type {
   CadDocument,
   CapabilityResponse,
+  GenerateFromDocumentRequest,
   GenerateFromSpecRequest,
   GenerateRequest,
   JobListItem,
@@ -26,6 +27,8 @@ export interface ApiClient {
   plan(request: PlanRequest): Promise<PlanResponse>;
   generate(request: GenerateRequest): Promise<JobManifest>;
   generateFromSpec(request: GenerateFromSpecRequest): Promise<JobManifest>;
+  /** Generate from a CadDocument 2.0 (`POST /generate-from-document`). */
+  generateFromDocument(request: GenerateFromDocumentRequest): Promise<JobManifest>;
   validate(spec: CadDocument): Promise<ValidationReport>;
   listJobs(): Promise<JobListItem[]>;
   getJob(jobId: string): Promise<JobManifest>;

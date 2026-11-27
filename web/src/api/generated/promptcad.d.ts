@@ -219,6 +219,21 @@ export interface CapabilityResponse {
 }
 /**
  * This interface was referenced by `PromptCADStudio`'s JSON-Schema
+ * via the `definition` "GenerateFromDocumentRequest".
+ */
+export interface GenerateFromDocumentRequest {
+  document: {
+    [k: string]: unknown;
+  };
+  /**
+   * @minItems 1
+   * @maxItems 7
+   */
+  formats?: ('step' | 'stl' | 'dxf' | 'svg' | 'py' | 'scad' | 'json')[];
+  render?: boolean;
+}
+/**
+ * This interface was referenced by `PromptCADStudio`'s JSON-Schema
  * via the `definition` "GenerateFromSpecRequest".
  */
 export interface GenerateFromSpecRequest {
@@ -263,13 +278,17 @@ export interface JobListItem {
 export interface JobManifest {
   artifacts?: Artifact[];
   created_at: string;
+  document?: {
+    [k: string]: unknown;
+  } | null;
   error?: string | null;
   job_id: string;
   planner_used: string;
   prompt: string;
   renderer_used: string;
   requested_formats: ('step' | 'stl' | 'dxf' | 'svg' | 'py' | 'scad' | 'json')[];
-  spec: CadDocument;
+  spec?: CadDocument | null;
+  spec_version?: '1.0' | '2.0';
   status: 'completed' | 'source_only' | 'failed';
   validation: ValidationReport;
   warnings?: string[];

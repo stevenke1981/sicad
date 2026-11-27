@@ -57,6 +57,19 @@ describe('createHttpClient', () => {
     expect(JSON.parse(String(init?.body))).toMatchObject({ source_prompt: 'x' });
   });
 
+  it('posts a 2.0 document to /generate-from-document', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => jsonResponse({ job_id: 'j' }));
+    const client = createHttpClient({ baseUrl: '', fetch: fetchMock });
+    const document = { schema_version: '2.0', name: 'p' };
+
+    await client.generateFromDocument({ document, formats: ['stl'], render: true });
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('/api/v1/generate-from-document');
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({ document, formats: ['stl'], render: true });
+  });
+
   it('maps non-2xx responses to an ApiError carrying FastAPI {detail}', async () => {
     const fetchMock = vi.fn<typeof fetch>(async () =>
       jsonResponse({ detail: 'Invalid API token' }, 401, 'Unauthorized'),

@@ -154,3 +154,39 @@ def test_cadquery_available_survives_find_spec_raising(monkeypatch, error):
     monkeypatch.setattr(importlib.util, "find_spec", raising)
 
     assert Renderer.cadquery_available() is False
+
+
+def test_openscad_is_skipped_when_not_allowed(settings, tmp_path, monkeypatch):
+    settings.render_backend = "openscad"
+    monkeypatch.setattr(Renderer, "openscad_available", staticmethod(lambda: True))
+
+    def boom(*args, **kwargs):
+        raise AssertionError("openscad must not run")
+
+    monkeypatch.setattr(renderer_module.subprocess, "run", boom)
+    result = Renderer(settings).render(tmp_path, ["step", "stl"], allow_openscad=False)
+
+    assert result.renderer == "source_only"
+    assert result.status == "source_only"
+    assert any("OpenSCAD" in warning for warning in result.warnings)
+
+
+def test_cadquery_failure_does_not_fall_back_to_openscad_when_not_allowed(
+    settings, tmp_path, monkeypatch
+):
+    settings.render_backend = "cadquery"
+    settings.allow_source_fallback = True
+    monkeypatch.setattr(Renderer, "cadquery_available", staticmethod(lambda: True))
+    monkeypatch.setattr(Renderer, "openscad_available", staticmethod(lambda: True))
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 1, stdout="", stderr="cq broke")
+
+    monkeypatch.setattr(renderer_module.subprocess, "run", fake_run)
+    result = Renderer(settings).render(tmp_path, ["stl"], allow_openscad=False)
+
+    assert result.renderer == "source_only"
+    assert len(calls) == 1  # only the CadQuery attempt
+    assert any("cq broke" in warning for warning in result.warnings)

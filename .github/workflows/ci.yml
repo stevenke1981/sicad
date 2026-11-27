@@ -95,6 +95,15 @@ jobs:
           python3 -c "import json; d = json.load(open('/tmp/validate.json')); assert d['issues'] and any(i.get('target') for i in d['issues']), d"
       - name: CadQuery imports in the runtime env
         run: docker exec promptcad /usr/local/bin/_entrypoint.sh python -c "import cadquery; print('cadquery', cadquery.__version__)"
+      # The image's WORKDIR is /app (scripts/ is copied there), so no -w is needed.
+      - name: Geometry equivalence (Cad2Compiler vs CadQuery 1.0 corpus, in the runtime env)
+        run: docker exec promptcad /usr/local/bin/_entrypoint.sh python scripts/geometry_equivalence.py
+      # The endpoint does not strip expected_resolved (a test-only key), so the caller removes it.
+      - name: POST /api/v1/generate-from-document (2.0 plate yields model.step)
+        run: |
+          python3 -c "import json; d = json.load(open('examples/cad2/plate-four-holes.cad2.json', encoding='utf-8')); d.pop('expected_resolved', None); json.dump({'document': d, 'formats': ['step'], 'render': True}, open('/tmp/gen2-body.json', 'w', encoding='utf-8'))"
+          curl --fail --silent --show-error -X POST http://127.0.0.1:8000/api/v1/generate-from-document -H 'Content-Type: application/json' --data @/tmp/gen2-body.json | tee /tmp/gen2.json
+          python3 -c "import json; d = json.load(open('/tmp/gen2.json', encoding='utf-8')); names = {a['filename'] for a in d.get('artifacts', [])}; assert d['status'] == 'completed', d; assert 'model.step' in names, sorted(names)"
       - name: Container logs
         if: always()
         run: docker logs promptcad || true

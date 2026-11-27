@@ -259,3 +259,14 @@
 - **Python 驗證器移除**：**已完成**（見上）。
 
 結論：第 2 階段尚未結束（編譯器接受 2.0 與幾何等價測試、1.0 模型生成、前端編輯與元件選取尚未完成），階段順序不變。ADR 0012 仍待負責人簽核。
+
+### 2026-11-27：第 2 階段 2d — 2.0 文件端到端輸出
+
+2d 的內容與細節見 `PROJECT_STATUS.md` 的「第 2 階段 2d 切片」。新增 `Cad2Compiler`（`app/services/compiler2.py`）與 `POST /api/v1/generate-from-document`；選擇此方式而非「core 降級後交給 1.0 編譯器」的理由，見 [0006](0006-geometry-kernel-occt-python-sidecar.md) 的回顧紀錄。逐項對照第 2 階段的完成條件：
+
+- **所有 `examples/generated/` 的 1.0 文件經 adapter 後輸出等價幾何**：**達成（本機）**；CI 待確認。`scripts/geometry_equivalence.py` 比較 1.0 `CadQueryCompiler`（輸入 1.0 文件）與 `Cad2Compiler`（輸入 core 的 `validate` 結果）：54 個唯一案例全數等價（0 個 both_failed、0 個 mismatch、允許差異 0 個），最大體積差與最大對稱差體積皆為 0.0。`plate_fillet_all_too_large`、`ring_chamfer_all_too_large` 兩個編譯器都產生無效實體，因此略過對稱差檢查，其餘指標仍比較。參照端仍是舊的 1.0 編譯器；1.0 流程切換至 `Cad2Compiler` 並移除舊編譯器尚未進行。
+- **Python 驗證器移除**：**已於 2c 達成**。
+- **CI 的 schema 生成比對檢查已啟用**：**部分達成（未變）**。2d 未改變 schema 來源；2.0 的 Pydantic 仍僅為 spike，1.0 `CadDocument` 仍為手寫。
+- **REST API 與 CLI 在伺服器模式下仍可用**：**達成**。新增 `POST /api/v1/generate-from-document`，CLI 的 `render`、`validate` 接受 2.0 檔案；既有端點與 CLI 指令的行為未改變。
+
+結論：第 2 階段尚未結束（前端屬性編輯、檢視器元件選取與 port 顯示、1.0 Pydantic 生成、1.0 流程切換至 `Cad2Compiler` 並移除舊編譯器、ADR 0012 簽核尚未完成），階段順序不變。

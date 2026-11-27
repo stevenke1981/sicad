@@ -6,8 +6,9 @@ Drives ``src-tauri/binaries/promptcad-sidecar/promptcad-sidecar.exe`` (built by
 a. server mode - spawn with a one-time token and a temporary data dir, wait for the READY
    line, check ``/api/v1/capabilities`` reports ``cadquery_available: true``, then POST
    ``/api/v1/generate-from-spec`` for every base type x every hole type (plus the checked-in
-   ``examples/generated/*`` specs) requesting step/stl/dxf/svg, and one prompt through
-   ``/api/v1/generate``. Every job must finish ``completed`` with renderer ``cadquery``,
+   ``examples/generated/*`` specs) requesting step/stl/dxf/svg, the ``examples/cad2/*`` documents
+   through ``/api/v1/generate-from-document``, and one prompt through ``/api/v1/generate``.
+   Every job must finish ``completed`` with renderer ``cadquery``,
    every requested file must be non-empty and the STEP file must start with
    ``ISO-10303-21``;
 b. render-worker mode - time direct ``--render-worker`` invocations on a sample model.py.
@@ -69,6 +70,9 @@ EXE_NAME = "promptcad-sidecar" + (".exe" if sys.platform == "win32" else "")
 DEFAULT_EXE = ROOT / "src-tauri" / "binaries" / "promptcad-sidecar" / EXE_NAME
 MEASURE_DIR = ROOT / "build" / "sidecar"
 EXAMPLES_DIR = ROOT / "examples" / "generated"
+CAD2_EXAMPLES_DIR = ROOT / "examples" / "cad2"
+# Test-only key in the checked-in 2.0 examples; generate-from-document does not strip it.
+CAD2_TEST_ONLY_KEYS = ("expected_resolved",)
 READY_PREFIX = "PROMPTCAD_SIDECAR_READY"
 CAD_FORMATS = ["step", "stl", "dxf", "svg"]
 FORMAT_FILES = {"step": "model.step", "stl": "model.stl", "dxf": "model.dxf", "svg": "model.svg"}
@@ -180,6 +184,17 @@ def smoke_cases(examples_dir: Path = EXAMPLES_DIR) -> list[tuple[str, dict[str, 
         for spec_path in sorted(examples_dir.glob("*/spec.json")):
             spec = json.loads(spec_path.read_text(encoding="utf-8"))
             cases.append((f"example:{spec_path.parent.name}", spec))
+    return cases
+
+
+def cad2_smoke_cases(examples_dir: Path = CAD2_EXAMPLES_DIR) -> list[tuple[str, dict[str, Any]]]:
+    """Every checked-in CadDocument 2.0 example, with the test-only keys removed."""
+    cases = []
+    for doc_path in sorted(examples_dir.glob("*.cad2.json")):
+        document = json.loads(doc_path.read_text(encoding="utf-8"))
+        for key in CAD2_TEST_ONLY_KEYS:
+            document.pop(key, None)
+        cases.append((f"cad2:{doc_path.name.removesuffix('.cad2.json')}", document))
     return cases
 
 
@@ -813,21 +828,45 @@ def _json(sidecar: Sidecar, method: str, path: str, token: str, body: Any = None
     return json.loads(payload)
 
 
-def check_manifest(sidecar: Sidecar, token: str, label: str, manifest: dict[str, Any]) -> None:
+# Files a 1.0 (generate-from-spec) manifest must carry: one per requested CAD format.
+CAD_FILES: tuple[str, ...] = tuple(FORMAT_FILES[fmt] for fmt in CAD_FORMATS)
+# Artifacts a 2.0 manifest carries (no model.scad / preview.svg: OpenSCAD is not used for 2.0).
+CAD2_EXPECTED_FILES: tuple[str, ...] = CAD_FILES
+
+
+def manifest_problems(
+    manifest: Mapping[str, Any], expected_files: Sequence[str] = CAD_FILES
+) -> list[str]:
+    """Everything wrong with a finished job's manifest (empty list = acceptable).
+
+    ``expected_files`` lists the artifacts that must be present and non-empty. Only the files
+    named there are checked, so a 2.0 (``generate-from-document``) manifest is not required to
+    carry ``model.scad`` or ``preview.svg`` (it never produces them).
+    """
     problems = []
     if manifest.get("status") != "completed":
         problems.append(f"status={manifest.get('status')!r} error={manifest.get('error')!r}")
     if manifest.get("renderer_used") != "cadquery":
         problems.append(f"renderer_used={manifest.get('renderer_used')!r}")
     sizes = {a["filename"]: a["size"] for a in manifest.get("artifacts", [])}
-    for fmt in CAD_FORMATS:
-        name = FORMAT_FILES[fmt]
+    for name in expected_files:
         if sizes.get(name, 0) <= 0:
             problems.append(f"{name} missing or empty")
     for issue in (manifest.get("validation") or {}).get("issues", []):
         if "layer" not in issue or "target" not in issue:
             problems.append(f"issue without core fields layer/target: {issue}")
             break
+    return problems
+
+
+def check_manifest(
+    sidecar: Sidecar,
+    token: str,
+    label: str,
+    manifest: dict[str, Any],
+    expected_files: Sequence[str] = CAD_FILES,
+) -> None:
+    problems = manifest_problems(manifest, expected_files)
     if not problems:
         status, step = _request(
             sidecar, "GET", f"/api/v1/jobs/{manifest['job_id']}/files/model.step", token
@@ -926,6 +965,23 @@ def _server_requests(sidecar: Sidecar, token: str, results: dict[str, Any]) -> N
         extra = f" ({len(manifest['warnings'])} warnings)" if manifest.get("warnings") else ""
         print(f"  generate-from-spec {label:<28} completed in {elapsed:6.2f}s{extra}")
     results["generate_from_spec"] = timings
+
+    doc_timings: list[dict[str, Any]] = []
+    for label, document in cad2_smoke_cases():
+        started = time.perf_counter()
+        manifest = _json(
+            sidecar,
+            "POST",
+            "/api/v1/generate-from-document",
+            token,
+            {"document": document, "formats": CAD_FORMATS, "render": True},
+        )
+        elapsed = time.perf_counter() - started
+        check_manifest(sidecar, token, label, manifest, CAD2_EXPECTED_FILES)
+        doc_timings.append({"case": label, "seconds": round(elapsed, 3)})
+        extra = f" ({len(manifest['warnings'])} warnings)" if manifest.get("warnings") else ""
+        print(f"  generate-from-document {label:<26} completed in {elapsed:6.2f}s{extra}")
+    results["generate_from_document"] = doc_timings
 
     started = time.perf_counter()
     manifest = _json(

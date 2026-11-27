@@ -17,7 +17,7 @@ Rust core（validate，經 app/services/core_validator.py）
 Job manifest + downloadable artifacts
 ```
 
-本文描述目前可執行的 v0.1.0 架構，以及 [ADR 0010](adr/0010-migration-phases.md) 第 1 階段加入、尚未發佈的前端與桌面外殼（見「前端、桌面外殼與 schema 管線」一節）。目標架構見 [`adr/overview.md`](adr/overview.md)；CadDocument 2.0 的凍結規格見 [`CAD_DSL_2.md`](CAD_DSL_2.md)，2.0 的 Rust core 已實作於 `crates/promptcad-core/`（見「Rust core crate」一節），並已由桌面版（Tauri 命令）與伺服器（`POST /api/v1/core`）兩種宿主呼叫（見「Rust core 的宿主與資料流」）。自第 2 階段 2c 起，1.0 的驗證也由 core 執行，Python 端不再含任何設計規則；生成流程的其餘部分不變。2.0 文件目前可以經 core 驗證，並以唯讀元件樹查看，但不能輸出幾何（幾何編譯器尚不接受 2.0）。
+本文描述目前可執行的 v0.1.0 架構，以及 [ADR 0010](adr/0010-migration-phases.md) 第 1 階段加入、尚未發佈的前端與桌面外殼（見「前端、桌面外殼與 schema 管線」一節）。目標架構見 [`adr/overview.md`](adr/overview.md)；CadDocument 2.0 的凍結規格見 [`CAD_DSL_2.md`](CAD_DSL_2.md)，2.0 的 Rust core 已實作於 `crates/promptcad-core/`（見「Rust core crate」一節），並已由桌面版（Tauri 命令）與伺服器（`POST /api/v1/core`）兩種宿主呼叫（見「Rust core 的宿主與資料流」）。自第 2 階段 2c 起，1.0 的驗證也由 core 執行，Python 端不再含任何設計規則；生成流程的其餘部分不變。2.0 文件可經 core 驗證並輸出幾何（第 2 階段 2d，未發佈）：`Cad2Compiler` 只讀取 core 的 `resolved`，不使用 OpenSCAD，支援的構造見下節與 `PROJECT_STATUS.md`。1.0 流程仍使用舊的 `CadQueryCompiler`。
 
 ## 為何加入 DSL
 
@@ -108,7 +108,7 @@ app/web_dist/ ──served at "/" by FastAPI when index.html exists (else 503 "b
 
 ## Rust core crate（第 2 階段 2a、2b、2c，未發佈）
 
-`crates/promptcad-core/` 是依 [`CAD_DSL_2.md`](CAD_DSL_2.md) 與 [ADR 0005](adr/0005-rust-core-document-model.md) 實作的獨立 library crate，不依賴 Tauri，有自己的 `Cargo.lock`。**2b 起，兩個應用程式宿主呼叫它**：桌面版的 Tauri 命令 `core_request`（`src-tauri/src/core.rs`，行程內呼叫）與伺服器的 `POST /api/v1/core`（每次呼叫啟動一次 `promptcad-core rpc` 子行程）。兩者共用 `promptcad_core::api` 的同一契約。Python 編譯器仍不接受 2.0。命令列用法見 `crates/promptcad-core/README.md`。
+`crates/promptcad-core/` 是依 [`CAD_DSL_2.md`](CAD_DSL_2.md) 與 [ADR 0005](adr/0005-rust-core-document-model.md) 實作的獨立 library crate，不依賴 Tauri，有自己的 `Cargo.lock`。**2b 起，兩個應用程式宿主呼叫它**：桌面版的 Tauri 命令 `core_request`（`src-tauri/src/core.rs`，行程內呼叫）與伺服器的 `POST /api/v1/core`（每次呼叫啟動一次 `promptcad-core rpc` 子行程）。兩者共用 `promptcad_core::api` 的同一契約。Python 編譯器自第 2 階段 2d 起接受 core 驗證後的 2.0 文件，見下節「2.0 生成路徑」。命令列用法見 `crates/promptcad-core/README.md`。
 
 模組分層（由下而上，上層只依賴下層）：
 
@@ -168,6 +168,17 @@ Rust core 有三個宿主，共用 `promptcad_core::api` 的 `CoreRequest`（以
 - 1.0 驗證（2c）：`/plan`、`/generate`、`/generate-from-spec`、`/validate` 與 CLI 經 `app/services/core_validator.py`（`CoreValidator`，透過 `CoreBridge`）呼叫 `validate`。core 不可用時這些端點回 `503`，逾時 `504`，core 失敗 `502`；錯誤對應見 `docs/API.md`。
 - 找不到 core 執行檔時，`/api/v1/capabilities` 的 `core_available` 為 `false`，1.0 驗證端點回 `503`。桌面版 sidecar 內含 core（`<onedir>/_internal/`），由 `scripts/build_sidecar.py` 複製。
 - 執行檔的查找順序與設定見 `docs/API.md` 的 `POST /core` 一節。
+
+## 2.0 生成路徑（第 2 階段 2d，未發佈）
+
+`POST /api/v1/generate-from-document`、CLI 的 `render`（2.0 檔案）與前端「套用 JSON 並重新輸出」共用同一條路徑：
+
+1. `CoreValidator.validate_document` 呼叫 core 的 `validate`，取得正規化的 `document`、`resolved` 與報告。
+2. 報告不合法：工作為 `failed`／`validation-blocked`，不產生 `model.py`，但寫入 `resolved.json`。
+3. `Cad2Compiler`（`app/services/compiler2.py`）只讀取 `document` 與 `resolved` 產生 `model.py`。零件依 `resolved.components` 剛體放置，主孔切刀依 `resolved.holes`，沉頭與埋頭的入口依 `resolved.ports["<id>.entry"]` 以 §7.2 算術計算。Python 不做求解。不支援的構造拋出 `CompileUnsupported`，工作為 `failed`／`compile-unsupported`。
+4. `model.py` 沿用 1.0 的契約，由 renderer 與 render worker 執行（兩者未改動）。2.0 不回退到 OpenSCAD。
+
+等價性由 `scripts/geometry_equivalence.py`（`make geometry-check`）檢查，比較對象是 1.0 `CadQueryCompiler` 的輸出。
 
 ## 擴充新特徵
 

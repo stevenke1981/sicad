@@ -2,6 +2,7 @@ import { ApiError, type ApiClient, type HealthStatus } from './client';
 import type {
   CadDocument,
   CapabilityResponse,
+  GenerateFromDocumentRequest,
   GenerateFromSpecRequest,
   GenerateRequest,
   JobListItem,
@@ -106,6 +107,8 @@ export function createHttpClient(options: HttpClientOptions): ApiClient {
       postJson<JobManifest>(`${API_PREFIX}/generate`, request),
     generateFromSpec: (request: GenerateFromSpecRequest) =>
       postJson<JobManifest>(`${API_PREFIX}/generate-from-spec`, request),
+    generateFromDocument: (request: GenerateFromDocumentRequest) =>
+      postJson<JobManifest>(`${API_PREFIX}/generate-from-document`, request),
     validate: (spec: CadDocument) => postJson<ValidationReport>(`${API_PREFIX}/validate`, spec),
     listJobs: () => getJson<JobListItem[]>(`${API_PREFIX}/jobs`),
     getJob: (jobId: string) => getJson<JobManifest>(jobPath(jobId)),

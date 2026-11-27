@@ -390,6 +390,44 @@
       "title": "FilletFeature",
       "type": "object"
     },
+    "GenerateFromDocumentRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "document": {
+          "additionalProperties": true,
+          "title": "Document",
+          "type": "object"
+        },
+        "formats": {
+          "items": {
+            "enum": [
+              "step",
+              "stl",
+              "dxf",
+              "svg",
+              "py",
+              "scad",
+              "json"
+            ],
+            "type": "string"
+          },
+          "maxItems": 7,
+          "minItems": 1,
+          "title": "Formats",
+          "type": "array"
+        },
+        "render": {
+          "default": true,
+          "title": "Render",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "document"
+      ],
+      "title": "GenerateFromDocumentRequest",
+      "type": "object"
+    },
     "GenerateFromSpecRequest": {
       "additionalProperties": false,
       "properties": {
@@ -674,6 +712,19 @@
           "title": "Created At",
           "type": "string"
         },
+        "document": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Document"
+        },
         "error": {
           "anyOf": [
             {
@@ -719,7 +770,24 @@
           "type": "array"
         },
         "spec": {
-          "$ref": "#/$defs/CadDocument"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CadDocument"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "spec_version": {
+          "default": "1.0",
+          "enum": [
+            "1.0",
+            "2.0"
+          ],
+          "title": "Spec Version",
+          "type": "string"
         },
         "status": {
           "enum": [
@@ -749,7 +817,6 @@
         "planner_used",
         "renderer_used",
         "requested_formats",
-        "spec",
         "validation"
       ],
       "title": "JobManifest",

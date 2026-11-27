@@ -4,6 +4,7 @@ export type {
   Artifact,
   CadDocument,
   CapabilityResponse,
+  GenerateFromDocumentRequest,
   GenerateFromSpecRequest,
   GenerateRequest,
   JobListItem,

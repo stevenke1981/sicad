@@ -66,6 +66,7 @@ function mockClient(overrides: Partial<ApiClient> = {}): ApiClient {
     }),
     generate: vi.fn(async () => manifest),
     generateFromSpec: vi.fn(async () => manifest),
+    generateFromDocument: vi.fn(async () => manifest),
     validate: vi.fn(async () => ({ valid: true, review_required: false, issues: [] })),
     listJobs: vi.fn<ApiClient['listJobs']>().mockResolvedValueOnce([]).mockResolvedValue([jobItem]),
     getJob: vi.fn(async () => manifest),
