@@ -20,6 +20,7 @@
 
 use std::fmt;
 
+use schemars::{json_schema, JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 
 use crate::canonical::canonical_sha256;
@@ -31,7 +32,7 @@ use crate::patch_engine::{
 };
 
 /// What an entry records.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EntryKind {
     /// A submitted patch (accepted or rejected).
@@ -41,7 +42,7 @@ pub enum EntryKind {
 }
 
 /// `{code, severity}` of one validation issue.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct IssueSummary {
     /// Issue code.
@@ -59,8 +60,16 @@ impl From<&ValidationIssue> for IssueSummary {
     }
 }
 
+fn submitted_patch_schema(_: &mut SchemaGenerator) -> Schema {
+    json_schema!({
+        "type": ["object", "null"],
+        "additionalProperties": true,
+        "description": "The patch as submitted: structurally a Patch (schemas/cad2/patch.schema.json) that deserialized, but not necessarily within its range / length constraints (a `schema_invalid` rejection is logged as submitted); null for undo entries."
+    })
+}
+
 /// One line of `oplog.jsonl`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct OpLogEntry {
     /// 0-based position in the log.
@@ -74,6 +83,10 @@ pub struct OpLogEntry {
     /// Caller-supplied timestamp (the library never reads a clock).
     pub timestamp: Option<String>,
     /// The patch as submitted (`null` for undo entries).
+    ///
+    /// Its JSON Schema is a plain object: a patch rejected as `schema_invalid` is logged as
+    /// submitted and need not satisfy `patch.schema.json`'s range / length constraints.
+    #[schemars(schema_with = "submitted_patch_schema")]
     pub patch: Option<Patch>,
     /// SHA-256 of the canonical patch JSON (`null` for undo entries).
     pub patch_sha256: Option<String>,

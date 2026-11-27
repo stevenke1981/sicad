@@ -88,3 +88,8 @@ class CapabilityResponse(StrictApiModel):
     openscad_available: bool
     configured_planner_mode: str
     configured_render_backend: str
+    # Rust core (POST /api/v1/core); optional so older clients and servers stay compatible.
+    core_available: bool = False
+    core_crate_version: str | None = None
+    core_api_version: int | None = None
+    core_schema_versions: list[str] = Field(default_factory=list)

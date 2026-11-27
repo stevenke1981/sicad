@@ -36,6 +36,18 @@ class Settings(BaseSettings):
     max_prompt_chars: int = Field(default=4000, ge=100, le=20000)
     max_jobs_returned: int = Field(default=50, ge=1, le=500)
 
+    # Rust core (promptcad-core, ADR 0005/0008/0012). The server runs `promptcad-core rpc`
+    # once per call. Unset: search next to the executable, on PATH, then crates/ (dev build).
+    core_bin: Path | None = None
+    core_timeout_seconds: int = Field(default=15, ge=1, le=300)
+    # At most this many promptcad-core children run at once; they use a dedicated executor,
+    # never the default thread pool (render jobs). Up to 4x this many more requests may wait.
+    core_max_concurrency: int = Field(default=4, ge=1, le=64)
+    # A request that cannot get a slot within this many seconds gets HTTP 503 + Retry-After.
+    core_queue_wait_seconds: float = Field(default=3.0, ge=0.1, le=60.0)
+    # Request body cap for POST /api/v1/core; the core itself refuses more than 8 MiB.
+    core_max_request_bytes: int = Field(default=8 * 1024 * 1024, ge=1024, le=8 * 1024 * 1024)
+
     api_token: str | None = None
     cors_origins: str = "http://localhost:8000,http://127.0.0.1:8000"
 
@@ -47,7 +59,7 @@ class Settings(BaseSettings):
     llm_max_retries: int = Field(default=1, ge=0, le=5)
     llm_fallback_to_rule: bool = True
 
-    @field_validator("api_token", "llm_api_key", mode="before")
+    @field_validator("api_token", "llm_api_key", "core_bin", mode="before")
     @classmethod
     def empty_to_none(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():

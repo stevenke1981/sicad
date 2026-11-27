@@ -1,11 +1,24 @@
-import type { ValidationReport, ValidationSeverity } from '../api/types';
+import type { ValidationIssue, ValidationReport, ValidationSeverity } from '../api/types';
+
+/** 1.0 issues plus the optional fields a 2.0 (Rust core) issue carries. */
+export type PanelIssue = ValidationIssue & {
+  target?: string | null;
+  related?: string[];
+  owner?: string | null;
+  layer?: string;
+};
+export type PanelReport = Omit<ValidationReport, 'issues'> & { issues?: PanelIssue[] };
+
+const LAYER_LABEL: Record<string, string> = { analytic: '解析層', kernel: '核心層' };
 
 interface Props {
-  report: ValidationReport | null;
+  report: PanelReport | null;
   /** Where the report came from: the job manifest or an explicit "validate" call. */
   source: 'job' | 'validate';
   /** Extra renderer/job warnings from the manifest (strings, not issues). */
   warnings: string[];
+  /** Warnings about the submitted input itself (e.g. numbers the transport altered). */
+  inputWarnings?: string[];
 }
 
 const SEVERITY_LABEL: Record<ValidationSeverity, string> = {
@@ -16,8 +29,18 @@ const SEVERITY_LABEL: Record<ValidationSeverity, string> = {
 
 const SEVERITY_ORDER: ValidationSeverity[] = ['error', 'warning', 'info'];
 
-export function ValidationPanel({ report, source, warnings }: Props) {
-  if (!report && !warnings.length) return null;
+function IssueRefs({ issue }: { issue: PanelIssue }) {
+  const parts = [
+    issue.target ? `目標：${issue.target}` : '',
+    issue.related?.length ? `相關：${issue.related.join('、')}` : '',
+    issue.owner ? `負責：${issue.owner}` : '',
+    issue.layer ? `層級：${LAYER_LABEL[issue.layer] ?? issue.layer}` : '',
+  ].filter(Boolean);
+  return parts.length ? <small className="issue-ref">{parts.join(' · ')}</small> : null;
+}
+
+export function ValidationPanel({ report, source, warnings, inputWarnings = [] }: Props) {
+  if (!report && !warnings.length && !inputWarnings.length) return null;
   const issues = report?.issues ?? [];
   const counts = SEVERITY_ORDER.map((severity) => ({
     severity,
@@ -43,6 +66,16 @@ export function ValidationPanel({ report, source, warnings }: Props) {
           </span>
         ))}
       </div>
+      {inputWarnings.length > 0 && (
+        <ul className="issues" aria-label="輸入警告">
+          {[...new Set(inputWarnings)].map((text) => (
+            <li key={`i-${text}`} className="issue warning">
+              <span className="sev">輸入</span>
+              <span className="msg">{text}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       {warnings.length > 0 && (
         <ul className="issues">
           {[...new Set(warnings)].map((text) => (
@@ -66,6 +99,7 @@ export function ValidationPanel({ report, source, warnings }: Props) {
                     ? ` · 特徵 #${issue.feature_index}`
                     : ''}
                 </small>
+                <IssueRefs issue={issue} />
               </span>
             </li>
           ))}

@@ -8,17 +8,17 @@ use std::io::{self, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use promptcad_core::api::{
+    self, CoreError, CoreRequest, CoreResponse, CoreResult, PatchOutcomeView, MAX_REQUEST_BYTES,
+};
 use promptcad_core::bindings::recompute_bindings;
 use promptcad_core::canonical::{
     strip_example_keys, to_canonical_json, to_canonical_string, to_canonical_value,
 };
-use promptcad_core::migrate::{downgrade_2_to_1, upgrade_1_to_2};
 use promptcad_core::model::{
     CadDocument1, CadDocument2, Patch, Resolved, Severity, ValidationReport,
 };
-use promptcad_core::patch_engine::{apply_patch, PatchOrigin, PatchOutcome};
-use promptcad_core::solver::solve;
-use promptcad_core::validate::{validate, ValidateOptions};
+use promptcad_core::patch_engine::PatchOrigin;
 use serde_json::{json, Value};
 
 const USAGE: &str = "\
@@ -41,6 +41,10 @@ commands:
   apply-patch <spec-2.0.json> <patch.json> [--human] [--out <file>]
                     apply a patch and print the new canonical document (exit 1 and the reject
                     reason as JSON if the patch is rejected)
+  rpc               read ONE JSON request (promptcad_core::api) from stdin and write ONE
+                    single-line JSON response to stdout; exit 0 whenever a response was
+                    written (also for \"status\": \"error\"), 1 if stdout cannot be
+                    written, 2 on usage errors or unreadable stdin
   help              print this message
 
 options:
@@ -69,6 +73,7 @@ fn main() -> ExitCode {
         Some("downgrade") => cmd_downgrade(&args[1..]),
         Some("normalize") => cmd_normalize(&args[1..]),
         Some("apply-patch") => cmd_apply_patch(&args[1..]),
+        Some("rpc") => cmd_rpc(&args[1..]),
         Some(other) => {
             eprintln!("promptcad-core: unknown command `{other}`\n");
             eprint!("{USAGE}");
@@ -116,15 +121,20 @@ fn cmd_validate(args: &[String]) -> ExitCode {
         Ok(a) => a,
         Err(code) => return code,
     };
-    let doc = match load_any(&a.positional[0], a.has("--strip-example-keys")) {
-        Ok(doc) => doc,
+    let path = &a.positional[0];
+    let document = match read_value(path, a.has("--strip-example-keys")) {
+        Ok(value) => value,
         Err(msg) => return input_error(&msg),
     };
-    let opts = ValidateOptions {
+    let request = CoreRequest::Validate {
+        document,
         completed: !a.has("--draft"),
-        submitter: None,
     };
-    let report: ValidationReport = validate(&doc, &opts).report;
+    let report: ValidationReport = match call(path, request) {
+        Ok(CoreResult::Validate(r)) => r.report,
+        Ok(_) => return unexpected_result(),
+        Err(code) => return code,
+    };
     if let Err(code) = emit(&a, &to_canonical_string(&report)) {
         return code;
     }
@@ -143,11 +153,16 @@ fn cmd_solve(args: &[String]) -> ExitCode {
         Ok(a) => a,
         Err(code) => return code,
     };
-    let doc = match load_any(&a.positional[0], a.has("--strip-example-keys")) {
-        Ok(doc) => doc,
+    let path = &a.positional[0];
+    let document = match read_value(path, a.has("--strip-example-keys")) {
+        Ok(value) => value,
         Err(msg) => return input_error(&msg),
     };
-    let resolved: Resolved = solve(&doc);
+    let resolved: Resolved = match call(path, CoreRequest::Solve { document }) {
+        Ok(CoreResult::Solve(r)) => r.resolved,
+        Ok(_) => return unexpected_result(),
+        Err(code) => return code,
+    };
     let has_error = resolved
         .issues
         .iter()
@@ -169,17 +184,16 @@ fn cmd_upgrade(args: &[String]) -> ExitCode {
         Err(code) => return code,
     };
     let path = &a.positional[0];
-    let text = match read_input(path) {
-        Ok(text) => text,
+    let document = match read_value(path, false) {
+        Ok(value) => value,
         Err(msg) => return input_error(&msg),
     };
-    // `CadDocument1` only accepts `schema_version` "1.0", so a 2.0 file fails here.
-    let doc = match CadDocument1::from_json_str(&text) {
-        Ok(doc) => doc,
-        Err(err) => return input_error(&format!("{path}: {err}")),
-    };
-    let upgraded = upgrade_1_to_2(&doc);
-    finish(emit(&a, &to_canonical_json(&upgraded)))
+    // `upgrade` only accepts 1.0 (or no `schema_version`), so a 2.0 file fails here.
+    match call(path, CoreRequest::Upgrade { document }) {
+        Ok(CoreResult::Upgrade(r)) => finish(emit(&a, &to_canonical_json(&r.document))),
+        Ok(_) => unexpected_result(),
+        Err(code) => code,
+    }
 }
 
 /// `downgrade <spec-2.0.json> [--strip-example-keys] [--out <file>]`
@@ -190,11 +204,17 @@ fn cmd_downgrade(args: &[String]) -> ExitCode {
         Ok(a) => a,
         Err(code) => return code,
     };
-    let doc = match load_v2(&a.positional[0], a.has("--strip-example-keys")) {
-        Ok(doc) => doc,
+    let path = &a.positional[0];
+    let document = match read_value(path, a.has("--strip-example-keys")) {
+        Ok(value) => value,
         Err(msg) => return input_error(&msg),
     };
-    match downgrade_2_to_1(&doc) {
+    let doc1: Option<CadDocument1> = match call(path, CoreRequest::Downgrade { document }) {
+        Ok(CoreResult::Downgrade(r)) => r.document,
+        Ok(_) => return unexpected_result(),
+        Err(code) => return code,
+    };
+    match doc1 {
         Some(doc1) => finish(emit(&a, &to_canonical_string(&doc1))),
         None => {
             eprintln!("promptcad-core: document cannot be expressed as CadDocument 1.0");
@@ -211,7 +231,12 @@ fn cmd_normalize(args: &[String]) -> ExitCode {
         Ok(a) => a,
         Err(code) => return code,
     };
-    let mut doc = match load_v2(&a.positional[0], a.has("--strip-example-keys")) {
+    let path = &a.positional[0];
+    // Unlike the `normalize` API op (which also accepts 1.0 and recomputes `root`), this
+    // subcommand only accepts 2.0 and only recomputes bindings (its output is unchanged).
+    let mut doc: CadDocument2 = match read_value(path, a.has("--strip-example-keys"))
+        .and_then(|value| api::parse_document_v2(value).map_err(|e| describe_error(path, &e)))
+    {
         Ok(doc) => doc,
         Err(msg) => return input_error(&msg),
     };
@@ -232,8 +257,9 @@ fn cmd_apply_patch(args: &[String]) -> ExitCode {
         Ok(a) => a,
         Err(code) => return code,
     };
-    let doc = match load_v2(&a.positional[0], false) {
-        Ok(doc) => doc,
+    let path = &a.positional[0];
+    let document = match read_value(path, false) {
+        Ok(value) => value,
         Err(msg) => return input_error(&msg),
     };
     let patch_path = &a.positional[1];
@@ -241,6 +267,8 @@ fn cmd_apply_patch(args: &[String]) -> ExitCode {
         Ok(text) => text,
         Err(msg) => return input_error(&msg),
     };
+    // Schema-checked here (exit 2 on violations, as before), whereas the API rejects such a
+    // patch as `schema_invalid`.
     let patch = match Patch::from_json_str(&patch_text) {
         Ok(patch) => patch,
         Err(err) => return input_error(&format!("{patch_path}: {err}")),
@@ -250,12 +278,24 @@ fn cmd_apply_patch(args: &[String]) -> ExitCode {
     } else {
         PatchOrigin::Agent(patch.agent)
     };
+    let request = CoreRequest::ApplyPatch {
+        document,
+        patch: to_canonical_value(&patch),
+        origin,
+        timestamp: None,
+        log_seq: 0,
+    };
+    let outcome = match call(path, request) {
+        Ok(CoreResult::ApplyPatch(r)) => r.outcome,
+        Ok(_) => return unexpected_result(),
+        Err(code) => return code,
+    };
 
-    match apply_patch(&doc, &patch, origin) {
-        PatchOutcome::Accepted(accepted) => {
+    match outcome {
+        PatchOutcomeView::Accepted(accepted) => {
             finish(emit(&a, &to_canonical_json(&accepted.document)))
         }
-        PatchOutcome::Rejected(rejected) => {
+        PatchOutcomeView::Rejected(rejected) => {
             let body = json!({
                 "accepted": false,
                 "reason": {
@@ -338,43 +378,79 @@ fn read_input(path: &str) -> Result<String, String> {
 }
 
 /// Reads and parses a JSON document, removing example-only keys when `strip` is set.
-fn read_value(path: &str, strip: bool) -> Result<(String, Value), String> {
+fn read_value(path: &str, strip: bool) -> Result<Value, String> {
     let text = read_input(path)?;
     let mut value: Value =
         serde_json::from_str(&text).map_err(|err| format!("{path}: invalid JSON: {err}"))?;
     if strip {
         strip_example_keys(&mut value);
     }
-    Ok((text, value))
+    Ok(value)
 }
 
-/// Parses a CadDocument 2.0 document.
-fn load_v2(path: &str, strip: bool) -> Result<CadDocument2, String> {
-    let (_, value) = read_value(path, strip)?;
-    let version = value.get("schema_version").and_then(Value::as_str);
-    if version != Some("2.0") {
-        return Err(format!(
-            "{path}: expected schema_version \"2.0\", found {}",
-            version.map_or_else(|| "none".to_owned(), |v| format!("\"{v}\""))
-        ));
+/// Runs one API request; a request-level error becomes an input error (exit 2) whose message
+/// names `path`.
+fn call(path: &str, request: CoreRequest) -> Result<CoreResult, ExitCode> {
+    match api::handle(request) {
+        CoreResponse::Ok { result } => Ok(result),
+        CoreResponse::Error(err) => Err(input_error(&describe_error(path, &err))),
     }
-    CadDocument2::from_value(value).map_err(|err| format!("{path}: {err}"))
 }
 
-/// Parses a document of either version into the 2.0 model: 1.0 documents are upgraded.
-fn load_any(path: &str, strip: bool) -> Result<CadDocument2, String> {
-    let (text, value) = read_value(path, strip)?;
-    match value.get("schema_version").and_then(Value::as_str) {
-        Some("1.0") => {
-            let doc1 =
-                CadDocument1::from_json_str(&text).map_err(|err| format!("{path}: {err}"))?;
-            Ok(upgrade_1_to_2(&doc1))
+fn describe_error(path: &str, err: &CoreError) -> String {
+    format!("{path}: {}", err.message)
+}
+
+fn unexpected_result() -> ExitCode {
+    eprintln!("promptcad-core: internal error: unexpected result kind");
+    ExitCode::from(1)
+}
+
+/// `rpc`: one JSON request on stdin, one JSON response line on stdout (`promptcad_core::api`).
+///
+/// Exit 0 whenever a response was written (including `"status": "error"` responses), 1 when
+/// stdout cannot be written, 2 on usage errors or unreadable stdin. Input beyond
+/// [`MAX_REQUEST_BYTES`] is drained and answered with `too_large`; non-UTF-8 input with
+/// `bad_request`.
+fn cmd_rpc(args: &[String]) -> ExitCode {
+    match args.first().map(String::as_str) {
+        None => {}
+        Some("-h" | "--help") => {
+            print!("{USAGE}");
+            return ExitCode::SUCCESS;
         }
-        Some("2.0") => CadDocument2::from_value(value).map_err(|err| format!("{path}: {err}")),
-        other => Err(format!(
-            "{path}: unsupported schema_version {}",
-            other.map_or_else(|| "(none)".to_owned(), |v| format!("\"{v}\""))
-        )),
+        Some(other) => return usage_error(&format!("`rpc` takes no arguments, got `{other}`")),
+    }
+    let limit = MAX_REQUEST_BYTES as u64;
+    let mut bytes = Vec::new();
+    let mut stdin = io::stdin().lock();
+    if let Err(err) = (&mut stdin).take(limit + 1).read_to_end(&mut bytes) {
+        return input_error(&format!("cannot read stdin: {err}"));
+    }
+    let response = if bytes.len() as u64 > limit {
+        // Drain the rest so the writer never sees a broken pipe, counting the total size.
+        match io::copy(&mut stdin, &mut io::sink()) {
+            Ok(rest) => {
+                let total = bytes
+                    .len()
+                    .saturating_add(usize::try_from(rest).unwrap_or(usize::MAX));
+                CoreResponse::Error(api::too_large(total)).to_json()
+            }
+            Err(err) => return input_error(&format!("cannot read stdin: {err}")),
+        }
+    } else {
+        match String::from_utf8(bytes) {
+            Ok(text) => api::handle_json(&text),
+            Err(_) => CoreResponse::Error(api::bad_request("request is not valid UTF-8")).to_json(),
+        }
+    };
+    let mut stdout = io::stdout().lock();
+    match writeln!(stdout, "{response}").and_then(|()| stdout.flush()) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => {
+            eprintln!("promptcad-core: cannot write stdout: {err}");
+            ExitCode::from(1)
+        }
     }
 }
 
@@ -424,11 +500,23 @@ fn schema_files() -> Vec<(&'static str, String)> {
             "validation-report.schema.json",
             render::<ValidationReport>(),
         ),
+        (
+            "core-request.schema.json",
+            render_schema(api::request_schema()),
+        ),
+        (
+            "core-response.schema.json",
+            render_schema(api::response_schema()),
+        ),
     ]
 }
 
 fn render<T: schemars::JsonSchema>() -> String {
-    let value: Value = serde_json::to_value(schemars::schema_for!(T)).expect("schema is JSON");
+    render_schema(schemars::schema_for!(T))
+}
+
+fn render_schema(schema: schemars::Schema) -> String {
+    let value: Value = serde_json::to_value(schema).expect("schema is JSON");
     // serde_json maps are sorted, so the output is deterministic.
     let mut text = serde_json::to_string_pretty(&value).expect("JSON value serializes");
     text.push('\n');

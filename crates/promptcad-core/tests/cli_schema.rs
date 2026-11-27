@@ -4,12 +4,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-const FILES: [&str; 5] = [
+const FILES: [&str; 7] = [
     "cad-document-2.schema.json",
     "patch.schema.json",
     "cad-document-1.schema.json",
     "resolved.schema.json",
     "validation-report.schema.json",
+    "core-request.schema.json",
+    "core-response.schema.json",
 ];
 
 /// A scratch directory under the system temp dir, removed on drop.

@@ -130,6 +130,30 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .downloads .download { display:inline-flex; align-items:baseline; gap:6px; color:#dbe8ff; border:1px solid var(--line); background:#121d32; padding:8px 10px; border-radius:10px; font-size:.82rem; font-weight:700; }
 .downloads .download small { color: var(--muted); font-weight:600; font-size:.7rem; }
 .downloads .download.bundle { border-color: rgba(143,180,255,.45); }
+.component-tree { margin-top:14px; }
+.ct-list { list-style:none; margin:6px 0 0; padding:0 0 0 16px; display:grid; gap:6px; border-left:1px solid var(--line); }
+.ct-list.ct-root { padding-left:0; border-left:0; }
+.ct-node { display:flex; flex-wrap:wrap; align-items:baseline; gap:8px; font-size:.88rem; }
+.ct-tag { display:inline-block; border:1px solid var(--line); border-radius:999px; padding:1px 8px; margin-right:4px; font-size:.7rem; font-weight:800; color:var(--accent); }
+.ct-tag.warn { color: var(--accent-2); border-color: rgba(240,179,106,.45); }
+.ct-label { color:#cad5e8; font-size:.84rem; }
+.ct-op { display:inline-block; min-width:1.6em; text-align:center; font-weight:900; font-size:.78rem; margin-right:6px; color:var(--ok); }
+.ct-op.cut { color: var(--danger); }
+.ct-op.intersect { color: var(--accent-2); }
+.ct-body-ops > li { display:flex; align-items:baseline; gap:2px; }
+.ct-component { flex:1; min-width:0; border:1px solid var(--line); border-radius:10px; padding:6px 10px; background:var(--panel-2); font-size:.84rem; }
+.ct-component > summary { cursor:pointer; }
+.ct-body { margin-top:8px; display:grid; gap:8px; }
+.ct-table { border-collapse:collapse; width:100%; font-size:.8rem; }
+.ct-table th, .ct-table td { text-align:left; padding:3px 8px; border-bottom:1px solid var(--line); font-weight:600; }
+.ct-table thead th { color:var(--muted); font-size:.7rem; letter-spacing:.06em; }
+.ct-ports { margin:0; display:flex; flex-wrap:wrap; gap:6px; align-items:baseline; font-size:.8rem; }
+.ct-port small { color:var(--muted); margin-left:4px; font-size:.68rem; }
+.ct-repeated > .ct-node { opacity:.75; font-style:italic; }
+.ct-heading { margin:14px 0 4px; font-size:.95rem; }
+.ct-constraints { font-size:.84rem; }
+.core-note { margin:10px 0 0; color:var(--accent-2); font-size:.82rem; }
+.issue .msg .issue-ref { color:var(--muted); font-size:.72rem; }
 .spec-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
 .job { text-align:left; font:inherit; color:var(--text); font-weight:400; }
 .job.active { border-color: var(--accent-2); }

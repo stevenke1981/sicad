@@ -7,13 +7,13 @@
 
 use std::fmt;
 
-use schemars::{json_schema, Schema, SchemaGenerator};
+use schemars::{json_schema, JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 
 use super::geom::MAX_DIMENSION_MM;
 
 /// One schema-level violation (range, length, list cap, cross-field shape rule, …).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SchemaViolation {
     /// JSON pointer to the offending value (`""` for the document root).

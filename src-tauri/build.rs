@@ -12,9 +12,11 @@ fn main() {
 
     tauri_build::try_build(
         tauri_build::Attributes::new()
-            // Explicit app-command ACL: generates the `allow-backend-info` permission that
+            // Explicit app-command ACL: generates the `allow-backend-info` and `allow-core-request` permissions that
             // capabilities/default.json grants. Commands not listed here are unreachable.
-            .app_manifest(tauri_build::AppManifest::new().commands(&["backend_info"])),
+            .app_manifest(
+                tauri_build::AppManifest::new().commands(&["backend_info", "core_request"]),
+            ),
     )
     .expect("failed to run tauri-build");
 }

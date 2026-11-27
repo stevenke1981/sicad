@@ -32,6 +32,25 @@
 - 乾淨機器驗證以 `desktop-bundle.yml` 的實際執行結果為準：2026-11-26 於 GitHub `windows-latest`（Windows Server 2025，4 CPU）首次執行 [run 45723089074](https://github.com/stevenke1981/sicad/actions/runs/45723089074) 全數通過：建置與安裝後的 sidecar 皆在 isolated env 下通過 smoke（各觀察到 7 個 render worker，`foreign_processes=[]`）；安裝 sidecar 的 Job Object 中斷檢查 `KILL_CHECK_OK`；強制結束已安裝的 `promptcad-studio.exe` 後 sidecar 於 0.007 秒內結束（`job.rs` 實證，此步驟已改為必過）；安裝目錄含 `THIRD_PARTY_NOTICES.md`。量測：安裝檔 107.5 MiB、安裝後 554.1 MiB、READY 0.64–0.66 s、warm render 2.38 s、端到端 generate 2.42 s。
 - 檢視器只支援 STL；GLB、元件選取與 port 圖層尚未實作。
 
+## Unreleased / Phase 2b：Rust core 接入 Tauri 與伺服器
+
+這是 [ADR 0010](docs/adr/0010-migration-phases.md) 第 2 階段的第二個切片，尚未發佈；第 2 階段尚未結束（見 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)）。伺服器宿主形式見 [ADR 0012](docs/adr/0012-server-host-for-rust-core.md)，待負責人簽核。
+
+新增：
+
+- **單一契約**：`promptcad_core::api`（`CoreRequest`、`CoreResponse`）與命令列子命令 `promptcad-core rpc`（stdin 讀一個 JSON 請求，stdout 寫一行回應）。請求與回應的 JSON Schema 為 `schemas/cad2/core-request.schema.json`、`core-response.schema.json`。
+- **桌面版**：Tauri 命令 `core_request` 在行程內呼叫 Rust core。
+- **伺服器**：`POST /api/v1/core` 每次呼叫啟動一次 `promptcad-core rpc`，回應位元組原樣回傳；`/api/v1/capabilities` 新增 `core_available`、`core_crate_version`、`core_api_version`、`core_schema_versions`；新增設定 `PROMPTCAD_CORE_BIN`、`PROMPTCAD_CORE_TIMEOUT_SECONDS`、`PROMPTCAD_CORE_MAX_REQUEST_BYTES`。
+- **編輯器**：2.0 文件的「驗證 JSON」經 core；唯讀元件樹顯示組裝、零件、body 操作、元件（欄位、綁定、port）與約束。
+- **Docker**：新增 `rust:1.90.0-slim-trixie` 建置階段，映像內含 `/usr/local/bin/promptcad-core`。
+
+已知限制：
+
+- 2.0 文件目前不能輸出幾何（幾何編譯器尚不接受 2.0；前端已停用該操作）。
+- 元件樹為唯讀；尚無 patch 或 op log 介面；2.0 文件與 `oplog.jsonl` 未在 jobs 中持久化；檢視器無元件選取。
+- Docker 映像建置、Tauri `invoke` 在真實 WebView 內的往返與完整 `tauri build` 尚未驗證。
+- Python 設計驗證器尚未移除；schema 來源仍為 1.0 的 Pydantic 模型。
+
 ## Unreleased / Phase 2a：Rust core
 
 這是 [ADR 0010](docs/adr/0010-migration-phases.md) 第 2 階段的第一個切片，尚未發佈；第 2 階段尚未結束（見 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)）。
@@ -39,11 +58,11 @@
 新增：
 
 - **`crates/promptcad-core/`**：獨立的 Rust library crate（不依賴 Tauri），依 [`docs/CAD_DSL_2.md`](docs/CAD_DSL_2.md) 實作 CadDocument 2.0 型別、運算式與綁定、port 表與求解器、分層驗證器、patch 引擎（含權限矩陣與復原）、op log、1.0 ↔ 2.0 轉接，以及 `promptcad-core` 命令列工具。驗證：`cd crates/promptcad-core && cargo test`。
-- **`schemas/cad2/`**：由 Rust 型別生成的 JSON Schema；`ci.yml` 新增 `core` job（fmt、clippy、test、schema 漂移檢查），該 job 尚未在 GitHub 上執行過。
+- **`schemas/cad2/`**：由 Rust 型別生成的 JSON Schema；`ci.yml` 新增 `core` job（fmt、clippy、test、schema 漂移檢查），該 job 已於 PR #5 在 GitHub 上執行並通過。
 
 已知限制：
 
-- Rust core 尚未被 Tauri 外殼或 FastAPI 呼叫；應用程式與 Python 編譯器仍只接受 1.0。
+- （2b 已接入，見下節）Python 編譯器仍只接受 1.0。
 - Schema 來源尚未切換（仍是 `app/models/cad.py`），2.0 的 Pydantic／TypeScript 生成型別尚不存在。
 - Python `DesignValidator` 未移除；幾何等價測試、前端元件樹與 port 顯示尚未進行。
 

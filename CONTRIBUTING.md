@@ -12,4 +12,6 @@ pytest
 
 修改 `crates/promptcad-core/`（Rust core）時，另在該目錄執行 `cargo fmt --check`、`cargo clippy --all-targets -- -D warnings` 與 `cargo test`。
 
+修改 `crates/promptcad-core/src/api.rs` 或 Rust 型別後，請重新生成 `schemas/cad2/`（`cargo run -- schema --out-dir ../../schemas/cad2`），並在 `web/` 執行 `npm run gen:types`，一併提交生成檔。伺服器的整合測試需要 `promptcad-core` 執行檔，可先執行 `make core`。
+
 提交內容不要包含 API Key、私有模型、加工客戶資料或 `generated/` 產物。

@@ -7,6 +7,7 @@
 //! typed round trip `CadDocument2 → JSON → CadDocument2` is lossless (`float_roundtrip`), and
 //! keys are compared by their serialized text, so even `-0.0` vs `0.0` is preserved.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -14,10 +15,11 @@ use crate::canonical::to_canonical_value;
 use crate::model::v2::CadDocument2;
 
 /// Previous values of the top-level keys a patch changed.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Revert {
-    /// Top-level key → value before the patch.
+    /// Top-level key → value before the patch (raw JSON: each value is the previous
+    /// canonical value of that top-level CadDocument 2.0 key).
     pub sections: Map<String, Value>,
 }
 

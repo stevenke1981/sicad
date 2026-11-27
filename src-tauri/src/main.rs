@@ -1,6 +1,7 @@
 // Release builds must not open a console window next to the app on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod core;
 #[cfg(windows)]
 mod job;
 mod sidecar;
@@ -124,7 +125,7 @@ fn main() {
 
     let app = tauri::Builder::default()
         .manage(Arc::clone(&backend))
-        .invoke_handler(tauri::generate_handler![backend_info])
+        .invoke_handler(tauri::generate_handler![backend_info, core::core_request])
         .setup(|app| {
             let backend = Arc::clone(app.state::<Arc<Backend>>().inner());
             let app_data_dir = app.path().app_data_dir()?;

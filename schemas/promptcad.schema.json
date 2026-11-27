@@ -181,6 +181,42 @@
           "title": "Configured Render Backend",
           "type": "string"
         },
+        "core_api_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Core Api Version"
+        },
+        "core_available": {
+          "default": false,
+          "title": "Core Available",
+          "type": "boolean"
+        },
+        "core_crate_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Core Crate Version"
+        },
+        "core_schema_versions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Core Schema Versions",
+          "type": "array"
+        },
         "formats": {
           "items": {
             "type": "string"

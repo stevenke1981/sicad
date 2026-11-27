@@ -190,6 +190,10 @@ export interface CapabilityResponse {
   cadquery_available: boolean;
   configured_planner_mode: string;
   configured_render_backend: string;
+  core_api_version?: number | null;
+  core_available?: boolean;
+  core_crate_version?: string | null;
+  core_schema_versions?: string[];
   formats: string[];
   hole_types: string[];
   openscad_available: boolean;

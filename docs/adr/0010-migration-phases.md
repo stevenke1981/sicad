@@ -224,3 +224,22 @@
 - 核心層（kernel）驗證代碼未實作，屬於 sidecar 的工作。
 
 結論：第 2 階段尚未結束，本 ADR 的階段順序不變。下一步依序為把 Rust core 接進 Tauri 命令並以新 ADR 決定伺服器宿主、切換 schema 來源並生成 Pydantic／TypeScript、讓 Python 編譯器接受 2.0 並完成幾何等價測試，之後才移除 Python 驗證器並開始前端元件樹。
+
+### 2026-11-26：第 2 階段 2b — Rust core 接入 Tauri 與伺服器
+
+2b 的內容與細節見 `PROJECT_STATUS.md` 的「第 2 階段 2b 切片」。逐項對照第 2 階段的完成條件：
+
+- **所有 `examples/generated/` 的 1.0 文件經 adapter 後輸出等價幾何**：**仍為部分達成**。2b 未新增幾何等價測試；Python 編譯器仍不接受 2.0。
+- **Python 與 Rust 驗證器判定一致後，移除 Python 端的設計驗證邏輯**：**未達成**。`app/services/validator.py` 仍是 1.0 的實際驗證器；2.0 的驗證走 `POST /api/v1/core`，但 1.0 路徑未改。
+- **CI 的 schema 生成比對檢查已啟用**：**部分達成**。Rust → `schemas/cad2/` 的漂移檢查在 `core` job；2.0 的 core 請求／回應 TypeScript 型別由 `web` job 檢查漂移。Pydantic 生成物仍不存在。CI 在 GitHub 上的執行結果本紀錄撰寫時未確認。
+- **REST API 與 CLI 在伺服器模式下仍可用**：**已確認的部分**。`docs/API.md` 既有端點與 CLI 的 1.0 流程未變動，並新增 `POST /api/v1/core`。本次未確認應用程式是否對 1.0 文件走 core 的 `upgrade` 操作；core 本身提供該操作。
+
+第 2 階段「內容」的狀態：
+
+- **Rust core 接入 Tauri 與伺服器**：**已完成**（Tauri 命令 `core_request` 與 `POST /api/v1/core`，宿主形式見 [0012](0012-server-host-for-rust-core.md)，待負責人簽核）。
+- **伺服器宿主形式（新增 ADR）**：**已記錄**，[0012](0012-server-host-for-rust-core.md) 待簽核。
+- **前端**：**部分完成**。唯讀元件樹已完成；屬性編輯、檢視器元件選取與 port 顯示尚未開始。
+- **Schema 來源切換為 Rust**：**未達成**。來源仍是 `app/models/cad.py`；2.0 的 Pydantic 生成型別不存在；TypeScript 的 core 請求／回應型別已生成。
+- **編譯器改為接受 2.0 的已驗證規格**：**未達成**。2.0 文件的輸出在前端停用。
+
+結論：第 2 階段尚未結束，階段順序不變。2b 之後的剩餘項目與驗證缺口見 `PROJECT_STATUS.md`。
