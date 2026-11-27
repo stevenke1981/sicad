@@ -841,3 +841,4 @@ schema 子集只是降低產生錯誤的機率；**權限仍由協調器依 §8.
 - **數值約束求解器**：第 3 階段依 ADR 0007 評估 planegcs 與 libslvs；本文 §5.5 是其前處理層與軸對齊文件的規範行為。
 - **Line／Plane 升維鏈的細節**（`arc` 的平面判定、`revolve` 的完整埠表）在第 4 階段（概念文件 §13）實作前可再細化，但不得改變本文已列出的埠名與欄位名。
 - **新增 op 或代碼**只能追加，不得改變既有 op、欄位與代碼的意義。
+- **實作註記（第 2 階段 2d，非規格）**：`Cad2Compiler`（`app/services/compiler2.py`）依 §5.6 的 `resolved` 與 §7.2 實作，只讀取 core 的 `validate` 結果。已於 CadQuery 2.8.0 實測的呼叫：`cq.Plane(origin=, xDir=, normal=).location`、`Shape.moved(loc)`、`Workplane('XY').newObject([shape])`（plane 的 yDir 等於 core 的 z×x）、`Workplane.cut／union／intersect`（接受 Solid 或 Workplane）、`cq.Compound.makeCompound(list)` 包成 `newObject` 後匯出 STEP 並對 compound 呼叫 `.section(z)`、`Solid.makeCylinder`、`Solid.makeCone(r1, r2, h, pnt, dir)`、`Shape.Volume()`、`BoundingBox()`、`Center()`、`isValid()`。§6.2 的零件座標系與 `cq.Location` 組裝尚未實作；2.0 幾何目前在世界座標建立（已知偏差）。支援與不支援的構造見 `PROJECT_STATUS.md` 的「第 2 階段 2d 切片」。

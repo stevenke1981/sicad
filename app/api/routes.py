@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from app.core.security import require_api_token, safe_job_file, validate_job_id
 from app.models.api import (
     CapabilityResponse,
+    GenerateFromDocumentRequest,
     GenerateFromSpecRequest,
     GenerateRequest,
     JobListItem,
@@ -143,6 +144,20 @@ async def generate_from_spec(request: Request, body: GenerateFromSpecRequest):
         with core_http_errors():
             return await _service(request).generate_from_spec(
                 body.spec,
+                body.formats,
+                body.render,
+            )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/generate-from-document", response_model=JobManifest)
+async def generate_from_document(request: Request, body: GenerateFromDocumentRequest):
+    """Generate geometry from a CadDocument 2.0 (ADR 0010); 422 for a rejected document."""
+    try:
+        with core_http_errors():
+            return await _service(request).generate_from_document(
+                body.document,
                 body.formats,
                 body.render,
             )

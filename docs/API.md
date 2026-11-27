@@ -74,6 +74,36 @@
 }
 ```
 
+## `POST /generate-from-document`（第 2 階段 2d）
+
+將 CadDocument 2.0 經 Rust core 的 `validate` 驗證後輸出幾何。請求本文為完整的 2.0 文件（`document`）、`formats` 與 `render`。
+
+```json
+{
+  "document": {"schema_version": "2.0", "...": "..."},
+  "formats": ["step", "stl", "dxf", "svg"],
+  "render": true
+}
+```
+
+| HTTP | 情況 |
+|---|---|
+| `200`，`completed`／`source_only` | 工作成功。`render=true` 且有 CadQuery 時為 `completed`，否則 `source_only`。產物：`spec.json`（core 正規化的文件）、`validation.json`、`resolved.json`、`model.py`；有 CadQuery 時另有 STEP、STL、DXF、SVG。不產生 `model.scad` 與 `preview.svg` |
+| `200`，`failed`，`renderer_used="validation-blocked"` | core 驗證報告不合法。不產生 `model.py`，但仍寫入 `resolved.json` |
+| `200`，`failed`，`renderer_used="compile-unsupported"` | 文件含不支援的構造。`error` 列出每個 id 與原因（例如 `extrude`、`revolve`、Empty 的 `of`、旋轉零件上的圓角） |
+| `422` | core 拒絕文件（`detail` 含 core 的代碼，例如 `invalid_document`，與路徑）；或 `schema_version` 不是 `"2.0"`（此時不呼叫 core） |
+| `503` | core 不可用，或 core 忙碌（附 `Retry-After`） |
+| `504` | core 逾時 |
+| `502` | core 行程失敗 |
+
+其他行為：
+
+- `planner_used` 為 `manual-dsl`，`prompt` 為文件的 `source_prompt`。
+- 2.0 不回退到 OpenSCAD。無 CadQuery 時為 `source_only`，並附固定警告。
+- 本端點不移除 `expected_resolved`（僅範例使用的欄位）；用戶端必須自行移除。CLI 會移除。
+- 工作 manifest 新增 `spec_version`（`"1.0"`／`"2.0"`，預設 `"1.0"`）與 `document`（2.0 時為 core 正規化的文件）；`spec` 改為可為 null。舊的 manifest 仍可讀取。
+- 支援與不支援的構造見 `PROJECT_STATUS.md` 的「第 2 階段 2d 切片」。
+
 ## `POST /validate`
 
 Body 是完整 `CadDocument`。回傳：
@@ -117,7 +147,7 @@ CadDocument 2.0 的唯一入口：把請求原封不動轉交給 Rust core（`pr
 再把 core 的回應原封不動回傳。伺服器**不**解讀、驗證或重新序列化 2.0 內容（ADR 0008 規則 4）；
 `validate`、`solve`、`normalize`、`upgrade`、`downgrade`、`apply_patch`、`describe`、`version` 等 `op`
 的欄位與回應內容請見 [`crates/promptcad-core/README.md`](../crates/promptcad-core/README.md)。
-本端點與 `/validate`、`/generate-from-spec` 無關，後兩者仍只接受 1.0 文件。
+本端點與 `/validate`、`/generate-from-spec`、`/generate-from-document` 無關。`/validate` 與 `/generate-from-spec` 只接受 1.0 文件；2.0 文件的生成改用 `/generate-from-document`（見下節）。
 
 請求：JSON 物件（以 `op` 標記），例如 `{"op": "version"}`。文件中的範例專用鍵 `expected_resolved` 需由呼叫端先移除。
 
@@ -189,6 +219,6 @@ curl http://localhost:8000/api/v1/capabilities \
 - `401`：Token 缺少或錯誤。
 - `404`：工作或檔案不存在，或識別碼／檔名不符合安全格式。
 - `413`：僅 `POST /core`，見該節。
-- `502`、`503`、`504`：`POST /core`，以及所有 1.0 驗證端點（見「1.0 驗證的執行位置」）。
+- `502`、`503`、`504`：`POST /core`、`POST /generate-from-document`，以及所有 1.0 驗證端點（見「1.0 驗證的執行位置」）。
 - `422`：Prompt、DSL、格式或 LLM 規劃結果不符合 schema。
 - HTTP `200` 且 manifest `status=failed`：工作已被記錄，但驗證閘門阻止渲染；請查看 `validation.issues`。

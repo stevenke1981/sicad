@@ -123,3 +123,14 @@
 - **隨安裝包發佈**：`tauri.conf.json` 的 `bundle.resources` 新增 `"../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"`，安裝後位於 `<安裝目錄>\THIRD_PARTY_NOTICES.md`；`desktop-bundle.yml` 在 `tauri build` 前以 `--strict` 自 `.venv-desktop` 重新產生並上傳，安裝後檢查該檔存在且大於 10 KB。
 - **交叉核對**：以 PyInstaller 的分析結果（`build/sidecar/work/*/PYZ-00.toc`、`COLLECT-00.toc`）核對，凍結內容中的每個套件都列在聲明檔中；`setuptools`（含 `_vendor`）實際被凍結，因此列入而不視為建置工具。
 - 本聲明檔是授權資訊彙整，不是法律意見；公開發佈前仍建議由負責人複核「需特別留意的授權」表（GPL／LGPL／MPL／EPL／CDDL）。
+
+### 2026-11-27：2.0 幾何編譯器與輸出契約（第 2 階段 2d）
+
+- **編譯器只讀 `resolved`**：2.0 幾何由 `Cad2Compiler`（`app/services/compiler2.py`）產生。它讀取 Rust core 驗證結果中的 `document` 與 `resolved`：零件依 `resolved.components` 剛體放置，主孔切刀依 `resolved.holes`，沉頭與埋頭的入口依 `resolved.ports["<id>.entry"]` 以 §7.2 算術計算。Python 不做任何求解。產生的程式碼不含文件文字（以索引命名、數值經 `float` 輸出、軸向以固定表格對應），輸出確定性。
+- **未選「降級後交給 1.0 編譯器」**：降級會讓等價測試變成同義反覆；降級不保留幾何（沿軸向的入口被投影到 0）；且無法表達多零件文件（enclosure-with-lid 為 `expressible: false`）。降級保留為測試參照（oracle）。
+- **輸出契約不變**：`model.py` 維持 1.0 的契約（`build() -> (result, warnings)`、`export_all`、`--output-dir`／`--formats`、`render-warnings.json`）。renderer 與 render worker 未改動。
+- **2.0 不使用 OpenSCAD**：2.0 呼叫 `Renderer.render(allow_openscad=False)`。無 CadQuery 時回 `source_only` 並附固定警告，不產生 `model.scad` 與 `preview.svg`。
+- **無法編譯的構造明確拒絕**：不支援的構造拋出 `CompileUnsupported`，列出所有 `(id, 原因)`，工作狀態為 `failed`／`compile-unsupported`，不會靜默略過。
+- **已知偏差**：2.0 幾何在世界座標建立，不採用 [CAD_DSL_2](CAD_DSL_2.md) §6.2 的零件座標系與 `cq.Location` 組裝（延後）。
+- **通孔切刀方向**：非盲孔的主切刀由負端沿正向軸建立（1.0 的形式）。改用另一種參數化時，`cylinder_y_axis_outside` 的 OCC 體積積分相對差異為 3.3e-6。
+- **本機證據**：`scripts/geometry_equivalence.py` 的 54 個唯一案例全數與 1.0 等價（見 [0010](0010-migration-phases.md) 的 2d 回顧）；CI 結果待確認。

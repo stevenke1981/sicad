@@ -4,11 +4,13 @@ import asyncio
 import mimetypes
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from app.core.config import Settings
 from app.models.api import Artifact, JobListItem, JobManifest, PlanResponse
 from app.models.cad import CadDocument, ValidationReport
 from app.services.compiler import CadQueryCompiler
+from app.services.compiler2 import Cad2Compiler, CompileUnsupported
 from app.services.core_bridge import CoreBridge
 from app.services.core_validator import CoreValidator
 from app.services.openscad import OpenScadCompiler
@@ -25,6 +27,7 @@ class JobService:
         self.core = core if core is not None else CoreBridge(settings)
         self.core_validator = CoreValidator(self.core)
         self.compiler = CadQueryCompiler()
+        self.compiler2 = Cad2Compiler()
         self.openscad = OpenScadCompiler()
         self.preview = SvgPreview()
         self.storage = JobStorage(settings)
@@ -90,10 +93,6 @@ class JobService:
     ) -> JobManifest:
         job_id, job_dir = self.storage.create()
         created_at = datetime.now(UTC).isoformat()
-        warnings: list[str] = []
-        error: str | None = None
-        renderer_used = "not-run"
-        status = "source_only"
 
         self.storage.write_json(job_dir / "spec.json", spec.model_dump(mode="json"))
         self.storage.write_json(
@@ -104,6 +103,87 @@ class JobService:
         self.storage.write_text(job_dir / "model.scad", self.openscad.compile(spec))
         self.preview.write(spec, job_dir / "preview.svg")
 
+        return await self._finish(
+            job_id=job_id,
+            job_dir=job_dir,
+            created_at=created_at,
+            validation=validation,
+            prompt=prompt,
+            planner_used=planner_used,
+            formats=formats,
+            render=render,
+            payload={"spec": spec},
+        )
+
+    async def generate_from_document(
+        self,
+        document: dict[str, Any],
+        formats: list[str],
+        render: bool,
+    ) -> JobManifest:
+        """Generate from a CadDocument 2.0 (ADR 0010): the core resolves, Python only emits."""
+        if document.get("schema_version") != "2.0":
+            raise ValueError(
+                "generate-from-document requires schema_version \"2.0\"; "
+                "use generate-from-spec for 1.0 documents"
+            )
+        report, resolved, canonical, _version = await self.core_validator.validate_document(
+            document
+        )
+        job_id, job_dir = self.storage.create()
+        created_at = datetime.now(UTC).isoformat()
+        self.storage.write_json(job_dir / "spec.json", canonical)
+        self.storage.write_json(job_dir / "validation.json", report.model_dump(mode="json"))
+        self.storage.write_json(job_dir / "resolved.json", resolved)
+
+        failure: tuple[str, str] | None = None
+        if report.valid:
+            try:
+                source = self.compiler2.compile(canonical, resolved)
+            except CompileUnsupported as exc:
+                detail = "; ".join(f"{item}: {reason}" for item, reason in exc.items)
+                failure = (
+                    "compile-unsupported",
+                    f"Cannot generate geometry for this document yet: {detail or exc}",
+                )
+            else:
+                self.storage.write_text(job_dir / "model.py", source)
+        prompt = canonical.get("source_prompt")
+        return await self._finish(
+            job_id=job_id,
+            job_dir=job_dir,
+            created_at=created_at,
+            validation=report,
+            prompt=prompt if isinstance(prompt, str) else "",
+            planner_used="manual-dsl",
+            formats=formats,
+            render=render,
+            payload={"spec_version": "2.0", "document": canonical},
+            failure=failure,
+            allow_openscad=False,
+        )
+
+    async def _finish(
+        self,
+        *,
+        job_id: str,
+        job_dir: Path,
+        created_at: str,
+        validation: ValidationReport,
+        prompt: str,
+        planner_used: str,
+        formats: list[str],
+        render: bool,
+        payload: dict[str, Any],
+        failure: tuple[str, str] | None = None,
+        allow_openscad: bool = True,
+    ) -> JobManifest:
+        """Shared tail: render (or explain why not), list artifacts, write the manifest."""
+        warnings: list[str] = []
+        error: str | None = None
+        renderer_used = "not-run"
+        status = "source_only"
+
         if not validation.valid:
             status = "failed"
             renderer_used = "validation-blocked"
@@ -113,9 +193,14 @@ class JobService:
                 for issue in validation.issues
                 if issue.severity.value == "error"
             )
+        elif failure is not None:
+            status = "failed"
+            renderer_used, error = failure
         elif render:
             try:
-                result = await asyncio.to_thread(self.renderer.render, job_dir, formats)
+                result = await asyncio.to_thread(
+                    self.renderer.render, job_dir, formats, allow_openscad
+                )
                 renderer_used = result.renderer
                 status = result.status
                 warnings.extend(result.warnings)
@@ -136,11 +221,11 @@ class JobService:
             planner_used=planner_used,
             renderer_used=renderer_used,
             requested_formats=list(dict.fromkeys(formats)),
-            spec=spec,
             validation=validation,
             artifacts=artifacts,
             warnings=warnings,
             error=error,
+            **payload,
         )
         self.storage.write_json(job_dir / "manifest.json", manifest.model_dump(mode="json"))
         return manifest
@@ -165,11 +250,18 @@ class JobService:
                     status=manifest.status,
                     created_at=manifest.created_at,
                     prompt=manifest.prompt,
-                    name=manifest.spec.name,
+                    name=self._manifest_name(manifest),
                     renderer_used=manifest.renderer_used,
                 )
             )
         return items
+
+    @staticmethod
+    def _manifest_name(manifest: JobManifest) -> str:
+        if manifest.spec is not None:
+            return manifest.spec.name
+        name = (manifest.document or {}).get("name")
+        return name if isinstance(name, str) else ""
 
     @staticmethod
     def _artifacts(job_id: str, job_dir: Path) -> list[Artifact]:

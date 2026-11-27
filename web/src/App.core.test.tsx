@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import type { ApiClient } from './api/client';
 import { CoreTransportError, type CoreClient, type CoreRequest } from './api/coreClient';
-import type { CapabilityResponse } from './api/types';
+import type { CapabilityResponse, JobManifest } from './api/types';
 import { plateDescribe, plateValidate } from './test/fixtures';
 
 const capabilities: CapabilityResponse = {
@@ -24,6 +24,7 @@ function mockApi(): ApiClient {
     plan: vi.fn(),
     generate: vi.fn(),
     generateFromSpec: vi.fn(),
+    generateFromDocument: vi.fn(),
     validate: vi.fn(async () => ({ valid: true, review_required: false, issues: [] })),
     listJobs: vi.fn(async () => []),
     getJob: vi.fn(),
@@ -58,7 +59,7 @@ function paste(value: unknown) {
 }
 
 describe('App with the Rust core', () => {
-  it('validates a 2.0 document through the core client, shows the tree and disables generate', async () => {
+  it('validates a 2.0 document through the core client, shows the tree and enables generate', async () => {
     const request = vi.fn(async (req: CoreRequest) =>
       req.op === 'describe' ? plateDescribe : plateValidate,
     );
@@ -66,8 +67,8 @@ describe('App with the Rust core', () => {
     paste(DOC_2_0);
 
     const regenerate = screen.getByRole('button', { name: '套用 JSON 並重新輸出' });
-    expect(regenerate).toBeDisabled();
-    expect(screen.getByTestId('no-generate-2')).toHaveTextContent('幾何編譯器尚未支援');
+    expect(regenerate).toBeEnabled();
+    expect(screen.queryByTestId('no-generate-2')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '驗證 JSON' }));
 
@@ -173,7 +174,7 @@ describe('App with the Rust core', () => {
     fireEvent.click(screen.getByRole('button', { name: '載入 2.0 範例' }));
     const text = (screen.getByLabelText('CAD DSL JSON') as HTMLTextAreaElement).value;
     expect(JSON.parse(text)).toMatchObject({ schema_version: '2.0' });
-    expect(screen.getByRole('button', { name: '套用 JSON 並重新輸出' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '套用 JSON 並重新輸出' })).toBeEnabled();
   });
   it('keeps a successful validate result when describe fails (transport error)', async () => {
     const request = vi.fn(async (req: CoreRequest) => {
@@ -276,5 +277,75 @@ describe('App with the Rust core', () => {
     await waitFor(() =>
       expect(screen.queryByRole('list', { name: '輸入警告' })).not.toBeInTheDocument(),
     );
+  });
+
+  const JOB_ID = '0123456789abcdef0123456789abcdef';
+  const manifest2 = (over: Partial<JobManifest> = {}): JobManifest => ({
+    job_id: JOB_ID,
+    status: 'source_only',
+    created_at: '2026-11-27T00:00:00Z',
+    prompt: 'x',
+    planner_used: 'manual-dsl',
+    renderer_used: 'cadquery',
+    requested_formats: ['stl'],
+    spec_version: '2.0',
+    document: { schema_version: '2.0', name: 'canonical-plate' },
+    validation: { valid: true, review_required: false, issues: [] },
+    artifacts: [],
+    warnings: [],
+    error: null,
+    ...over,
+  });
+
+  it('generates from a 2.0 document with the parsed document and loads the canonical one', async () => {
+    const request = vi.fn(async () => plateValidate);
+    const api = setup({ request });
+    vi.mocked(api.generateFromDocument).mockResolvedValue(manifest2());
+    paste(DOC_2_0);
+
+    fireEvent.click(screen.getByRole('button', { name: '套用 JSON 並重新輸出' }));
+
+    await waitFor(() => expect(api.generateFromDocument).toHaveBeenCalledTimes(1));
+    expect(api.generateFromDocument).toHaveBeenCalledWith({
+      document: { schema_version: '2.0', name: 'plate-four-holes' },
+      formats: expect.any(Array),
+      render: expect.anything(),
+    });
+    expect(api.generateFromSpec).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(JSON.parse((screen.getByLabelText('CAD DSL JSON') as HTMLTextAreaElement).value)).toEqual({
+        schema_version: '2.0',
+        name: 'canonical-plate',
+      }),
+    );
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the error of a failed (compile-unsupported) 2.0 job', async () => {
+    const api = setup({ request: vi.fn() });
+    vi.mocked(api.generateFromDocument).mockResolvedValue(
+      manifest2({
+        status: 'failed',
+        renderer_used: 'compile-unsupported',
+        error: '不支援的結構：extrude',
+      }),
+    );
+    paste(DOC_2_0);
+    fireEvent.click(screen.getByRole('button', { name: '套用 JSON 並重新輸出' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('不支援的結構：extrude'),
+    );
+    expect(screen.getByTestId('status')).toHaveTextContent('compile-unsupported');
+  });
+
+  it('warns about numbers JSON.stringify would alter when generating from 2.0', async () => {
+    const api = setup({ request: vi.fn(), verbatimDocuments: true });
+    vi.mocked(api.generateFromDocument).mockResolvedValue(manifest2());
+    paste(BIG);
+    fireEvent.click(screen.getByRole('button', { name: '套用 JSON 並重新輸出' }));
+
+    const warnings = await screen.findByRole('list', { name: '輸入警告' });
+    expect(warnings).toHaveTextContent('/revision：18446744073709551615 → 18446744073709552000');
   });
 });

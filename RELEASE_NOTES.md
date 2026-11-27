@@ -32,6 +32,27 @@
 - 乾淨機器驗證以 `desktop-bundle.yml` 的實際執行結果為準：2026-11-26 於 GitHub `windows-latest`（Windows Server 2025，4 CPU）首次執行 [run 45723089074](https://github.com/stevenke1981/sicad/actions/runs/45723089074) 全數通過：建置與安裝後的 sidecar 皆在 isolated env 下通過 smoke（各觀察到 7 個 render worker，`foreign_processes=[]`）；安裝 sidecar 的 Job Object 中斷檢查 `KILL_CHECK_OK`；強制結束已安裝的 `promptcad-studio.exe` 後 sidecar 於 0.007 秒內結束（`job.rs` 實證，此步驟已改為必過）；安裝目錄含 `THIRD_PARTY_NOTICES.md`。量測：安裝檔 107.5 MiB、安裝後 554.1 MiB、READY 0.64–0.66 s、warm render 2.38 s、端到端 generate 2.42 s。
 - 檢視器只支援 STL；GLB、元件選取與 port 圖層尚未實作。
 
+## Unreleased / Phase 2d：2.0 文件端到端輸出
+
+這是 [ADR 0010](docs/adr/0010-migration-phases.md) 第 2 階段的第四個切片，尚未發佈；第 2 階段尚未結束（見 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)）。
+
+新增：
+
+- **`Cad2Compiler`**（`app/services/compiler2.py`）：讀取 core 驗證後的 `resolved`，產生與 1.0 相同契約的 `model.py`。支援與不支援的構造見 `PROJECT_STATUS.md`；不支援者回 `compile-unsupported`，並列出每個 id 與原因。
+- **`POST /api/v1/generate-from-document`**：輸入 2.0 文件並輸出幾何。回應與錯誤見 [`docs/API.md`](docs/API.md)。工作 manifest 新增 `spec_version`、`document` 欄位，`spec` 改為可為 null；舊 manifest 仍可讀取。
+- **CLI**：`promptcad render` 與 `promptcad validate` 接受 2.0 檔案。
+- **前端**：2.0 文件的「套用 JSON 並重新輸出」已啟用；2.0 工作完成後編輯器顯示 core 正規化的文件。
+- **桌面版**：沿用同一 sidecar；`scripts/frozen_smoke.py` 新增兩份 `examples/cad2` 文件的 2.0 smoke 案例。
+- **幾何等價 harness**：`scripts/geometry_equivalence.py`（`make geometry-check`）比較 1.0 與 2.0 編譯器的輸出。本機 54 個唯一案例全數等價（體積與對稱差皆為 0.0）。
+
+變更與限制：
+
+- 2.0 不回退到 OpenSCAD。無 CadQuery 時回 `source_only` 並附警告；不產生 `model.scad` 與 `preview.svg`。
+- 2.0 幾何在世界座標建立，不採用 [`docs/CAD_DSL_2.md`](docs/CAD_DSL_2.md) §6.2 的零件座標系。
+- 1.0 流程仍使用舊的 `CadQueryCompiler`，行為無變更。
+- 端點不移除 `expected_resolved`（僅範例使用的欄位）；用戶端需自行移除，CLI 會移除。
+- CI 結果（docker job 的 harness 與新端點檢查，以及三平台 `desktop-bundle.yml` 的 harness）與桌面 sidecar 的 2.0 smoke 尚待確認。
+
 ## Unreleased / Phase 2c：驗證器改由 Rust core 執行
 
 這是 [ADR 0010](docs/adr/0010-migration-phases.md) 第 2 階段的第三個切片，尚未發佈；第 2 階段尚未結束（見 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)）。

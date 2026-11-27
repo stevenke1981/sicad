@@ -15,6 +15,7 @@ EXPECTED_MODELS = {
     "PlanRequest",
     "GenerateRequest",
     "GenerateFromSpecRequest",
+    "GenerateFromDocumentRequest",
     "PlanResponse",
     "Artifact",
     "JobManifest",

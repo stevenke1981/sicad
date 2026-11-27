@@ -6,6 +6,8 @@ All rule logic lives in ``promptcad-core``; this module only sends the 1.0 docum
 
 from __future__ import annotations
 
+from typing import Any
+
 from app.models.cad import CadDocument
 from app.models.generated.validation_report import ValidationReport
 from app.services.core_bridge import CoreBridge, CoreFailed, CoreUnavailable
@@ -24,6 +26,24 @@ class CoreRejected(CoreFailed):
         super().__init__(f"core rejected the document: {code} at {path or '/'}: {message}")
         self.code = code
         self.path = path
+
+
+class DocumentRejected(ValueError):
+    """The core refused a submitted document because of the user's input (HTTP 422).
+
+    Carries the core's error code, JSON path and violations unchanged. Core ``internal`` and
+    ``response_too_large`` errors are not the caller's fault and stay :class:`CoreFailed`.
+    """
+
+    def __init__(self, code: str, path: str, message: str, violations: list[Any] | None = None):
+        super().__init__(f"{code} at {path or '/'}: {message}")
+        self.code = code
+        self.path = path
+        self.violations = list(violations or [])
+
+
+# Core error codes that are server-side problems rather than invalid input.
+_CORE_SERVER_CODES = frozenset({"internal", "response_too_large"})
 
 
 class CoreValidator:
@@ -47,3 +67,38 @@ class CoreValidator:
             return ValidationReport.model_validate(response["result"]["report"])
         except (KeyError, TypeError, ValueError) as exc:
             raise CoreFailed(f"promptcad-core returned an unusable validate result: {exc}") from exc
+
+    async def validate_document(
+        self, document: dict[str, Any]
+    ) -> tuple[ValidationReport, dict[str, Any], dict[str, Any], str]:
+        """Validate a 1.0 or 2.0 document: ``(report, resolved, canonical document, version)``.
+
+        ``resolved`` is empty when structure errors gate the solver; the caller decides.
+        """
+        try:
+            response = await self.bridge.call({"op": "validate", "document": document})
+        except CoreUnavailable as exc:
+            raise CoreUnavailable(f"{exc}. {CORE_MISSING_HINT}") from exc
+        if response.get("status") != "ok":
+            code = str(response.get("code", "unknown"))
+            message = str(response.get("message", ""))
+            if code in _CORE_SERVER_CODES:
+                raise CoreFailed(f"promptcad-core failed: {code}: {message}")
+            violations = response.get("violations")
+            raise DocumentRejected(
+                code,
+                str(response.get("path", "")),
+                message,
+                violations if isinstance(violations, list) else [],
+            )
+        try:
+            result = response["result"]
+            report = ValidationReport.model_validate(result["report"])
+            resolved = result.get("resolved") or {}
+            canonical = result["document"]
+            version = str(result.get("input_version", ""))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise CoreFailed(f"promptcad-core returned an unusable validate result: {exc}") from exc
+        if not isinstance(resolved, dict) or not isinstance(canonical, dict):
+            raise CoreFailed("promptcad-core returned an unusable validate result: bad shapes")
+        return report, resolved, canonical, version

@@ -103,9 +103,6 @@ function lossyNumbersWarning(lossy: LossyNumber[]): string {
   );
 }
 
-const NO_GENERATE_2_0 =
-  '目前無法輸出 2.0 文件：幾何編譯器尚未支援 CadDocument 2.0，只能驗證並檢視元件樹。';
-
 function findArtifact(manifest: JobManifest | null, ...names: string[]): Artifact | null {
   const artifacts = manifest?.artifacts ?? [];
   for (const name of names) {
@@ -211,10 +208,10 @@ export function App({
   );
   const selectedFormats = availableFormats.filter((format) => formats.has(format));
 
-  const showManifest = (data: JobManifest) => {
+  const showManifest = (data: JobManifest, inputWarnings?: string[]) => {
     setManifest(data);
-    setSpecText(JSON.stringify(data.spec, null, 2));
-    setReport({ source: 'job', value: data.validation });
+    setSpecText(JSON.stringify(data.spec ?? data.document, null, 2));
+    setReport({ source: 'job', value: data.validation, inputWarnings });
     setBadge({
       text: data.validation.review_required ? 'REVIEW' : data.status.toUpperCase(),
       kind:
@@ -222,14 +219,23 @@ export function App({
     });
   };
 
-  const runJob = async (label: string, run: () => Promise<JobManifest>) => {
+  const runJob = async (
+    label: string,
+    run: () => Promise<JobManifest>,
+    inputWarnings?: string[],
+  ) => {
     setBusy(true);
     say(label);
     setBadge({ text: 'RUNNING', kind: 'neutral' });
     try {
       const data = await run();
-      showManifest(data);
-      say(`完成：${data.renderer_used} / ${data.status}`, data.status === 'failed');
+      showManifest(data, inputWarnings);
+      say(
+        data.status === 'failed' && data.error
+          ? `輸出失敗（${data.renderer_used}）：${data.error}`
+          : `完成：${data.renderer_used} / ${data.status}`,
+        data.status === 'failed',
+      );
       await loadJobs();
     } catch (error) {
       say(errorText(error), true);
@@ -372,8 +378,29 @@ export function App({
   };
 
   const onRegenerate = () => {
-    if (is2) return say(NO_GENERATE_2_0, true);
     if (!selectedFormats.length) return say('請至少選擇一種輸出格式。', true);
+    if (is2) {
+      let document: DocumentText;
+      try {
+        document = new DocumentText(specText);
+      } catch (error) {
+        say(`JSON 格式錯誤：${errorText(error)}`, true);
+        return;
+      }
+      // The HTTP body goes through JSON.stringify, so warn about numbers it would alter.
+      const lossy = findLossyNumbers(document.text);
+      void runJob(
+        '正在驗證並輸出 2.0 文件…',
+        () =>
+          client.generateFromDocument({
+            document: document.value,
+            formats: selectedFormats,
+            render,
+          }),
+        lossy.length ? [lossyNumbersWarning(lossy)] : undefined,
+      );
+      return;
+    }
     const spec = parseSpec();
     if (!spec) return;
     void runJob('正在驗證修改後的 DSL 並重新建立 CAD…', () =>
@@ -536,7 +563,7 @@ export function App({
           <div className="result-head">
             <div>
               <div className="eyebrow">RESULT</div>
-              <h2>{manifest?.spec.name ?? '尚未生成'}</h2>
+              <h2>{manifest?.spec?.name ?? (manifest?.document?.name as string | undefined) ?? '尚未生成'}</h2>
             </div>
             <span className={`badge ${badge.kind}`} data-testid="badge">
               {badge.text}
@@ -642,18 +669,12 @@ export function App({
               <button
                 type="button"
                 className="secondary"
-                disabled={busy || is2}
-                aria-describedby={is2 ? 'no-generate-2' : undefined}
+                disabled={busy}
                 onClick={onRegenerate}
               >
                 套用 JSON 並重新輸出
               </button>
             </div>
-            {is2 && (
-              <p id="no-generate-2" className="muted" data-testid="no-generate-2">
-                {NO_GENERATE_2_0}
-              </p>
-            )}
             <button
               type="button"
               className="secondary"

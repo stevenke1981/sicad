@@ -26,6 +26,7 @@ from app import __version__  # noqa: E402
 from app.models.api import (  # noqa: E402
     Artifact,
     CapabilityResponse,
+    GenerateFromDocumentRequest,
     GenerateFromSpecRequest,
     GenerateRequest,
     JobListItem,
@@ -43,6 +44,7 @@ MODELS: tuple[type[BaseModel], ...] = (
     PlanRequest,
     GenerateRequest,
     GenerateFromSpecRequest,
+    GenerateFromDocumentRequest,
     PlanResponse,
     Artifact,
     JobManifest,

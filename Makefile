@@ -1,5 +1,5 @@
 .PHONY: core dev test lint format doctor docker-up docker-down clean schema schema-check schema-py schema-py-check web-deps web \
-        desktop-lock desktop-lock-check desktop-env notices notices-check sidecar desktop
+        desktop-lock desktop-lock-check desktop-env notices notices-check sidecar desktop geometry-check
 
 PYTHON ?= python
 NPM ?= npm
@@ -89,6 +89,10 @@ notices-check:
 # PyInstaller onedir -> src-tauri/binaries/promptcad-sidecar/ (run with .venv-desktop).
 sidecar: core
 	$(DESKTOP_PYTHON) scripts/build_sidecar.py
+
+# Cad2Compiler vs CadQuery 1.0 geometry corpus (needs the CadQuery venv and the core binary).
+geometry-check: core
+	$(DESKTOP_PYTHON) scripts/geometry_equivalence.py
 
 # Tauri bundle; beforeBuildCommand in src-tauri/tauri.conf.json builds the frontend.
 desktop: sidecar

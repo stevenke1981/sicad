@@ -271,3 +271,115 @@ def test_check_core_requires_core_available_and_version_ok(monkeypatch):
     replies[("POST", "/api/v1/core")] = {"status": "error"}
     with pytest.raises(fs.SmokeFailure, match="version op"):
         fs.check_core(object(), "t")
+
+
+def _artifacts(*names: str, size: int = 10) -> list[dict[str, object]]:
+    return [{"filename": name, "size": size} for name in names]
+
+
+def _completed(artifacts: list[dict[str, object]], **extra: object) -> dict[str, object]:
+    manifest: dict[str, object] = {
+        "status": "completed",
+        "renderer_used": "cadquery",
+        "artifacts": artifacts,
+        "validation": {"issues": []},
+        "warnings": [],
+    }
+    manifest.update(extra)
+    return manifest
+
+
+def test_cad2_smoke_cases_covers_both_examples_without_test_only_key():
+    cases = fs.cad2_smoke_cases()
+    assert [label for label, _ in cases] == [
+        "cad2:enclosure-with-lid",
+        "cad2:plate-four-holes",
+    ]
+    for _, document in cases:
+        assert "expected_resolved" not in document
+        assert document["schema_version"] == "2.0"
+    # The checked-in files keep their key (only the in-memory copy is stripped).
+    on_disk = (fs.CAD2_EXAMPLES_DIR / "plate-four-holes.cad2.json").read_text(encoding="utf-8")
+    assert '"expected_resolved"' in on_disk
+
+
+def test_cad2_smoke_cases_reads_only_cad2_files(tmp_path):
+    (tmp_path / "one.cad2.json").write_text(
+        '{"schema_version": "2.0", "name": "one", "expected_resolved": {}}', encoding="utf-8"
+    )
+    (tmp_path / "other.json").write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    cases = fs.cad2_smoke_cases(tmp_path)
+    assert cases == [("cad2:one", {"schema_version": "2.0", "name": "one"})]
+    assert fs.cad2_smoke_cases(tmp_path / "missing") == []
+
+
+def test_smoke_cases_unchanged_by_cad2_examples(tmp_path):
+    # smoke_cases() reads examples/generated only; the cad2 directory never leaks into it.
+    labels = [label for label, _ in fs.smoke_cases(tmp_path)]
+    assert labels == list(fs.BASES)
+    assert not any(label.startswith("cad2") for label, _ in fs.smoke_cases())
+
+
+def test_cad_files_are_the_one_per_format_artifacts():
+    assert fs.CAD_FILES == ("model.step", "model.stl", "model.dxf", "model.svg")
+    assert fs.CAD2_EXPECTED_FILES == fs.CAD_FILES
+    assert not {"model.scad", "preview.svg"} & set(fs.CAD2_EXPECTED_FILES)
+
+
+def test_manifest_problems_10_default_requires_every_cad_file():
+    full = _completed(_artifacts(*fs.CAD_FILES, "model.scad", "preview.svg"))
+    assert fs.manifest_problems(full) == []
+    missing_svg = _completed(_artifacts("model.step", "model.stl", "model.dxf"))
+    assert fs.manifest_problems(missing_svg) == ["model.svg missing or empty"]
+    empty = _completed([*_artifacts("model.step", "model.stl", "model.dxf"), {"filename": "model.svg", "size": 0}])
+    assert fs.manifest_problems(empty) == ["model.svg missing or empty"]
+
+
+def test_manifest_problems_20_needs_no_scad_or_preview():
+    # A 2.0 manifest: the CAD files only, no model.scad / preview.svg.
+    manifest = _completed(_artifacts("spec.json", "validation.json", "resolved.json", *fs.CAD_FILES))
+    assert fs.manifest_problems(manifest, fs.CAD2_EXPECTED_FILES) == []
+    # The 1.0 default would still demand the same CAD files, so a 2.0 check that
+    # passes for a 2.0 manifest is not a weaker check: a missing STEP still fails.
+    no_step = _completed(_artifacts("spec.json", "model.stl", "model.dxf", "model.svg"))
+    assert fs.manifest_problems(no_step, fs.CAD2_EXPECTED_FILES) == ["model.step missing or empty"]
+
+
+def test_manifest_problems_reports_status_renderer_and_core_fields():
+    failed = _completed(_artifacts(*fs.CAD_FILES), status="failed", error="boom")
+    problems = fs.manifest_problems(failed)
+    assert problems == ["status='failed' error='boom'"]
+    source_only = _completed(_artifacts(*fs.CAD_FILES), renderer_used="source_only")
+    assert fs.manifest_problems(source_only) == ["renderer_used='source_only'"]
+    bad_issue = _completed(_artifacts(*fs.CAD_FILES), validation={"issues": [{"layer": "L"}]})
+    assert fs.manifest_problems(bad_issue) == ["issue without core fields layer/target: {'layer': 'L'}"]
+
+
+def test_check_manifest_20_accepts_completed_manifest_with_step(monkeypatch):
+    manifest = _completed(_artifacts("spec.json", *fs.CAD_FILES), job_id="job1")
+    calls = []
+
+    def fake_request(sidecar, method, path, token, body=None, timeout=600):
+        calls.append(path)
+        return 200, fs.STEP_MAGIC + b"\n"
+
+    monkeypatch.setattr(fs, "_request", fake_request)
+    fs.check_manifest(object(), "t", "cad2:plate", manifest, fs.CAD2_EXPECTED_FILES)
+    assert calls == ["/api/v1/jobs/job1/files/model.step"]
+
+
+def test_check_manifest_2_0_failure_names_the_case(monkeypatch):
+    manifest = _completed(_artifacts("spec.json"), job_id="job2")
+    monkeypatch.setattr(fs, "_request", lambda *a, **k: (200, fs.STEP_MAGIC))
+    with pytest.raises(fs.SmokeFailure, match="cad2:plate-four-holes: model.step missing"):
+        fs.check_manifest(object(), "t", "cad2:plate-four-holes", manifest, fs.CAD2_EXPECTED_FILES)
+
+
+def test_check_manifest_1_0_default_unchanged(monkeypatch):
+    manifest = _completed(_artifacts(*fs.CAD_FILES), job_id="job3")
+    monkeypatch.setattr(fs, "_request", lambda *a, **k: (200, b"ISO-10303-21;"))
+    fs.check_manifest(object(), "t", "example:x", manifest)
+    bad_step = _completed(_artifacts(*fs.CAD_FILES), job_id="job4")
+    monkeypatch.setattr(fs, "_request", lambda *a, **k: (200, b"not step"))
+    with pytest.raises(fs.SmokeFailure, match="model.step download HTTP 200"):
+        fs.check_manifest(object(), "t", "example:x", bad_step)

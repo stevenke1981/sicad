@@ -71,13 +71,17 @@ class Renderer:
     def openscad_available() -> bool:
         return shutil.which("openscad") is not None
 
-    def render(self, job_dir: Path, formats: list[str]) -> RenderResult:
+    def render(
+        self, job_dir: Path, formats: list[str], allow_openscad: bool = True
+    ) -> RenderResult:
         # Subprocesses run with cwd=job_dir, so every path handed to them must be absolute;
         # a relative data_dir (the default "generated") would otherwise be resolved twice.
         job_dir = job_dir.resolve()
         requested = set(formats)
         backend = self._choose_backend()
         warnings: list[str] = []
+        if backend == "openscad" and not allow_openscad:
+            backend = "source_only"
 
         if backend == "cadquery":
             cmd = _cadquery_command(job_dir, requested)
@@ -94,7 +98,9 @@ class Renderer:
                 if not self.settings.allow_source_fallback:
                     raise
                 warnings.append(str(exc))
-                backend = "openscad" if self.openscad_available() else "source_only"
+                backend = (
+                    "openscad" if allow_openscad and self.openscad_available() else "source_only"
+                )
 
         if backend == "openscad":
             if "stl" in requested:
@@ -119,9 +125,14 @@ class Renderer:
             )
 
         missing = requested & {"step", "stl", "dxf"}
-        if missing:
+        if missing and allow_openscad:
             warnings.append(
                 "目前環境沒有 CadQuery/OpenSCAD；已保留可執行 model.py、model.scad 與預覽，未生成: "
+                + ", ".join(sorted(missing))
+            )
+        elif missing:
+            warnings.append(
+                "2.0 文件不支援 OpenSCAD 後備；已保留可執行 model.py，需要 CadQuery 才能生成: "
                 + ", ".join(sorted(missing))
             )
         return RenderResult(

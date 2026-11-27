@@ -9,6 +9,7 @@ from pathlib import Path
 from app.core.config import get_settings
 from app.models.cad import CadDocument
 from app.services.core_bridge import CoreBridge, CoreError, locate_core_binary
+from app.services.core_validator import DocumentRejected
 from app.services.job_service import JobService
 
 
@@ -17,6 +18,9 @@ def _run(args, action) -> int:
     core = CoreBridge(get_settings())
     try:
         return asyncio.run(action(JobService(get_settings(), core)))
+    except DocumentRejected as exc:
+        print(f"document rejected: {exc}", file=sys.stderr)
+        return 2
     except CoreError as exc:
         print(f"promptcad-core error: {exc}", file=sys.stderr)
         return 3
@@ -35,11 +39,27 @@ def _generate(args) -> int:
     return _run(args, action)
 
 
+def _load_document(path: str) -> tuple[dict | None, CadDocument | None]:
+    """Sniff schema_version: ``(document, None)`` for 2.0, ``(None, CadDocument)`` for 1.0."""
+    text = Path(path).read_text(encoding="utf-8")
+    try:
+        raw = json.loads(text)
+    except ValueError:
+        raw = None
+    if isinstance(raw, dict) and raw.get("schema_version") == "2.0":
+        raw.pop("expected_resolved", None)  # example-only key, not part of the document
+        return raw, None
+    return None, CadDocument.model_validate_json(text)
+
+
 def _validate(args) -> int:
-    spec = CadDocument.model_validate_json(Path(args.spec).read_text(encoding="utf-8"))
+    document, spec = _load_document(args.spec)
 
     async def action(service: JobService) -> int:
-        report = await service.validate(spec)
+        if document is not None:
+            report, *_ = await service.core_validator.validate_document(document)
+        else:
+            report = await service.validate(spec)
         print(json.dumps(report.model_dump(mode="json"), ensure_ascii=False, indent=2))
         return 0 if report.valid else 2
 
@@ -47,10 +67,15 @@ def _validate(args) -> int:
 
 
 def _render(args) -> int:
-    spec = CadDocument.model_validate_json(Path(args.spec).read_text(encoding="utf-8"))
+    document, spec = _load_document(args.spec)
 
     async def action(service: JobService) -> int:
-        manifest = await service.generate_from_spec(spec, args.formats, not args.no_render)
+        if document is not None:
+            manifest = await service.generate_from_document(
+                document, args.formats, not args.no_render
+            )
+        else:
+            manifest = await service.generate_from_spec(spec, args.formats, not args.no_render)
         print(json.dumps(manifest.model_dump(mode="json"), ensure_ascii=False, indent=2))
         return 0 if manifest.status != "failed" else 1
 

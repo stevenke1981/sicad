@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.cad import CadDocument, ValidationReport
 
@@ -42,6 +42,16 @@ class GenerateFromSpecRequest(StrictApiModel):
     render: bool = True
 
 
+class GenerateFromDocumentRequest(StrictApiModel):
+    document: dict[str, Any]
+    formats: list[OutputFormat] = Field(
+        default_factory=default_formats,
+        min_length=1,
+        max_length=7,
+    )
+    render: bool = True
+
+
 class PlanResponse(StrictApiModel):
     spec: CadDocument
     validation: ValidationReport
@@ -63,11 +73,22 @@ class JobManifest(StrictApiModel):
     planner_used: str
     renderer_used: str
     requested_formats: list[OutputFormat]
-    spec: CadDocument
+    # 1.0 jobs carry `spec`; 2.0 jobs carry `document` (see the validator below).
+    spec: CadDocument | None = None
+    spec_version: Literal["1.0", "2.0"] = "1.0"
+    document: dict[str, Any] | None = None
     validation: ValidationReport
     artifacts: list[Artifact] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     error: str | None = None
+
+    @model_validator(mode="after")
+    def _check_payload_for_version(self) -> JobManifest:
+        if self.spec_version == "1.0" and self.spec is None:
+            raise ValueError("spec_version 1.0 manifests require 'spec'")
+        if self.spec_version == "2.0" and self.document is None:
+            raise ValueError("spec_version 2.0 manifests require 'document'")
+        return self
 
 
 class JobListItem(StrictApiModel):
