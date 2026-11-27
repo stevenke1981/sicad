@@ -104,6 +104,18 @@
 - 工作 manifest 新增 `spec_version`（`"1.0"`／`"2.0"`，預設 `"1.0"`）與 `document`（2.0 時為 core 正規化的文件）；`spec` 改為可為 null。舊的 manifest 仍可讀取。
 - 支援與不支援的構造見 `PROJECT_STATUS.md` 的「第 2 階段 2d 切片」。
 
+## 1.0 生成的行為變更（第 2 階段 2e）
+
+`POST /generate` 與 `POST /generate-from-spec` 的 HTTP 狀態碼、工作狀態、產物名稱、`manifest.spec` 與 CLI 結束碼不變。1.0 工作的 `model.py` 改由 `Cad2Compiler` 產生，因此：
+
+- `model.py` 不再內嵌 `CAD_SPEC`；文件字串改為說明它由 2.0 文件產生，並含 `place()` 輔助函式。
+- 略過特徵的警告文字改為 `part 1 fillet 1 skipped: …`（倒角為 `part 1 chamfer 1 skipped: …`）。
+- DXF 剖面高度改為包圍盒中點的 Z；五種基體的數值相同。
+- `renderer_used="compile-unsupported"` 現在也可能出現在 1.0 工作（`failed`），錯誤訊息列出每個 id 與原因，格式與 2.0 相同。
+- 有效的 1.0 文件若 core 沒有回傳 `resolved`，同樣為 `compile-unsupported` 且不產生 `model.py`；未在 54 個語料案例中觀察到。
+- 無效的 1.0 規格仍為 `failed`／`validation-blocked`，且仍寫入 `model.py`（與之前相同）。
+- 1.0 的產物清單不變：`spec.json`、`validation.json`、`model.py`、`model.scad`、`preview.svg`（有 CadQuery 時另有渲染產物）。
+
 ## `POST /validate`
 
 Body 是完整 `CadDocument`。回傳：

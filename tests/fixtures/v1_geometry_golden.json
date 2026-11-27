@@ -1,0 +1,1222 @@
+{
+  "cases": {
+    "example:plate-four-holes": {
+      "area": 18426.923806605428,
+      "bbox": [
+        -60.0,
+        -30.0,
+        0.0,
+        60.0,
+        30.0,
+        10.0
+      ],
+      "com": [
+        -1.1365952003781e-15,
+        5.424658910895478e-16,
+        5.0
+      ],
+      "model_sha256": "0befdf01ffbde17861abab2acc65ee667799511fc2fe56a79e526fa62eac1039",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "d3c87bdd579c621b22a005b4d287a1b6deef5b9ad29771b1ddffef258167229a",
+      "volume": 70416.92040349373,
+      "warnings": 0
+    },
+    "parity:cylinder_vertical_fillet_too_large": {
+      "area": 1256.637061435917,
+      "bbox": [
+        -10.0,
+        -10.0,
+        0.0,
+        10.0,
+        10.0,
+        10.0
+      ],
+      "com": [
+        1.4475057750305073e-16,
+        2.053912595556538e-17,
+        5.0
+      ],
+      "model_sha256": "8f77c049bf0f091658c6aad31b5bdd3c05e15f728bf37622f3cab8447d081537",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "3211d3f53b230a974b48ec724d13b15a66620a7455a0e30a83f2b4b407d84282",
+      "volume": 3141.592653589793,
+      "warnings": 1
+    },
+    "parity:cylinder_x_axis_blind_too_deep": {
+      "area": 2736.8050386589784,
+      "bbox": [
+        -10.000000100000001,
+        -10.0000001,
+        -1e-07,
+        10.0000001,
+        10.0000001,
+        30.0000001
+      ],
+      "com": [
+        4.763212445259532e-07,
+        -2.626797897699965e-07,
+        14.999999474456217
+      ],
+      "model_sha256": "3b07dfe5e6e65fca265250b5f8ba2b24e93aeddc3cb3e4b12aaf588395b6d7d0",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "5f5088d10b3b16048f9980024b2b108d556e4ad46349980f1e5e3dbc3a7ceeab",
+      "volume": 9174.69990987011,
+      "warnings": 0
+    },
+    "parity:cylinder_y_axis_outside": {
+      "area": 1332.8818548313789,
+      "bbox": [
+        -10.0000001,
+        -10.0000001,
+        -1e-07,
+        10.0000001,
+        10.0000001,
+        10.000000100000022
+      ],
+      "com": [
+        -1.8461703845540558e-05,
+        -1.700356164404013e-05,
+        4.749938279562948
+      ],
+      "model_sha256": "8c32e2c81fd5ade56e7e23ba98d168aa60d15041eba75c71330c96af22e74f24",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "202e4ee7dc10544d37cbee487e7206cb2fb2442af8d46d7891955eb7ad2a1dc1",
+      "volume": 2940.4951470330557,
+      "warnings": 0
+    },
+    "parity:cylinder_z_blind_too_deep": {
+      "area": 1357.1680263507906,
+      "bbox": [
+        -10.0,
+        -10.0,
+        0.0,
+        10.0,
+        10.0,
+        10.0
+      ],
+      "com": [
+        -8.787754786562162e-16,
+        -3.8008464739879813e-16,
+        4.999999999999999
+      ],
+      "model_sha256": "e3b39e743f740db9de941ce18e1e3eef6d386d51c1c802d13cc94a5c514764d0",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "aa95284d023861f6748d3bbe900b0b5e1803feb67fe3a9a0e93608dd9ad80760",
+      "volume": 3015.928947446201,
+      "warnings": 0
+    },
+    "parity:cylinder_z_clean": {
+      "area": 1388.5839528866884,
+      "bbox": [
+        -10.0,
+        -10.0,
+        0.0,
+        10.0,
+        10.0,
+        10.0
+      ],
+      "com": [
+        -2.0877487139863084e-16,
+        -2.600623138195927e-16,
+        4.999999999999999
+      ],
+      "model_sha256": "add432f9339decb566259ed61a6110b2efc4aa1e30194ac7c1f9812a09e799fa",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "0ae055c4c778c3722dd3ea432e2bca56eb6767e5174beb1e6ec16e31a59751f9",
+      "volume": 2858.849314766712,
+      "warnings": 0
+    },
+    "parity:cylinder_z_low_edge": {
+      "area": 1388.5839528866884,
+      "bbox": [
+        -10.0,
+        -10.0,
+        0.0,
+        10.0,
+        10.0,
+        10.0
+      ],
+      "com": [
+        -0.5934065934065945,
+        -3.015469866593811e-16,
+        4.999999999999999
+      ],
+      "model_sha256": "0e4c5dbb9d87cf46e2a7262d364b6411a000a404d057c0b2a720701429023171",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "dc990dd904eeaa77b37cb541ab08287e99286a4377331e790d4b29bdcd33d38a",
+      "volume": 2858.849314766712,
+      "warnings": 0
+    },
+    "parity:cylinder_z_outside": {
+      "area": 1287.125581391924,
+      "bbox": [
+        -10.0,
+        -10.0,
+        0.0,
+        9.6875,
+        10.0,
+        10.0
+      ],
+      "com": [
+        -0.6550822895466365,
+        3.471482529819132e-16,
+        5.0
+      ],
+      "model_sha256": "c15abe98b660c9f7dd7dda0497504e2c75b04e49eb6d8bc44a0a5b022cc45b09",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "046151d5c993d631e7799ef45d90dca5ebb740b07f79efc0cb7de223e1babb1a",
+      "volume": 2894.230092673885,
+      "warnings": 0
+    },
+    "parity:enclosure_chamfer_bottom_too_large": {
+      "area": 29911.696961966998,
+      "bbox": [
+        -50.00000000000001,
+        -35.0,
+        0.0,
+        50.0,
+        35.0,
+        30.0
+      ],
+      "com": [
+        6.110851605965853e-13,
+        1.0838537896775896e-13,
+        -118.3911917098458
+      ],
+      "model_sha256": "cdd35432d1b5a437fb62dae2ef2830d92acd23653bb66ba5ddfecf6698e1f0cd",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "c6e6bdfbcfcf7390ff0810fc4eb98ed57d385e6c1a0ec680b816c074d676c114",
+      "volume": -1157.9999999999927,
+      "warnings": 0
+    },
+    "parity:enclosure_extreme_aspect_ratio": {
+      "area": 36011.5,
+      "bbox": [
+        -1500.0,
+        -1.25,
+        0.0,
+        1500.0,
+        1.25,
+        2.0
+      ],
+      "com": [
+        3.8733393884295926e-15,
+        -1.1193378248212672e-17,
+        0.7955784785967464
+      ],
+      "model_sha256": "3ab74ceaad1fedabfc122ad2c1ffd43e5ec1819a045cb1e4a9a759e1afaf851b",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "e04c5eae93069caddd8d5240736fbdf9680b95466db20c607fba92a35c39a026",
+      "volume": 8252.25,
+      "warnings": 0
+    },
+    "parity:enclosure_thin_wall": {
+      "area": 34054.880000000005,
+      "bbox": [
+        -50.0,
+        -35.0,
+        0.0,
+        50.0,
+        35.0,
+        30.0
+      ],
+      "com": [
+        3.2697689931679805e-16,
+        -4.0535146894509006e-15,
+        9.09632080465858
+      ],
+      "model_sha256": "9cc242471d79e7c822b155bf33286ee81bec2f6770399f91100b0db470ba3ab4",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "ebda3378c5d8069bc237eeb050eef70b2a03e5d521c32bad5c7f39f5912987c2",
+      "volume": 10155.264000000032,
+      "warnings": 0
+    },
+    "parity:enclosure_x_counterbore_too_deep": {
+      "area": 33221.734517542565,
+      "bbox": [
+        -50.0,
+        -35.0,
+        0.0,
+        50.0,
+        35.0,
+        30.0
+      ],
+      "com": [
+        -0.11379519164658047,
+        -7.037094441778947e-16,
+        9.535632280949097
+      ],
+      "model_sha256": "3a96392ee9cb44d4235d67d07dc58fa8ba57e7e5613ef8c699a57beda8905cb5",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "47bcacec9a79b5fddc86e38d207c5d8873b343197e6897c8a341ac343fdf5851",
+      "volume": 32466.336293856446,
+      "warnings": 0
+    },
+    "parity:enclosure_x_hole_zero_clearance": {
+      "area": 33503.7521601036,
+      "bbox": [
+        -50.0,
+        -35.0,
+        0.0,
+        50.0,
+        35.0,
+        30.0
+      ],
+      "com": [
+        -6.166919105491381e-16,
+        -0.6911989696904851,
+        9.445333082896973
+      ],
+      "model_sha256": "ebb73c131f3eb8ff048b600e7eea829e4073ec1cc504004a5b84715d1d144756",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "cabc9d96a6a96ffadaa105dceb958b1b31c958275709c922dfefc4f5e140ad1c",
+      "volume": 31938.54872805337,
+      "warnings": 0
+    },
+    "parity:enclosure_z_blind_too_deep": {
+      "area": 33272.0,
+      "bbox": [
+        -50.0,
+        -35.0,
+        0.0,
+        50.0,
+        35.0,
+        30.0
+      ],
+      "com": [
+        -6.043275845382294e-16,
+        -4.032338745894333e-15,
+        9.556701030927837
+      ],
+      "model_sha256": "94fdf43bcaadc0eebd241061880c41708fa526e548c8bce73ec60d0acedbe478",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "52b15840b1a0e00a97f85482eb5bb11c1b9b1a66c435727843a88ec3e7167780",
+      "volume": 32592.000000000007,
+      "warnings": 0
+    },
+    "parity:lbracket_thin": {
+      "area": 5100.0,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        31.5
+      ],
+      "com": [
+        2.9205033453333974e-16,
+        -7.125,
+        8.625000000000002
+      ],
+      "model_sha256": "2a26ef5467a73fd500a64e1a9ae9e6a10fb1f1cf1997d9f56cb5325069ef9d69",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "7be850226bbd281e7373a9cc07718a667cfc498dbbc582daf637383b0a1a34bf",
+      "volume": 3600.000000000001,
+      "warnings": 0
+    },
+    "parity:lbracket_x_axis_blind_too_deep": {
+      "area": 5645.044226980003,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        33.0
+      ],
+      "com": [
+        -5.142501933716464e-16,
+        -6.630097583542096,
+        9.567925960193554
+      ],
+      "model_sha256": "af15958d267b26ad2d0a2ecda7ce424994e3b659f0926ac1f7d1fcd02a605a83",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "5a1b149070e0fe84bf6d8a7b1f5a2426e76eac7e5260f720f6feb800fbd78f98",
+      "volume": 7074.336293856406,
+      "warnings": 0
+    },
+    "parity:lbracket_y_counterbore_too_deep": {
+      "area": 5412.566370614359,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        33.0
+      ],
+      "com": [
+        -5.073449413403225e-16,
+        -6.714471053518353,
+        9.69604863682417
+      ],
+      "model_sha256": "dd7acfa219066d60fefb86acd606f856376e77c644ee4514111f8ddc709eb741",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "e5ff1261503b5e4638cc2dd65e2dcfc960fcd739b6a24b08f8cc8033e8552766",
+      "volume": 7162.300888156921,
+      "warnings": 0
+    },
+    "parity:lbracket_z_blind_too_deep": {
+      "area": 5400.0,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        33.0
+      ],
+      "com": [
+        -9.037523815733392e-16,
+        -6.75,
+        9.75
+      ],
+      "model_sha256": "9bc5222b07117ccabc01c403ed0ff41c57eb90f4aef9636fbfe4ec6863a87499",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "76912b8dbc18e976561c6e0add21a7586596a6f85d3ac79b492feae7cff7ccdd",
+      "volume": 7200.0,
+      "warnings": 0
+    },
+    "parity:lbracket_z_outside": {
+      "area": 5394.521173949021,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        33.0
+      ],
+      "com": [
+        -0.0789236585804618,
+        -6.778553615516038,
+        9.784898863408491
+      ],
+      "model_sha256": "eb47476796ae33e9378dcea784f6d5d9e0f6c6bbed38ec9307cdfdb7f8fd78ef",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "f35c63653df98804a42e17e33ebbc3cef7aed51113d79915accca8b9bae617ca",
+      "volume": 7169.671106348574,
+      "warnings": 0
+    },
+    "parity:plate_assumptions": {
+      "area": 3099.999999999999,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        5.0
+      ],
+      "com": [
+        2.731148640577885e-16,
+        -3.209284689849786e-16,
+        2.5
+      ],
+      "model_sha256": "76b33652cfe23cf39410f31506656bf29186342851eca90bafec893a7eda4a89",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "bffb5b148f9781f200e2e888d325087eac809f3ea4531ba000ab69b014bc6be9",
+      "volume": 6000.0,
+      "warnings": 0
+    },
+    "parity:plate_chamfer_top_too_large": {
+      "area": 2884.6194077712557,
+      "bbox": [
+        -20.000000000000004,
+        -15.000000000000004,
+        0.0,
+        20.0,
+        15.0,
+        5.000000000000001
+      ],
+      "com": [
+        4.886837203556032e-16,
+        1.8834685055372205e-16,
+        2.3763992537313428
+      ],
+      "model_sha256": "08531e55bcfdc103e1991e2b11e5603d10cc3035de21ad40f83869d314e78bf5",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "a7793927c39b79b7ff2b3f738ab3d2c1865b08705335260a1dc7b00b3c597377",
+      "volume": 5583.333333333334,
+      "warnings": 0
+    },
+    "parity:plate_clean_through": {
+      "area": 3137.699111843077,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        5.0
+      ],
+      "com": [
+        6.784192452800975e-16,
+        -1.0014815552117724e-16,
+        2.4999999999999996
+      ],
+      "model_sha256": "8c653e7122f1cfa44e7a5f0fe5d010ff679071c7b2846b0d7cfb54d1e4179a9f",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "8dfe72b80aeeece1d02eba191f342f2f65c579c4f04287a3e0c2384ae198f480",
+      "volume": 5937.168146928205,
+      "warnings": 0
+    },
+    "parity:plate_counterbore_depth": {
+      "area": 3125.132741228718,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        5.0
+      ],
+      "com": [
+        7.230669238462183e-16,
+        -1.2094275301345216e-16,
+        2.4999999999999996
+      ],
+      "model_sha256": "b2ebdf016785bdffafe0109a9400d470dda8bad81050c0d456fe660fc97af6a0",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "b99eb3e5f2a7c25af8272bc4549cbe728a2eb34618bd0021e74835282aaa0a9e",
+      "volume": 5748.6725877128165,
+      "warnings": 0
+    },
+    "parity:plate_countersink_depth": {
+      "area": 2644.2719767884805,
+      "bbox": [
+        -20.0,
+        -15.0,
+        -4.440892098500626e-16,
+        20.0,
+        15.0,
+        2.0
+      ],
+      "com": [
+        1.3801827978536745e-16,
+        -1.9108436755521612e-16,
+        0.9927068225932574
+      ],
+      "model_sha256": "3d91dd4df2c2a3ae8a579d4abf789e985d0638761d0070cbc17a9b2053fa006e",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "8b0250cd80af6448d075adc4fd5c0fcfd344dc80387070162cbccd5b2a9dd2a1",
+      "volume": 2297.3746399827332,
+      "warnings": 0
+    },
+    "parity:plate_countersink_ok": {
+      "area": 3891.0137071009776,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        10.0
+      ],
+      "com": [
+        1.857243550692563e-16,
+        -3.8368717703128576e-16,
+        4.987618460273674
+      ],
+      "model_sha256": "1d66c6c640c623c41d9d6826fd3849b5e5f74430a6700e2452212bf49aaaf811",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "eebad6daca594510edb1fe6bb126fa0e046ac188d41aac5b6abfc78f444cdbe2",
+      "volume": 11840.82597221812,
+      "warnings": 0
+    },
+    "parity:plate_extreme_aspect_ratio": {
+      "area": 8002.0,
+      "bbox": [
+        -1000.0,
+        -0.5,
+        0.0,
+        1000.0,
+        0.5,
+        1.0
+      ],
+      "com": [
+        -1.3211653993039366e-14,
+        2.664535259100376e-18,
+        0.5000000000000001
+      ],
+      "model_sha256": "1099e228252d0f6320bbc526c3d717d155c99ccbf5a9fd02c7cacea0d1bf857d",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "847ba6c83f236a59c4991ecc4bf8e5cd49b2dc50c5ca1a6fbc2f9c3c02b8a542",
+      "volume": 1999.9999999999995,
+      "warnings": 0
+    },
+    "parity:plate_fillet_all_too_large": {
+      "area": 3117.6712025932916,
+      "bbox": [
+        -20.04678372204952,
+        -15.04875797434005,
+        -1.0000000086114411e-07,
+        20.04678372204347,
+        15.04623149249058,
+        5.000000100000001
+      ],
+      "com": [
+        1.206509665808531e-05,
+        -0.006097594815529038,
+        2.4966862681809885
+      ],
+      "model_sha256": "e97c0076cd9a83759bd42ade12b298bae778b40436498d1a0e2b4637e9018d46",
+      "shape_valid": false,
+      "solids": 1,
+      "spec_sha256": "c80c646687a5672d9fb5da5894a204119ee773f3ee1ae4d3d9e9ed99f611cc55",
+      "volume": 7510.0589209741665,
+      "warnings": 0
+    },
+    "parity:plate_fillet_vertical_too_large": {
+      "area": 2977.557488999924,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        5.0
+      ],
+      "com": [
+        -1.1199221299242805e-12,
+        -9.298028257726537e-13,
+        2.4592227818798493
+      ],
+      "model_sha256": "f9c42419cebbab0a458968c81be1c85d4057542f84a3b1c712d70b89c427ccc2",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "a3566201d85bac03b1a8e5a4ff9966a0b81a5c7a54c0a42776a067fabcc61fb8",
+      "volume": 5882.890822140055,
+      "warnings": 1
+    },
+    "parity:plate_low_edge_clearance": {
+      "area": 3137.699111843077,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        5.0
+      ],
+      "com": [
+        -0.18519897054377943,
+        3.3586222149826935e-18,
+        2.4999999999999996
+      ],
+      "model_sha256": "2dbb816fe38bf8c575a6c6eb8ad4816a611d2a389c9a82b500f349c1d785a53e",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "3aa1699467bfe4aa1d2bc187a48f3263a5921bff8e29ac7048bbfc7907d7d679",
+      "volume": 5937.168146928205,
+      "warnings": 0
+    },
+    "parity:plate_overlap_ignores_other_axis": {
+      "area": 4314.053048260031,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        10.0
+      ],
+      "com": [
+        -6.934147748000842e-14,
+        -1.1611934797683658e-15,
+        4.999999999999947
+      ],
+      "model_sha256": "451e7fa51742e90cbbe9a58b31876a24b800e414b3027a9407b75cc17829a9e8",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "368fe09cb81fe04d6ec740059418336503ab9d18a0b6a078ef25a48535a62113",
+      "volume": 11414.348135949102,
+      "warnings": 0
+    },
+    "parity:plate_tapped_with_thread": {
+      "area": 3139.269908169872,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        5.0
+      ],
+      "com": [
+        -2.0436835165984093e-16,
+        -1.1387247458638858e-16,
+        2.5
+      ],
+      "model_sha256": "773f6cab0cfd5f09403b2ee14ea06f0fd63b6494ebfc89e7cb440f73b4f47739",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "48397fb7d47bc7e61e744fd304ce3988418dfc78ca1844c13b2b33069187dce0",
+      "volume": 5901.825229575318,
+      "warnings": 0
+    },
+    "parity:plate_tapped_without_thread": {
+      "area": 3139.269908169872,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        5.0
+      ],
+      "com": [
+        -2.0436835165984093e-16,
+        -1.1387247458638858e-16,
+        2.5
+      ],
+      "model_sha256": "773f6cab0cfd5f09403b2ee14ea06f0fd63b6494ebfc89e7cb440f73b4f47739",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "00206012c7e540786e7b60122fd9bb5651b4777a6c70c9000f7616bd0e87eb1b",
+      "volume": 5901.825229575318,
+      "warnings": 0
+    },
+    "parity:plate_thread_invalid": {
+      "area": 3139.269908169872,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        5.0
+      ],
+      "com": [
+        -2.0436835165984093e-16,
+        -1.1387247458638858e-16,
+        2.5
+      ],
+      "model_sha256": "773f6cab0cfd5f09403b2ee14ea06f0fd63b6494ebfc89e7cb440f73b4f47739",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "5bef9203f2add895f64776b2134a1fb2421253ac428c6e014634bd238fa69739",
+      "volume": 5901.825229575318,
+      "warnings": 0
+    },
+    "parity:plate_thread_normalized": {
+      "area": 3139.269908169872,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        5.0
+      ],
+      "com": [
+        -2.0436835165984093e-16,
+        -1.1387247458638858e-16,
+        2.5
+      ],
+      "model_sha256": "773f6cab0cfd5f09403b2ee14ea06f0fd63b6494ebfc89e7cb440f73b4f47739",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "2378fd702b7370fdf8373ebd4b1b6cdc53462f12e1f81d9c2a6a6633986c2070",
+      "volume": 5901.825229575318,
+      "warnings": 0
+    },
+    "parity:plate_three_holes_two_overlaps": {
+      "area": 7651.818181539735,
+      "bbox": [
+        -40.0,
+        -20.0,
+        0.0,
+        40.0,
+        20.0,
+        5.0
+      ],
+      "com": [
+        -0.12873352918386036,
+        0.0,
+        2.4999999999999996
+      ],
+      "model_sha256": "a61a3d10e7637f3cbef7df21f67342eb5d61b558db1db01bb764b66751c8ef61",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "fedad9ff553a23dfe927beec821d61b43f749953d7c937e5992aa06a628e5458",
+      "volume": 15598.392769828779,
+      "warnings": 0
+    },
+    "parity:plate_x_axis_blind_too_deep": {
+      "area": 4277.522083345648,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        10.0
+      ],
+      "com": [
+        0.0,
+        -7.560773980259599e-17,
+        5.0
+      ],
+      "model_sha256": "46b7d1b1caa498e353f64ae7ad0b349ef3f96ed6c47fc751178b4f21f3c43df0",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "e4cfce8a8a8045097b14af648c17e1d131f53e38d670f3c2b9a1a0efc285e427",
+      "volume": 11497.345175425633,
+      "warnings": 0
+    },
+    "parity:plate_y_axis_hole_outside": {
+      "area": 3927.185101398767,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        10.0
+      ],
+      "com": [
+        3.913377986752548e-16,
+        -9.268697650665757e-17,
+        4.905167128470359
+      ],
+      "model_sha256": "5b99ee881f01b5a9c801e4aa0f080e928990bfc4738d34b7449b8ba4c384c25b",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "e92fb6c401e9cd7da779714842bde7b77c2f770e023e11622189ba8636f5a732",
+      "volume": 11696.711063485749,
+      "warnings": 0
+    },
+    "parity:plate_y_axis_low_edge": {
+      "area": 4151.858377202056,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        10.0
+      ],
+      "com": [
+        1.0571362392668848e-18,
+        -1.5531457098884887e-16,
+        4.918912752654656
+      ],
+      "model_sha256": "018c48a182f2e1ebe2876d0bb81bdc834be7c132d286235a1c04c40469caf65e",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "8ef2a03419edb8a93d405341b44b34a40e04ae4b297de4a9bf65ac967f0daf14",
+      "volume": 11623.008881569225,
+      "warnings": 0
+    },
+    "parity:ring_chamfer_all_too_large": {
+      "area": 3107.402331460113,
+      "bbox": [
+        -20.0,
+        -20.0,
+        0.0,
+        20.0,
+        20.0,
+        5.0
+      ],
+      "com": [
+        -0.9566326530612821,
+        -4.9697389039030446e-17,
+        2.4999999999999996
+      ],
+      "model_sha256": "4d98cd84b0494b8144e2db651e49d4e9ec5efca21f683fcdb341592362103bba",
+      "shape_valid": false,
+      "solids": 2,
+      "spec_sha256": "625b57565f91e6258e946d61207e07cc720cb44f5cc3fa2a274d7694141b4e22",
+      "volume": 6157.521601035995,
+      "warnings": 0
+    },
+    "parity:ring_hole_clean": {
+      "area": 2865.132500073891,
+      "bbox": [
+        -20.0,
+        -20.0,
+        0.0,
+        20.0,
+        20.0,
+        5.0
+      ],
+      "com": [
+        -0.20270270270273977,
+        -3.861026795471089e-16,
+        2.4999999999999996
+      ],
+      "model_sha256": "cf45b9b280d3139e30cfe5b837ba0c8ae407fd08b619caf4f127a246b78840c1",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "06720aa2dabf37260f93094ea1b66857c322eb9c1c61a4657585e389d220b9e3",
+      "volume": 4649.557127312894,
+      "warnings": 0
+    },
+    "parity:ring_hole_in_inner_void": {
+      "area": 2827.4333882308138,
+      "bbox": [
+        -20.0,
+        -20.0,
+        0.0,
+        20.0,
+        20.0,
+        5.0
+      ],
+      "com": [
+        -3.879315477081759e-14,
+        1.4099832412739478e-16,
+        2.4999999999999996
+      ],
+      "model_sha256": "deb6c4e0ab2839f9b42c153d05246eb31049b037c4599aa11ab80fd4476d3c60",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "a39aeb03324dad909270086015db5dad7331f69a4b8b5282cbc47ba6218ce234",
+      "volume": 4712.38898038469,
+      "warnings": 0
+    },
+    "parity:ring_hole_intersects_inner_void": {
+      "area": 2818.8822581811546,
+      "bbox": [
+        -20.0,
+        -20.0,
+        0.0,
+        20.0,
+        20.0,
+        5.0
+      ],
+      "com": [
+        -0.18143527436881055,
+        2.3584435072828207e-16,
+        2.5
+      ],
+      "model_sha256": "30305493759c8ceb6d39ccb3adfaacdab8f9647f78042a73b23663350938e401",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "b0e8beb522d77e22195d463238fcfaf7f0ade868bba13cfdd3a434df6819b7e7",
+      "volume": 4637.192946681018,
+      "warnings": 0
+    },
+    "parity:ring_hole_outside": {
+      "area": 2830.605515160681,
+      "bbox": [
+        -20.0,
+        -20.0,
+        0.0,
+        19.921052631578952,
+        20.0,
+        5.0
+      ],
+      "com": [
+        -0.20035303344526295,
+        -8.410873005865772e-16,
+        2.4999999999999996
+      ],
+      "model_sha256": "40fdb0a3b5a278db03eb2e55436f07ff0ada36b22fb444dc7ec80b60a0f820c8",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "b50a288d7ec0762a7b7cdb32d44df78f30185b112204e92bf9384479dd5dec08",
+      "volume": 4662.290871982557,
+      "warnings": 0
+    },
+    "parity:ring_x_axis_hole": {
+      "area": 2940.6830768410905,
+      "bbox": [
+        -20.0000001,
+        -20.0000001,
+        -1e-07,
+        20.0000001,
+        20.0000001,
+        5.0000001
+      ],
+      "com": [
+        8.671092294074214e-06,
+        -2.3998482313650874e-05,
+        2.500000066673441
+      ],
+      "model_sha256": "5fd0ec3a02514eaddcf366a3cc31200a0b2ff4762b675752b8814722033727ad",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "205ed52a7acb4b340535febeb1cc53a144983edfb69b37e8f3fcba1800f33a06",
+      "volume": 4649.48255766769,
+      "warnings": 0
+    },
+    "parity:test_blind_depth_equal_to_material_is_blocked": {
+      "area": 3137.699111843077,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        5.0
+      ],
+      "com": [
+        -6.784192452800975e-16,
+        -1.6196239399690867e-16,
+        2.4999999999999996
+      ],
+      "model_sha256": "8c0a5e13584d7437b6c7fc78b13e9bedae16eb379c24351ba747b0c33303c3a9",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "8193b46af3b3de48bef9380481fe886a71e6497df4d8348e93f21e2e7d0160d1",
+      "volume": 5937.168146928205,
+      "warnings": 0
+    },
+    "parity:test_counterbore_effective_diameter_respects_edge": {
+      "area": 3161.788768608773,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        5.0
+      ],
+      "com": [
+        -0.682821690501901,
+        0.0,
+        2.4490176574525515
+      ],
+      "model_sha256": "f80ab3d34e3c43f56e328df7ed5e82a4f557ede5e157d28f42f02ce8cd9ab19b",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "4976afaebee7f29f4c42a44e34724d51103ffeba9f6f31741b878ea2bc44c6ea",
+      "volume": 5735.506387393599,
+      "warnings": 0
+    },
+    "parity:test_hole_outside_part_is_error": {
+      "area": 3088.986473338033,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        5.0
+      ],
+      "com": [
+        -0.30964485141766873,
+        -2.688415399574547e-18,
+        2.500000000000001
+      ],
+      "model_sha256": "ea2c0c37e4bb2b598f11c020b1a928cf1a4e35b5a998486f84f6a925d54713d5",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "b1ad9941800ac2073ccb5847c692a9f9ce62778d5a651f9d7174dd66accfa18b",
+      "volume": 5899.879368745062,
+      "warnings": 0
+    },
+    "parity:test_overlapping_holes_are_error": {
+      "area": 3063.3393944403524,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        5.0
+      ],
+      "com": [
+        -0.2169793973099356,
+        -3.360551692988542e-16,
+        2.4999999999999996
+      ],
+      "model_sha256": "c5d9e530c98c8d2d961233a9dec0eea57510f5d3631ce72c1fff660987650501",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "bdbc3d6cadfaa88517d478467b911acd68787b6a323fde60747d3147f9ed713e",
+      "volume": 5412.770192885287,
+      "warnings": 0
+    },
+    "parity:test_vertical_plate_fillet_can_equal_half_thickness": {
+      "area": 3014.1592653589796,
+      "bbox": [
+        -20.0,
+        -15.0,
+        0.0,
+        20.0,
+        15.0,
+        5.0
+      ],
+      "com": [
+        3.0868526940314854e-16,
+        -2.411603667212098e-17,
+        2.4999999999999996
+      ],
+      "model_sha256": "1176b155f21a8ab25b78b2790e875b062bb8b5cddbcca1aa8793d2d0c5fda5a8",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "f052bca617d50a6391e1ead668d6b390c47241ea586b33c009bac9fd29a66462",
+      "volume": 5892.699081698724,
+      "warnings": 0
+    },
+    "smoke:cylinder": {
+      "area": 31995.176224815,
+      "bbox": [
+        -60.0,
+        -60.0,
+        0.0,
+        60.0,
+        60.0,
+        20.0
+      ],
+      "com": [
+        0.06937970605866138,
+        0.14636854144185757,
+        9.978465642490876
+      ],
+      "model_sha256": "04b6aae8b9dc47a979f0ea335616c431dc16cf4cf1746fdfce93256a9ea14125",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "483361db70e63282e8f1a876a5ae2c739fb4e65ecd5ace1823bc217c1abf0048",
+      "volume": 222569.4019415213,
+      "warnings": 0
+    },
+    "smoke:enclosure": {
+      "area": 48538.666363982586,
+      "bbox": [
+        -60.0,
+        -40.0,
+        0.0,
+        60.0,
+        40.0,
+        40.0
+      ],
+      "com": [
+        -0.04382721255649866,
+        -0.02645015457303482,
+        13.875220369541255
+      ],
+      "model_sha256": "6d5f77101531d78df7448be1c35214f7f700448d2ed2fda271672991f07cba7b",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "10fa0476dd5566545d8fed3faeb68aefe388a874b3ba018d6cbaddb4cb43b6b4",
+      "volume": 93128.3770393494,
+      "warnings": 0
+    },
+    "smoke:l_bracket": {
+      "area": 48677.90528613654,
+      "bbox": [
+        -80.0,
+        -40.0,
+        0.0,
+        80.0,
+        40.0,
+        66.0
+      ],
+      "com": [
+        -0.06549073672923486,
+        -16.05714608266802,
+        17.233024458506126
+      ],
+      "model_sha256": "ddb4d81eced4c2dba9b0e48c5f801479600ba744cf173617c908d1741fe25a71",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "f9ccab2d87d529fe48005e0a38e2de09f7734b2670c3a7aa28d3f4a35276a62d",
+      "volume": 133548.56555902408,
+      "warnings": 0
+    },
+    "smoke:plate": {
+      "area": 37965.86029254029,
+      "bbox": [
+        -80.0,
+        -50.0,
+        0.0,
+        80.0,
+        50.0,
+        10.0
+      ],
+      "com": [
+        -0.12259413604762881,
+        -0.09288528711165393,
+        4.991273385581059
+      ],
+      "model_sha256": "4063a2fbafc7a8c7d69de75343c630b778cd20185c09f85cdf39f5308db2f400",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "eaecdf719300e46083bd2a4da986a1afa2440777c075ebf8f4bc2930cc00d7af",
+      "volume": 158135.24799020137,
+      "warnings": 0
+    },
+    "smoke:ring": {
+      "area": 35858.392710934364,
+      "bbox": [
+        -70.0,
+        -70.0,
+        0.0,
+        70.0,
+        70.0,
+        15.0
+      ],
+      "com": [
+        0.08597198712252693,
+        0.19375434507956668,
+        7.484696603636328
+      ],
+      "model_sha256": "5aedeb2db0424adc5a423a47e7ded307f16a6c7c686c7d2ddc8a463e95be0b19",
+      "shape_valid": true,
+      "solids": 1,
+      "spec_sha256": "ec17cab26333082c6e75ecd3924e5d9faad7207e52673a2e7032b2ebfa7cbb7d",
+      "volume": 185750.54865201632,
+      "warnings": 0
+    }
+  },
+  "meta": {
+    "cadquery": "2.8.0",
+    "case_count": 54,
+    "format": 1,
+    "ocp": "7.9.3.1",
+    "platform": "Windows-11-10.0.22631-SP0"
+  },
+  "native": {
+    "native:plate-four-holes.cad2": {
+      "area": 18426.923806605428,
+      "bbox": [
+        -60.0,
+        -30.0,
+        0.0,
+        60.0,
+        30.0,
+        10.0
+      ],
+      "com": [
+        -1.1365952003781e-15,
+        5.424658910895478e-16,
+        5.0
+      ],
+      "model_sha256": "0befdf01ffbde17861abab2acc65ee667799511fc2fe56a79e526fa62eac1039",
+      "shape_valid": true,
+      "solids": 1,
+      "volume": 70416.92040349373,
+      "warnings": 0
+    }
+  }
+}

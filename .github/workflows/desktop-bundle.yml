@@ -100,7 +100,7 @@ jobs:
       # Runs once per matrix OS (bash shell on all three, so "$VENV_PY" resolves on Windows too).
       # Harness exit 0 = every corpus case equal or both_failed; the core binary is found under
       # crates/promptcad-core/target/release, which the step above just built.
-      - name: Geometry equivalence (Cad2Compiler vs CadQuery 1.0 corpus)
+      - name: Geometry equivalence (Cad2Compiler output vs frozen golden)
         timeout-minutes: 20
         run: '"$VENV_PY" scripts/geometry_equivalence.py'
 

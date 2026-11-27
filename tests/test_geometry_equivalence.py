@@ -115,24 +115,54 @@ def _cadquery_python() -> str | None:
     return None
 
 
-def _assert_summary(summary: dict) -> None:
+def _assert_summary(summary: dict, mode: str) -> None:
+    assert summary["mode"] == mode
     assert summary["counts"]["mismatch"] == 0, summary["problems"]
     assert summary["counts"]["equal"] + summary["counts"]["both_failed"] > 0
     assert summary["cases"] >= 50
+    if mode == "golden":  # every corpus case must reproduce its frozen metrics
+        assert summary["counts"]["equal"] == summary["cases"], summary["counts"]
     assert all(n["status"] == "equal" for n in summary["native"]), summary["native"]
     assert len(summary["native"]) == 3
 
 
-def test_corpus_geometry_equivalence(core_binary):
+def test_metrics_include_area_with_its_own_tolerance():
+    assert geo.AREA_REL_TOL == 1e-6
+    with_area = {**BASE, "area": 600.0}
+    assert geo.compare_metrics(with_area, {**with_area, "area": 600.0 + 1e-4}) == []
+    assert geo.compare_metrics(with_area, {**with_area, "area": 600.01})
+    assert geo.compare_metrics(BASE, with_area) == []  # area only compared when both have it
+
+
+def test_golden_comparison_is_reduced_for_invalid_shapes():
+    golden = {**BASE, "area": 600.0, "shape_valid": False}
+    fresh = {"ok": True, **golden, "volume": 1.0, "area": 1.0, "com": [0, 0, 0]}
+    assert geo.compare_golden(golden, fresh) == []
+    assert geo.compare_golden(golden, {**fresh, "shape_valid": True})
+    assert geo.compare_golden(golden, {**fresh, "solids": 2})
+    assert geo.compare_golden(golden, {**fresh, "bbox": [0, 0, 0, 10, 10, 11]})
+    valid = {**golden, "shape_valid": True}
+    assert geo.compare_golden(valid, {"ok": True, **valid, "volume": 1.0})
+    assert geo.compare_golden(valid, {"ok": False, "error": "boom"})
+
+
+def test_spec_key_and_golden_text_are_canonical():
+    assert geo.spec_sha256({"b": 1, "a": 2}) == geo.spec_sha256({"a": 2, "b": 1})
+    text = geo.dump_golden({"b": 1, "a": [1, 2]})
+    assert text.endswith("}\n") and "\r" not in text
+    assert text.index('"a"') < text.index('"b"')
+
+
+def _run_geometry(extra_args: list[str], mode: str) -> None:
     if importlib.util.find_spec("cadquery") is not None:
         import contextlib
         import io
 
         buffer, errors = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(errors):
-            code = geo.main([])
+            code = geo.main(extra_args)
         assert code == 0, errors.getvalue()[-2000:]
-        _assert_summary(json.loads(buffer.getvalue()))
+        _assert_summary(json.loads(buffer.getvalue()), mode)
         return
     python = _cadquery_python()
     if python is None:
@@ -142,7 +172,7 @@ def test_corpus_geometry_equivalence(core_binary):
             "CadQuery not importable (set PROMPTCAD_CADQUERY_PYTHON or create .venv-desktop)"
         )
     completed = subprocess.run(
-        [python, str(SCRIPT)],
+        [python, str(SCRIPT), *extra_args],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -151,4 +181,9 @@ def test_corpus_geometry_equivalence(core_binary):
         env=os.environ.copy(),
     )
     assert completed.returncode == 0, completed.stderr[-2000:] + completed.stdout[-2000:]
-    _assert_summary(json.loads(completed.stdout))
+    _assert_summary(json.loads(completed.stdout), mode)
+
+
+def test_corpus_matches_frozen_golden(core_binary):
+    _run_geometry([], "golden")
+

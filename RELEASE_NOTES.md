@@ -32,6 +32,24 @@
 - 乾淨機器驗證以 `desktop-bundle.yml` 的實際執行結果為準：2026-11-26 於 GitHub `windows-latest`（Windows Server 2025，4 CPU）首次執行 [run 45723089074](https://github.com/stevenke1981/sicad/actions/runs/45723089074) 全數通過：建置與安裝後的 sidecar 皆在 isolated env 下通過 smoke（各觀察到 7 個 render worker，`foreign_processes=[]`）；安裝 sidecar 的 Job Object 中斷檢查 `KILL_CHECK_OK`；強制結束已安裝的 `promptcad-studio.exe` 後 sidecar 於 0.007 秒內結束（`job.rs` 實證，此步驟已改為必過）；安裝目錄含 `THIRD_PARTY_NOTICES.md`。量測：安裝檔 107.5 MiB、安裝後 554.1 MiB、READY 0.64–0.66 s、warm render 2.38 s、端到端 generate 2.42 s。
 - 檢視器只支援 STL；GLB、元件選取與 port 圖層尚未實作。
 
+## Unreleased / Phase 2e：1.0 流程改用 Cad2Compiler、移除舊編譯器
+
+這是 [ADR 0010](docs/adr/0010-migration-phases.md) 第 2 階段的第五個切片，尚未發佈；第 2 階段尚未結束（見 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)）。
+
+新增：
+
+- **1.0 流程改用 `Cad2Compiler`**：`POST /api/v1/generate`、`POST /api/v1/generate-from-spec` 與 CLI 的 `generate`、`render` 經一次 core `validate` 呼叫，再由 `Cad2Compiler` 產生 `model.py`。專案現在只剩一個 CadQuery 編譯器（`app/services/compiler2.py`）。
+- **幾何回歸 golden**：`tests/fixtures/v1_geometry_golden.json` 取代舊編譯器的 A/B 比較。metrics 層需要 CadQuery；source 層（`tests/test_v1_compile_golden.py`）不需要。原生 plate 檢查改為 2.0 plate 與其降級後經 `Cad2Compiler` 輸出的往返比較。
+- **前端**：唯讀元件樹在「驗證 JSON」之後顯示 port 的世界座標。
+
+變更與限制：
+
+- `app/services/compiler.py`（`CadQueryCompiler`）已刪除。
+- 1.0 的 `model.py` 有行為變更：不再內嵌 `CAD_SPEC`；略過警告文字改為 `part N …`；DXF 剖面高度改為包圍盒中點；`compile-unsupported` 也可能出現在 1.0 流程。清單見 [`docs/API.md`](docs/API.md) 與 `PROJECT_STATUS.md`。
+- 狀態、HTTP 狀態碼、CLI 結束碼與 1.0 產物清單不變。`model.scad` 與 `preview.svg` 仍由 1.0 規格產生。
+- 已知缺口：`model.scad` 使用獨立的 1.0 算術，不受幾何 oracle 涵蓋。
+- 未改動：Rust core、schema 與相依套件。CI 對本最終 commit 的結果尚未確認。
+
 ## Unreleased / Phase 2d：2.0 文件端到端輸出
 
 這是 [ADR 0010](docs/adr/0010-migration-phases.md) 第 2 階段的第四個切片，尚未發佈；第 2 階段尚未結束（見 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)）。
@@ -49,7 +67,7 @@
 
 - 2.0 不回退到 OpenSCAD。無 CadQuery 時回 `source_only` 並附警告；不產生 `model.scad` 與 `preview.svg`。
 - 2.0 幾何在世界座標建立，不採用 [`docs/CAD_DSL_2.md`](docs/CAD_DSL_2.md) §6.2 的零件座標系。
-- 1.0 流程仍使用舊的 `CadQueryCompiler`，行為無變更。
+- 1.0 流程在本切片時仍使用舊的 `CadQueryCompiler`，行為無變更（2e 起改為 `Cad2Compiler`）。
 - 端點不移除 `expected_resolved`（僅範例使用的欄位）；用戶端需自行移除，CLI 會移除。
 - CI 結果（docker job 的 harness 與新端點檢查，以及三平台 `desktop-bundle.yml` 的 harness）與桌面 sidecar 的 2.0 smoke 尚待確認。
 

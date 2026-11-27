@@ -85,6 +85,44 @@ describe('App with the Rust core', () => {
     expect(api.generateFromSpec).not.toHaveBeenCalled();
   });
 
+  it('shows resolved port coordinates after validate, and hides them once the text changes', async () => {
+    const request = vi.fn(async (req: CoreRequest) =>
+      req.op === 'describe' ? plateDescribe : plateValidate,
+    );
+    setup({ request });
+    paste(DOC_2_0);
+    fireEvent.click(screen.getByRole('button', { name: '驗證 JSON' }));
+
+    const tree = await screen.findByRole('region', { name: '元件樹' });
+    expect(tree).toHaveTextContent('(0, 0, 10) 法向 +z');
+    expect(tree).toHaveTextContent('(0, 0, 0)');
+
+    paste({ ...DOC_2_0, name: 'changed' });
+    await waitFor(() => expect(screen.queryByRole('region', { name: '元件樹' })).not.toBeInTheDocument());
+    expect(screen.queryByText(/法向 \+z/)).not.toBeInTheDocument();
+  });
+
+  it('renders the tree as before when the validate result carries no matching ports', async () => {
+    const request = vi.fn(async (req: CoreRequest) =>
+      req.op === 'describe'
+        ? plateDescribe
+        : {
+            ...plateValidate,
+            result: {
+              ...plateValidate.result,
+              resolved: { ...plateValidate.result.resolved, ports: {} },
+            },
+          },
+    );
+    setup({ request: request as unknown as CoreClient['request'] });
+    paste(DOC_2_0);
+    fireEvent.click(screen.getByRole('button', { name: '驗證 JSON' }));
+
+    const tree = await screen.findByRole('region', { name: '元件樹' });
+    expect(tree).not.toHaveTextContent('法向');
+    expect(tree.querySelector('.ct-coord')).toBeNull();
+  });
+
   it('shows 2.0 issue fields (target, related, owner, layer) in the validation panel', async () => {
     const report = {
       valid: false,

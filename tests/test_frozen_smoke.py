@@ -169,6 +169,17 @@ def test_unix_tree_foreign_processes():
     assert fs.foreign_processes([p for p in tree if p.pid == 101], sidecar_dir, "") == []
 
 
+def test_exited_core_rpc_is_not_foreign():
+    """`promptcad-core rpc` often exits before its image path can be read (seen on Windows)."""
+    sidecar_dir = r"C:\PromptCAD\sidecar"
+    tree = [
+        fs.ProcInfo(201, 100, fs.CORE_EXE_NAME, None, None),
+        fs.ProcInfo(202, 100, "other-tool.exe", None, None),
+    ]
+    foreign = fs.foreign_processes(tree, sidecar_dir, r"C:\Windows")
+    assert {f["pid"]: f["reason"] for f in foreign} == {202: "image path unavailable"}
+
+
 def test_isolated_env_unix():
     base = {
         "PATH": "/home/u/.venv/bin:/usr/local/bin:/usr/bin",

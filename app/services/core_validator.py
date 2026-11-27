@@ -51,6 +51,16 @@ class CoreValidator:
         self.bridge = bridge
 
     async def validate(self, spec: CadDocument) -> ValidationReport:
+        return (await self.validate_spec(spec))[0]
+
+    async def validate_spec(
+        self, spec: CadDocument
+    ) -> tuple[ValidationReport, dict[str, Any], dict[str, Any]]:
+        """Validate a 1.0 document: ``(report, resolved, canonical 2.0 document)``.
+
+        The report is parsed strictly; ``resolved`` and the canonical document are parsed
+        leniently (empty when the core did not return them).
+        """
         try:
             response = await self.bridge.call(
                 {"op": "validate", "document": spec.model_dump(mode="json")}
@@ -64,9 +74,15 @@ class CoreValidator:
                 str(response.get("message", "")),
             )
         try:
-            return ValidationReport.model_validate(response["result"]["report"])
-        except (KeyError, TypeError, ValueError) as exc:
+            result = response["result"]
+            report = ValidationReport.model_validate(result["report"])
+            resolved = result.get("resolved") or {}
+            canonical = result.get("document") or {}
+        except (KeyError, TypeError, ValueError, AttributeError) as exc:
             raise CoreFailed(f"promptcad-core returned an unusable validate result: {exc}") from exc
+        if not isinstance(resolved, dict) or not isinstance(canonical, dict):
+            raise CoreFailed("promptcad-core returned an unusable validate result: bad shapes")
+        return report, resolved, canonical
 
     async def validate_document(
         self, document: dict[str, Any]

@@ -308,7 +308,7 @@ Create a 100x60x10 mm plate with two 5 mm blind holes 6 mm deep.
 |---|---|
 | `spec.json` | 可編輯、可版本控制的 CAD DSL |
 | `validation.json` | errors、warnings、info 與 review 狀態 |
-| `model.py` | 可獨立執行的 CadQuery 模型 |
+| `model.py` | 可獨立執行的 CadQuery 模型；1.0 與 2.0 皆由 `Cad2Compiler`（`app/services/compiler2.py`）產生 |
 | `model.scad` | OpenSCAD fallback 模型 |
 | `preview.svg` | 不依賴 CAD 核心的快速工程預覽 |
 | `model.step` | 實體 CAD 交換檔，需要 CadQuery |
@@ -340,7 +340,7 @@ npm --prefix web test
 
 `pytest` 需要 `promptcad-core` 執行檔（見上方「完整 CAD 環境」的 `make core`）。
 
-目前測試涵蓋規則解析、M 制孔徑、盲孔、沉頭孔、X/Y/Z 軸幾何原始碼、驗證閘門、可編輯 DSL、API Token、檔案下載與 ZIP；第 1 階段另加 schema 匯出、新前端服務（含未建置時的 503 說明頁）、sidecar 啟動、凍結 smoke／終止檢查、鎖檔與授權聲明產生器的純函式測試、2.0 範例的紙上驗證，以及前端的 vitest 測試。CI 另有 `docker` job 實際建置映像並確認 `/` 提供新前端、`lock-check` job 確認三份桌面鎖檔與 `pyproject.toml` 一致，以及三平台的 `desktop` job（`cargo fmt`／`clippy`／`test`）。第 2 階段 2b 另有：Rust core 303 項測試、`src-tauri` 23 項測試、伺服器整合測試（對實際的 `promptcad-core` 執行，含 49 個 parity 案例）與前端 vitest 52 項；這些數字為撰寫時的本機結果。第 2 階段 2d 另有 `Cad2Compiler` 測試、2.0 端點與前端測試，以及幾何等價 harness（`make geometry-check`，需要含 CadQuery 的環境，見 `CONTRIBUTING.md`）。2d 的本機結果：pytest 472 項通過、3 項略過；vitest 75 項通過（10 個檔案）。
+目前測試涵蓋規則解析、M 制孔徑、盲孔、沉頭孔、X/Y/Z 軸幾何原始碼、驗證閘門、可編輯 DSL、API Token、檔案下載與 ZIP；第 1 階段另加 schema 匯出、新前端服務（含未建置時的 503 說明頁）、sidecar 啟動、凍結 smoke／終止檢查、鎖檔與授權聲明產生器的純函式測試、2.0 範例的紙上驗證，以及前端的 vitest 測試。CI 另有 `docker` job 實際建置映像並確認 `/` 提供新前端、`lock-check` job 確認三份桌面鎖檔與 `pyproject.toml` 一致，以及三平台的 `desktop` job（`cargo fmt`／`clippy`／`test`）。第 2 階段 2b 另有：Rust core 303 項測試、`src-tauri` 23 項測試、伺服器整合測試（對實際的 `promptcad-core` 執行，含 49 個 parity 案例）與前端 vitest 52 項；這些數字為撰寫時的本機結果。第 2 階段 2d 另有 `Cad2Compiler` 測試、2.0 端點與前端測試，以及幾何等價 harness（`make geometry-check`，需要含 CadQuery 的環境，見 `CONTRIBUTING.md`）。2d 的本機結果：pytest 472 項通過、3 項略過；vitest 75 項通過（10 個檔案）。第 2 階段 2e 起，1.0 的 `model.py` 也由 `Cad2Compiler` 產生；`tests/test_v1_compile_golden.py`（不需 CadQuery）比對其 `model_sha256`，幾何 golden 模式（`make geometry-check`）比對凍結的 `tests/fixtures/v1_geometry_golden.json`。2e 的本機結果：pytest 全數通過、3 項略過（平台相關）；vitest 80 項通過。
 
 ## 專案結構
 
@@ -351,7 +351,7 @@ app/
   models/              CadDocument DSL 與 API 模型
   services/
     planners/          本地規則與 OpenAI-compatible LLM
-    compiler.py        CadQuery 確定性編譯器
+    compiler2.py       Cad2Compiler：CadQuery 確定性編譯器（1.0 與 2.0 共用）
     openscad.py        OpenSCAD 編譯器
     renderer.py        CAD 核心選擇與受限 subprocess
     core_validator.py  1.0 驗證，經 Rust core 的 validate 操作（設計規則只在 Rust core）

@@ -1,7 +1,12 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { enclosureDescription, plateDescription, repeatedDescription } from '../test/fixtures';
+import {
+  enclosureDescription,
+  plateDescription,
+  plateValidation,
+  repeatedDescription,
+} from '../test/fixtures';
 import { ComponentTree } from './ComponentTree';
 
 describe('ComponentTree', () => {
@@ -96,5 +101,43 @@ describe('ComponentTree', () => {
     } finally {
       consoleError.mockRestore();
     }
+  });
+  describe('resolved ports', () => {
+    const portsLine = (container: HTMLElement) =>
+      within(container).getAllByText('連接點：')[0]!.parentElement!;
+
+    it('shows world position and normal/direction next to each port chip', () => {
+      const resolved = plateValidation().resolved.ports;
+      render(<ComponentTree description={plateDescription()} resolvedPorts={resolved} />);
+      const body = screen.getByRole('list', { name: '固定板 的本體操作' });
+      const ports = portsLine(body);
+      expect(ports).toHaveTextContent('origin');
+      expect(ports).toHaveTextContent('(0, 0, 0)');
+      expect(ports).toHaveTextContent('(0, 0, 10) 法向 +z');
+    });
+
+    it('formats numbers to at most 4 decimals and never shows -0', () => {
+      const ports = {
+        'v_plate.origin': { type: 'point', position: [-0, 1.23456789, 2.5] },
+        'v_plate.axis_z': { type: 'axis', position: [0.00001, 100, -3], direction: '-z' },
+      } as ReturnType<typeof plateValidation>['resolved']['ports'];
+      render(<ComponentTree description={plateDescription()} resolvedPorts={ports} />);
+      const line = portsLine(screen.getByRole('list', { name: '固定板 的本體操作' }));
+      expect(line).toHaveTextContent('(0, 1.2346, 2.5)');
+      expect(line).toHaveTextContent('(0, 100, -3) 方向 -z');
+      expect(line.textContent).not.toContain('-0,');
+    });
+
+    it('renders ports without a resolved entry exactly as before', () => {
+      const withoutProp = render(<ComponentTree description={plateDescription()} />);
+      const before = portsLine(
+        screen.getByRole('list', { name: '固定板 的本體操作' }),
+      ).innerHTML;
+      withoutProp.unmount();
+      render(<ComponentTree description={plateDescription()} resolvedPorts={{}} />);
+      const after = portsLine(screen.getByRole('list', { name: '固定板 的本體操作' })).innerHTML;
+      expect(after).toBe(before);
+      expect(after).not.toContain('ct-coord');
+    });
   });
 });

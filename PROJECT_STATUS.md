@@ -1,6 +1,6 @@
 # Project Status — v0.1.0（含未發佈的第 1、2 階段切片）
 
-版本號仍為 0.1.0。下方「v0.1.0 可用功能」是已發佈的 MVP；「第 1 階段切片（Unreleased）」與「第 2 階段切片（Unreleased / Phase 2a、2b、2c、2d）」是依 [ADR 0010](docs/adr/0010-migration-phases.md) 第 1、2 階段加入、尚未發佈的部分。
+版本號仍為 0.1.0。下方「v0.1.0 可用功能」是已發佈的 MVP；「第 1 階段切片（Unreleased）」與「第 2 階段切片（Unreleased / Phase 2a、2b、2c、2d、2e）」是依 [ADR 0010](docs/adr/0010-migration-phases.md) 第 1、2 階段加入、尚未發佈的部分。
 
 ## v0.1.0 可用功能
 
@@ -250,7 +250,7 @@ v0.1.0 發行包：
 
 ## 第 2 階段 2d 切片（Unreleased / Phase 2d：2.0 文件端到端輸出）
 
-2d 讓 2.0 文件能經 REST、CLI 與桌面版輸出幾何。新的 `Cad2Compiler` 讀取 Rust core 的 `validate` 結果（`document` 與 `resolved`），產生 `model.py`；Python 端不做任何求解，只做 `resolved.components` 的剛體放置、`resolved.holes` 的主孔切刀，以及 `<id>.entry` port 上的 §7.2 沉頭、埋頭算術。不支援的構造會拋出 `CompileUnsupported` 並列出每一個（id, 原因），不會被靜默略過。1.0 流程仍使用舊的 `CadQueryCompiler`，行為無變更。
+2d 讓 2.0 文件能經 REST、CLI 與桌面版輸出幾何。新的 `Cad2Compiler` 讀取 Rust core 的 `validate` 結果（`document` 與 `resolved`），產生 `model.py`；Python 端不做任何求解，只做 `resolved.components` 的剛體放置、`resolved.holes` 的主孔切刀，以及 `<id>.entry` port 上的 §7.2 沉頭、埋頭算術。不支援的構造會拋出 `CompileUnsupported` 並列出每一個（id, 原因），不會被靜默略過。1.0 流程在 2d 時仍使用舊的 `CadQueryCompiler`，行為無變更；第 2 階段 2e 起 1.0 也改由 `Cad2Compiler` 產生（見「第 2 階段 2e 切片」）。
 
 為何不採用「core 降級為 1.0 文件後交給 1.0 編譯器」：降級會讓等價測試變成同義反覆，降級也不保留幾何（沿軸向的入口會被投影到 0），且無法表達多零件文件（enclosure-with-lid 為 `expressible: false`）。降級仍保留為測試參照（oracle）。決策紀錄見 [0006](docs/adr/0006-geometry-kernel-occt-python-sidecar.md) 的回顧紀錄。
 
@@ -304,11 +304,64 @@ v0.1.0 發行包：
 
 ### 第 2 階段 2d 尚未完成
 
-- 1.0 流程改用 `Cad2Compiler`，並移除舊的 `CadQueryCompiler`（於 CI 綠燈後進行）。
 - 零件座標系建置（§6.2）與上方的已知偏差。
 - 2.0 的 `model.scad`、`preview.svg`，以及 `kernel-validation.json`、`bom.json`、op log 持久化。
-- 前端的屬性編輯、檢視器元件選取與 port 顯示。
+- 前端的屬性編輯與檢視器元件選取（port 顯示已於 2e 完成）。
 - 1.0 `CadDocument` 的 Pydantic 由 Rust 生成。
+- [ADR 0012](docs/adr/0012-server-host-for-rust-core.md) 待負責人簽核。
+
+## 第 2 階段 2e 切片（Unreleased / Phase 2e：1.0 流程改用 Cad2Compiler、移除舊編譯器）
+
+1.0 的輸出流程（`POST /api/v1/generate`、`POST /api/v1/generate-from-spec`、CLI 的 `generate` 與 `render`）改由 `Cad2Compiler` 產生 `model.py`。`app/services/compiler.py`（`CadQueryCompiler`）已刪除，專案現在只剩一個 CadQuery 編譯器（`app/services/compiler2.py`），1.0 與 2.0 共用。依 [ADR 0010](docs/adr/0010-migration-phases.md) 第 2 階段「每個階段的完成條件都包含移除被取代的舊實作」，舊實作於本切片移除；移除後的回歸基準是凍結的 golden 檔，見下方「2e 的回歸 oracle」。
+
+| 項目 | 位置 | 狀態 |
+|---|---|---|
+| 1.0 流程：一次 core `validate` 呼叫取得報告、`resolved` 與正規化的 2.0 文件，再交給 `Cad2Compiler`；每個工作只呼叫 core 一次 | `app/services/core_validator.py`（`validate_spec`）、`app/services/job_service.py` | 已實作；`validate` 對外的介面不變 |
+| 舊編譯器移除 | `app/services/compiler.py` | 已刪除（`CadQueryCompiler`） |
+| `model.scad` 與 `preview.svg` 保留 | `app/services/openscad.py`、`app/services/preview.py` | 1.0 不變，仍由 1.0 規格產生，不由 CadQuery 編譯器產生。保留理由：`preview.svg` 是 source-only 使用者唯一的視覺（前端會退回顯示它）；`model.scad` 是沒有 CadQuery 時唯一的 STL 路徑（[ADR 0006](docs/adr/0006-geometry-kernel-occt-python-sidecar.md)） |
+| 1.0 幾何回歸 oracle（凍結 golden） | `tests/fixtures/v1_geometry_golden.json`、`scripts/geometry_equivalence.py`、`tests/test_v1_compile_golden.py` | 已實作；metrics 與 source 兩層，見下 |
+| 原生 plate 檢查 | `scripts/geometry_equivalence.py` | 2.0 plate 與其降級後經 core `validate` → `Cad2Compiler` 的往返比較（metrics 與對稱差）；附凍結的 `native:plate-four-holes.cad2` 條目 |
+| 唯讀元件樹顯示 port 的世界座標 | `web/src/components/ComponentTree.tsx`、`web/src/App.tsx` | 已實作：在「驗證 JSON」之後顯示；point 為 (x, y, z)，axis 為位置與方向，face 為原點與法向，region 為 (min)–(max)；至多 4 位小數；編輯器文字改變時隱藏。屬性編輯與檢視器元件選取仍未開始 |
+
+### 第 2 階段 2e 的 1.0 行為變更（已接受）
+
+- `model.py` 不再內嵌 `CAD_SPEC`；文件字串改為說明它由 2.0 文件產生，並含 `place()` 輔助函式。
+- 略過特徵的警告文字改為 `part 1 fillet 1 skipped: …`（倒角同理：`part 1 chamfer 1 skipped: …`）。
+- DXF 剖面高度由 `max_z / 2` 改為包圍盒中點的 Z；五種基體的數值相同。
+- 有效的 1.0 文件若 core 沒有回傳 `resolved`，工作為 `failed`／`compile-unsupported`，且不產生 `model.py`。未在 54 個語料案例中觀察到。
+- 無效的 1.0 規格：工作仍為 `failed`／`validation-blocked`，且仍寫入 `model.py`（與之前相同）。
+- `compile-unsupported` 現在也可能出現在 1.0 流程。
+- 1.0 的產物清單不變：`spec.json`、`validation.json`、`model.py`、`model.scad`、`preview.svg`（有 CadQuery 時另加渲染產物）。1.0 工作不產生 `resolved.json`。
+- 狀態、產物名稱、HTTP 狀態碼、CLI 結束碼與 `manifest.spec` 不變。
+
+### 第 2 階段 2e 的回歸 oracle
+
+- **兩層**：
+  - metrics 層（需要 CadQuery）：`scripts/geometry_equivalence.py` 的 golden 模式（預設）。每個案例比較體積、包圍盒、質心、表面積（新指標，相對誤差 1e-6）、實體數、警告數與 `shape_valid`。
+  - source 層（不需要 CadQuery）：`tests/test_v1_compile_golden.py`，在 Ubuntu 測試 job 執行，比對 `Cad2Compiler` 輸出的 `model_sha256`。
+- **golden 內容**：`tests/fixtures/v1_geometry_golden.json` 凍結於舊編譯器仍存在、A/B 比對 54／54 相等時，記錄每個案例的 `spec_sha256`（規格 JSON 的 sha256）與 `model_sha256`（`Cad2Compiler` 原始碼的 sha256）；meta 記錄 CadQuery 2.8.0、OCP 7.9.3.1、Windows 11 與 54 個案例。另含一筆 native 條目 `native:plate-four-holes.cad2`。
+- **比較規則**：案例缺漏、多出或 `spec_sha256` 改變即視為 mismatch。`shape_valid` 為 false 的 2 個案例只比較 `shape_valid`、實體數、警告數與包圍盒。
+- **已失去的檢查**：舊編譯器的對稱差檢查已不再進行；表面積指標僅部分補償。
+- **重新基準化**：`--write-golden PATH` 以目前輸出重建 golden；`PROMPTCAD_UPDATE_GOLDEN=1` 只改寫 `model_sha256` 欄位。任何重新基準化都必須在 PR 中說明理由。
+- **已知缺口**：`model.scad` 使用獨立的 1.0 算術，不受幾何 oracle 涵蓋（先前即是如此），因此 `model.py` 與 `model.scad` 可能不一致。
+
+### 第 2 階段 2e 驗證（本機）
+
+- **跨平台證據**：移除前已推送 golden，CI 的 `docker` job（Linux、conda CadQuery 2.8.0）執行 golden 模式：54 個 equal、0 個 mismatch，未需要任何核心敏感的例外。
+- **移除後本機 golden 模式**：54 個 equal，另 3 個 native equal。
+- **G1 實機輸出**（CLI，`.venv-desktop`）：`examples/generated/plate-four-holes/spec.json` 得到 `completed／cadquery`，約 5.4 秒；`model.step` 46,312 B、`model.stl` 127,884 B、`model.dxf` 22,080 B、`model.svg` 63,671 B。其 `model.py` 的 sha256 與 golden 的 `model_sha256` 相同。`examples/generated/plate-four-holes/model.py` 已重新產生。
+- **G2 桌面閘門**：以本切片重建的 sidecar 於隔離環境 smoke 通過：onedir 406.1 MiB（890 個檔案）；五種基體與範例的 `generate-from-spec`、規則 planner 的 `generate`、兩份 2.0 範例的 `generate-from-document` 皆 `completed`（各約 1.7–1.9 秒）；9 個 render worker，`foreign_processes=[]`。首次執行曾誤報 `promptcad-core.exe`（`image path unavailable`）：每次驗證都會啟動一次 `promptcad-core rpc`，它在檢查讀取映像路徑前就結束。`frozen_smoke.py` 因此把打包內的 core 名稱比照 sidecar 自身的名稱處理（其他名稱的未知路徑仍判為外部行程），並加上單元測試；修正後連續 4 次通過。
+- **其他**：pytest 全數通過（3 項略過，皆為平台相關：symlink 權限與兩項 unix 專用測試）；vitest 80 項通過。無 Rust 變更、無 schema 變更、無新增相依套件。
+
+### 第 2 階段 2e 未驗證
+
+- 本最終 commit 的 GitHub CI 結果（尚未確認）。上方 `docker` job 的證據是移除前的提交。
+- macOS／Linux 桌面包的 `desktop-bundle.yml` 執行（golden 模式與 smoke）。
+
+### 第 2 階段 2e 尚未完成
+
+- 1.0 `CadDocument` 的 Pydantic 由 Rust 生成。`app/models/cad.py` 仍被 `planners/intent.py`（建構與 isinstance 檢查）、`openscad.py`、`preview.py`、API 422 驗證（模型驗證器、大小限制）與 `export_schema.py`（產生 TypeScript 型別）使用；本切片只減少了一個依賴方（`compiler.py`），見 [ADR 0008](docs/adr/0008-single-schema-source-of-truth.md) 回顧紀錄。
+- 前端的屬性編輯與檢視器元件選取。
 - [ADR 0012](docs/adr/0012-server-host-for-rust-core.md) 待負責人簽核。
 
 ## 下一階段
@@ -317,11 +370,11 @@ v0.1.0 發行包：
 
 1. 完成第 1 階段：取得 `desktop-bundle.yml` 三平台矩陣的執行結果，依 CI 的 `--strict` 失敗補齊 unix 原生函式庫分類，macOS／Linux 的參考項目連續兩次全綠後改為必過（ADR 0011）。
 2. 完成第 2 階段：Rust core（CadDocument 2.0、驗證器、patch 引擎、op log、1.0 → 2.0 adapter）已於 `crates/promptcad-core/` 實作（見 Phase 2a），並已接入 Tauri 與伺服器（見 Phase 2b）。剩餘項目：
-   - 負責人簽核 [ADR 0012](docs/adr/0012-server-host-for-rust-core.md)；驗證 2b、2c、2d 未驗證項目（Tauri 真實 WebView 往返、`tauri build`、CI `docker` job、2c 與 2d 的 GitHub CI 執行、2d 的桌面 sidecar 2.0 smoke、macOS／Linux 桌面包內的 core 執行檔）。
+   - 負責人簽核 [ADR 0012](docs/adr/0012-server-host-for-rust-core.md)；驗證 2b、2c、2d、2e 未驗證項目（Tauri 真實 WebView 往返、`tauri build`、CI `docker` job、2c 與 2d 的 GitHub CI 執行、2d 的桌面 sidecar 2.0 smoke、macOS／Linux 桌面包內的 core 執行檔）。
    - 1.0 `CadDocument` 與 2.0 文件的 Pydantic 由 Rust 生成（TypeScript 的 core 請求／回應型別已於 2b 生成；validation report 的 Pydantic 已於 2c 生成；2.0 僅有 spike），`app/models/cad.py` 僅保留 1.0 相容用途或被生成檔取代（ADR 0008）。
    - （已於 2d 完成）Python 編譯器接受已驗證的 2.0 規格（`Cad2Compiler`），並完成 1.0 直接輸出與經轉接輸出的幾何等價測試（`scripts/geometry_equivalence.py`），見上方「第 2 階段 2d 切片」。
-   - 1.0 流程改用 `Cad2Compiler` 並移除舊編譯器（`CadQueryCompiler`），於 CI 綠燈後進行。
-   - 前端的屬性編輯、檢視器元件選取與 port 顯示（唯讀元件樹已於 2b 完成）。
+   - （已於 2e 完成）1.0 流程改用 `Cad2Compiler` 並移除舊編譯器（`CadQueryCompiler`）。
+   - 前端的屬性編輯與檢視器元件選取（唯讀元件樹已於 2b 完成；port 顯示已於 2e 完成）。
    - （已於 2c 完成）移除 Python 端的設計驗證邏輯，見上方「第 2 階段 2c 切片」。
 3. 第 3 階段：約束求解器評估（[ADR 0007](docs/adr/0007-constraint-solver.md)）與多 agent 編排。
 

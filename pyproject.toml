@@ -66,7 +66,6 @@ ignore = ["E501"]
 [tool.ruff.lint.per-file-ignores]
 # Pre-existing findings in modules that ADR 0010 Phase 1 must not modify; remove these
 # entries when app/services is next edited (all but SIM102 are auto-fixable).
-"app/services/compiler.py" = ["UP032"]
 "app/services/openscad.py" = ["I001"]
 "app/services/planners/rule_based.py" = ["I001"]
 "app/services/preview.py" = ["I001", "F401"]

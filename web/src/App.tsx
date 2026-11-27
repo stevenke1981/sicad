@@ -24,7 +24,7 @@ import type {
   PlannerChoice,
 } from './api/types';
 import { ArtifactList } from './components/ArtifactList';
-import { ComponentTree, type Description } from './components/ComponentTree';
+import { ComponentTree, type Description, type ResolvedPorts } from './components/ComponentTree';
 import { JobHistory } from './components/JobHistory';
 import { StlViewer } from './components/StlViewer';
 import { SvgPreview } from './components/SvgPreview';
@@ -159,7 +159,11 @@ export function App({
     inputWarnings?: string[];
   } | null>(null);
   // The tree is only shown while the editor still holds the text it was described from.
-  const [described, setDescribed] = useState<{ text: string; value: Description } | null>(null);
+  const [described, setDescribed] = useState<{
+    text: string;
+    value: Description;
+    ports?: ResolvedPorts;
+  } | null>(null);
   // Non-blocking: describe failed after a successful validate (same text rule as `described`).
   const [treeNote, setTreeNote] = useState<{ text: string; message: string } | null>(null);
   const [coreNote, setCoreNote] = useState<string | null>(null);
@@ -307,7 +311,7 @@ export function App({
       );
       try {
         const value = await core.describe(document);
-        setDescribed({ text, value });
+        setDescribed({ text, value, ports: result.resolved?.ports });
       } catch (error) {
         // The validation result above stands; a describe failure only replaces the tree.
         setTreeNote({ text, message: `無法顯示元件樹：${errorText(error)}` });
@@ -635,7 +639,7 @@ export function App({
             </p>
           )}
           {described && described.text === specText && is2 && (
-            <ComponentTree description={described.value} />
+            <ComponentTree description={described.value} resolvedPorts={described.ports} />
           )}
           {treeNote && treeNote.text === specText && is2 && (
             <p className="core-note" role="status" data-testid="tree-note">

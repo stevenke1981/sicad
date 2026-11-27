@@ -149,6 +149,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .ct-table thead th { color:var(--muted); font-size:.7rem; letter-spacing:.06em; }
 .ct-ports { margin:0; display:flex; flex-wrap:wrap; gap:6px; align-items:baseline; font-size:.8rem; }
 .ct-port small { color:var(--muted); margin-left:4px; font-size:.68rem; }
+.ct-port small.ct-coord { color:var(--text); font-size:.7rem; }
 .ct-repeated > .ct-node { opacity:.75; font-style:italic; }
 .ct-heading { margin:14px 0 4px; font-size:.95rem; }
 .ct-constraints { font-size:.84rem; }

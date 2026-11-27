@@ -67,6 +67,7 @@ from typing import Any, NamedTuple
 
 ROOT = Path(__file__).resolve().parents[1]
 EXE_NAME = "promptcad-sidecar" + (".exe" if sys.platform == "win32" else "")
+CORE_EXE_NAME = "promptcad-core" + (".exe" if sys.platform == "win32" else "")
 DEFAULT_EXE = ROOT / "src-tauri" / "binaries" / "promptcad-sidecar" / EXE_NAME
 MEASURE_DIR = ROOT / "build" / "sidecar"
 EXAMPLES_DIR = ROOT / "examples" / "generated"
@@ -368,7 +369,13 @@ def foreign_processes(
         elif proc.path is None:
             # Linux truncates comm to 15 bytes ("promptcad-sidec"); a short-lived render worker
             # may exit before /proc/<pid>/exe can be read, leaving only that truncated name.
-            own = {EXE_NAME.lower(), EXE_NAME.lower()[:LINUX_COMM_LEN]}
+            # The bundled core (build_sidecar.py refuses to build without it) is just as
+            # short-lived: one `promptcad-core rpc` per validate call.
+            own = {
+                EXE_NAME.lower(),
+                EXE_NAME.lower()[:LINUX_COMM_LEN],
+                CORE_EXE_NAME.lower(),
+            }
             if proc.name.lower() not in (*own, *SYSTEM_HELPER_IMAGES):
                 reason = "image path unavailable"
         elif not is_within(proc.path, sidecar_dir):
