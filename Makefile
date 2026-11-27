@@ -1,8 +1,17 @@
-.PHONY: dev test lint format doctor docker-up docker-down clean schema schema-check web-deps web \
+.PHONY: core dev test lint format doctor docker-up docker-down clean schema schema-check web-deps web \
         desktop-lock desktop-lock-check desktop-env notices notices-check sidecar desktop
 
 PYTHON ?= python
 NPM ?= npm
+
+# Rust core binary used by POST /api/v1/core (found automatically under crates/promptcad-core/target).
+# The repo-root rust-toolchain.toml pins the Windows MSVC toolchain, which does not exist on
+# Linux/macOS, so there the host stable toolchain is selected (as CI does); override freely.
+ifneq ($(OS),Windows_NT)
+core: export RUSTUP_TOOLCHAIN ?= stable
+endif
+core:
+	cd crates/promptcad-core && cargo build --release --locked --bins
 
 dev:
 	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

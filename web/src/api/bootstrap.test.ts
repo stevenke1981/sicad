@@ -15,12 +15,33 @@ describe('resolveBackend', () => {
       mode: 'tauri',
       baseUrl: 'http://127.0.0.1:50123',
       token: 'tok-123',
+      coreInvoke: expect.any(Function),
     });
+  });
+
+  it('hands out a core transport that calls invoke("core_request", { request })', async () => {
+    const invoke = vi.fn(async (cmd: string) =>
+      cmd === 'backend_info'
+        ? { base_url: 'http://127.0.0.1:50123', token: 't' }
+        : { status: 'ok', result: { op: 'version' } },
+    );
+    const fakeWindow = { __TAURI__: { core: { invoke } } } as unknown as Parameters<
+      typeof resolveBackend
+    >[0];
+    const backend = await resolveBackend(fakeWindow);
+    const request = { op: 'version' };
+
+    await expect(backend.coreInvoke?.(request)).resolves.toEqual({
+      status: 'ok',
+      result: { op: 'version' },
+    });
+    expect(invoke).toHaveBeenLastCalledWith('core_request', { request });
   });
 
   it('falls back to same-origin with no token in a plain browser', async () => {
     const backend = await resolveBackend({});
     expect(backend).toEqual({ mode: 'browser', baseUrl: '', token: null });
+    expect(backend.coreInvoke).toBeUndefined();
   });
 
   it('defaults to the real window (jsdom has no __TAURI__)', async () => {

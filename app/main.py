@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from app import __version__
 from app.api.routes import router
 from app.core.config import Settings, get_settings
+from app.services.core_bridge import CoreBridge
 from app.services.job_service import JobService
 
 _ROOT_FILE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -74,7 +75,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         settings.ensure_directories()
-        yield
+        try:
+            yield
+        finally:
+            app.state.core.shutdown()  # kill running core children instead of awaiting them
 
     app = FastAPI(
         title=settings.app_name,
@@ -84,6 +88,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.jobs = JobService(settings)
+    app.state.core = CoreBridge(settings)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,

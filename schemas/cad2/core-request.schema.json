@@ -1,0 +1,205 @@
+{
+  "$defs": {
+    "PatchOrigin": {
+      "description": "Who submitted a patch: an agent role or `human`.",
+      "enum": [
+        "space_planner",
+        "component_smith",
+        "joiner",
+        "assembler",
+        "human"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One request, tagged by `op`.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "Validate a 1.0 or 2.0 document (1.0 is upgraded first).",
+      "properties": {
+        "completed": {
+          "default": true,
+          "description": "Check the completed-document rules (components ≥ 1, parts ≥ 1, root). Default `true`.",
+          "type": "boolean"
+        },
+        "document": {
+          "additionalProperties": true,
+          "description": "Raw 1.0 or 2.0 document.",
+          "type": "object"
+        },
+        "op": {
+          "const": "validate",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "document"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Solve a 1.0 or 2.0 document (`resolved.json`).",
+      "properties": {
+        "document": {
+          "additionalProperties": true,
+          "description": "Raw 1.0 or 2.0 document.",
+          "type": "object"
+        },
+        "op": {
+          "const": "solve",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "document"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Canonical 2.0 form: upgrade 1.0, recompute bindings, recompute `root`.",
+      "properties": {
+        "document": {
+          "additionalProperties": true,
+          "description": "Raw 1.0 or 2.0 document.",
+          "type": "object"
+        },
+        "op": {
+          "const": "normalize",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "document"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Upgrade a 1.0 document to 2.0 (a missing `schema_version` counts as 1.0).",
+      "properties": {
+        "document": {
+          "additionalProperties": true,
+          "description": "Raw 1.0 document.",
+          "type": "object"
+        },
+        "op": {
+          "const": "upgrade",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "document"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Downgrade a 2.0 document to 1.0 when it is expressible there.",
+      "properties": {
+        "document": {
+          "additionalProperties": true,
+          "description": "Raw 2.0 document.",
+          "type": "object"
+        },
+        "op": {
+          "const": "downgrade",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "document"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Apply a patch to a 2.0 document (spec §8.6).",
+      "properties": {
+        "document": {
+          "additionalProperties": true,
+          "description": "Raw 2.0 document (the current state).",
+          "type": "object"
+        },
+        "log_seq": {
+          "default": 0,
+          "description": "`seq` of the op-log entry: the number of entries already in the host's\n`oplog.jsonl`. Default 0.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "op": {
+          "const": "apply_patch",
+          "type": "string"
+        },
+        "origin": {
+          "$ref": "#/$defs/PatchOrigin",
+          "description": "Who submitted the patch, as determined by the host (not by the patch body)."
+        },
+        "patch": {
+          "additionalProperties": true,
+          "description": "Raw patch.",
+          "type": "object"
+        },
+        "timestamp": {
+          "default": null,
+          "description": "Caller-supplied timestamp copied into the op-log entry (the core reads no clock).",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "op",
+        "document",
+        "patch",
+        "origin"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Read model for UIs: components with fields and ports, parts, assemblies, tree.",
+      "properties": {
+        "document": {
+          "additionalProperties": true,
+          "description": "Raw 1.0 or 2.0 document.",
+          "type": "object"
+        },
+        "op": {
+          "const": "describe",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "document"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Crate version and supported schema versions.",
+      "properties": {
+        "op": {
+          "const": "version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "CoreRequest"
+}

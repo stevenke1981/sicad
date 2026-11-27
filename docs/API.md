@@ -19,6 +19,10 @@
 
 回傳規劃器、特徵、格式、CadQuery／OpenSCAD 可用狀態及目前設定。
 
+另含 Rust core 的狀態（皆為選填欄位，舊用戶端可忽略）：`core_available`（布林，預設 `false`）、
+`core_crate_version`、`core_api_version`、`core_schema_versions`（例如 `["1.0", "2.0"]`）。找不到 core
+執行檔時 `core_available` 為 `false`，其餘為 `null`／空陣列。
+
 ## `POST /plan`
 
 只產生與驗證 CAD DSL，不建立工作目錄，也不啟動幾何核心。
@@ -84,6 +88,51 @@ Body 是完整 `CadDocument`。回傳：
 
 `error` 會阻止 renderer；`warning` 要求人工覆核；`info` 用於假設與螺紋近似資訊。
 
+## `POST /core`
+
+CadDocument 2.0 的唯一入口：把請求原封不動轉交給 Rust core（`promptcad-core rpc`，每次呼叫啟動一次子行程），
+再把 core 的回應原封不動回傳。伺服器**不**解讀、驗證或重新序列化 2.0 內容（ADR 0008 規則 4）；
+`validate`、`solve`、`normalize`、`upgrade`、`downgrade`、`apply_patch`、`describe`、`version` 等 `op`
+的欄位與回應內容請見 [`crates/promptcad-core/README.md`](../crates/promptcad-core/README.md)。
+本端點與 `/validate`、`/generate-from-spec` 無關，後兩者仍只接受 1.0 文件。
+
+請求：JSON 物件（以 `op` 標記），例如 `{"op": "version"}`。文件中的範例專用鍵 `expected_resolved` 需由呼叫端先移除。
+
+```bash
+curl -X POST http://localhost:8000/api/v1/core -H "Content-Type: application/json" -H "Authorization: Bearer YOUR_TOKEN" -d '{"op": "version"}'
+```
+
+```json
+{"status":"ok","result":{"op":"version","crate_version":"0.1.0","api_version":1,"schema_versions":["1.0","2.0"]}}
+```
+
+回應是 core 的信封：`status: "ok"` 帶 `result`；`status: "error"` 帶 `code`、`message`、`path`、`violations`。
+**領域錯誤（`status: "error"`）與成功一樣回 HTTP `200`**，讓前端對 Tauri 與 HTTP 兩種傳輸使用同一個解碼器。
+
+| HTTP | 意義 |
+|---|---|
+| `200` | core 已回應（`status` 為 `ok` 或 `error`） |
+| `401` | Token 缺少或錯誤 |
+| `413` | 請求本文超過 `PROMPTCAD_CORE_MAX_REQUEST_BYTES`（上限 8 MiB，與 core 相同），不會啟動 core |
+| `422` | 本文第一個非空白字元不是 `{`（不會啟動 core）。注意：以 `{` 開頭但格式錯誤的本文**不再**回 422，伺服器不解析本文，由 core 回 HTTP `200` 與 `bad_request` 錯誤信封 |
+| `502` | core 異常結束、輸出超過上限或無法解析（`detail` 只含截斷後的 stderr 尾端） |
+| `503` | 找不到或無法啟動 core 執行檔；或 core 忙碌（`PROMPTCAD_CORE_QUEUE_WAIT_SECONDS` 內拿不到執行名額，或等待佇列已滿），此時帶 `Retry-After` 標頭且不會啟動 core |
+| `504` | core 超過 `PROMPTCAD_CORE_TIMEOUT_SECONDS`（從行程啟動起算），行程已被終止 |
+
+設定：
+
+- `PROMPTCAD_CORE_BIN`：`promptcad-core` 執行檔路徑。未設定時依序尋找：目前執行檔旁（或 PyInstaller bundle 內）、
+  `PATH`（只搜尋絕對路徑目錄，不含目前工作目錄；Windows 只接受 `.exe`，不接受 `.cmd`／`.bat`）、
+  `crates/promptcad-core/target/{release,debug}`（僅限原始碼 checkout，`PROMPTCAD_ENV=production` 或凍結的 bundle 不使用）。
+  設定後必須指向既有檔案，否則視為 core 不可用（`/capabilities` 的 `core_available` 為 `false`），不會退回其他位置。Docker 映像已內建並設定為 `/usr/local/bin/promptcad-core`；
+  本機以 `make core` 建置。桌面 sidecar 不含 core（桌面前端經由 Tauri 呼叫），找不到屬正常狀態。
+- `PROMPTCAD_CORE_TIMEOUT_SECONDS`（預設 `15`）、`PROMPTCAD_CORE_MAX_REQUEST_BYTES`（預設 `8388608`）。
+- `PROMPTCAD_CORE_MAX_CONCURRENCY`（預設 `4`，1–64）：同時執行的 core 子行程上限，使用專用執行緒池，不佔用 render 工作的預設池。
+  最多再有 4 倍此數量的請求可等待；等待超過 `PROMPTCAD_CORE_QUEUE_WAIT_SECONDS`（預設 `3`，秒）即回 `503` + `Retry-After`。
+  客戶端中斷連線時，對應的 core 子行程會被終止並釋放名額；伺服器關閉時執行中的子行程直接被終止。
+- `/capabilities` 的 core 探測有獨立的短逾時（5 秒），失敗結果快取 30 秒，不會因 core 而阻塞或失敗。
+- 單一回應上限：core 自身 24 MiB（超過時回 `error` 信封，代碼 `response_too_large`）；橋接層另有略高的第二道上限（28 MiB，超過回 `502`）。
+
 ## 工作與下載
 
 - `GET /jobs`：列出最近工作。
@@ -116,5 +165,6 @@ curl http://localhost:8000/api/v1/capabilities \
 
 - `401`：Token 缺少或錯誤。
 - `404`：工作或檔案不存在，或識別碼／檔名不符合安全格式。
+- `413`、`502`、`503`、`504`：僅 `POST /core`，見該節。
 - `422`：Prompt、DSL、格式或 LLM 規劃結果不符合 schema。
 - HTTP `200` 且 manifest `status=failed`：工作已被記錄，但驗證閘門阻止渲染；請查看 `validation.issues`。

@@ -8,6 +8,12 @@ export interface BackendInfo {
   baseUrl: string;
   /** Token from the shell (Tauri) or null (browser: user types it in the UI). */
   token: string | null;
+  /**
+   * Tauri only: sends one CoreRequest object to the in-process Rust core (`core_request`
+   * command) and resolves to the CoreResponse object. A rejection is a host failure, not a
+   * domain error. `coreClient.ts` consumes this so it never touches the Tauri global.
+   */
+  coreInvoke?: (request: unknown) => Promise<unknown>;
 }
 
 interface TauriBackendInfo {
@@ -38,5 +44,6 @@ export async function resolveBackend(win: BootstrapWindow = window as BootstrapW
     mode: 'tauri',
     baseUrl: info.base_url.replace(/\/+$/, ''),
     token: typeof info.token === 'string' && info.token ? info.token : null,
+    coreInvoke: (request) => invoke<unknown>('core_request', { request }),
   };
 }

@@ -30,6 +30,7 @@
 - 編譯器只把已驗證的數值映射到固定 CadQuery／OpenSCAD 模板。
 - 任何設計 validation error 都會標記 `validation-blocked`，不啟動 CAD 核心。
 - subprocess 使用參數陣列、`shell=false`、關閉 stdin、固定 cwd 與 timeout。
+- Rust core 子行程（`promptcad-core rpc`，見 [ADR 0012](adr/0012-server-host-for-rust-core.md)）使用固定參數陣列 `[執行檔, "rpc"]` 與 `shell=false`；子行程環境只保留白名單變數（例如 `PATH`、`TEMP`、`HOME`），不繼承 API Token 或 LLM 金鑰；請求在啟動子行程前以 `PROMPTCAD_CORE_MAX_REQUEST_BYTES`（上限 8 MiB）檢查，回應超過 28 MiB 時子行程被結束；逾時（`PROMPTCAD_CORE_TIMEOUT_SECONDS`）後子行程被強制結束。
 - job ID、檔名與解析後路徑皆驗證，禁止跨工作目錄下載。
 - 可選 Bearer／X-API-Key，使用 constant-time compare。
 - `.env`、執行輸出、cache 與憑證不進版本控制或 Docker build context。

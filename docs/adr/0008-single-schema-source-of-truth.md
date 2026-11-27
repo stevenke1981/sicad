@@ -110,3 +110,10 @@ Rust 型別（serde + schemars）
 - **執行中的 1.0 應用程式不變**：來源仍是 `app/models/cad.py`，其 JSON Schema 由 `scripts/export_schema.py` 匯出為 `schemas/promptcad.schema.json`，前端型別由它生成（第 1 階段的過渡安排）。`app/models/cad.py` 尚未被取代，repo 中仍有手寫的 1.0 文件模型型別。
 - 本 ADR 的驗收項目因此皆尚未全部達成；2.0 的 Rust → JSON Schema 與漂移檢查是其中第一步。
 
+### 2026-11-26：第 2 階段 2b — core 請求／回應的 TypeScript 型別生成
+
+- **已完成**：`promptcad_core::api` 的請求與回應 JSON Schema（`schemas/cad2/core-request.schema.json`、`schemas/cad2/core-response.schema.json`，由 Rust 型別生成）已生成前端 TypeScript 型別（`web/scripts/gen-types.mjs` 輸出 `web/src/api/generated/core-request.d.ts`、`core-response.d.ts`），CI 的 `web` job 檢查漂移。
+- **尚未完成**：2.0 的 Pydantic 生成模型尚不存在。伺服器的 `POST /api/v1/core` 只轉交位元組（規則 4 與 [0012](0012-server-host-for-rust-core.md)），本端點目前不需要 Pydantic 模型。
+- **1.0 應用程式的 schema 來源不變**：仍為 `app/models/cad.py`；`schemas/promptcad.schema.json` 與其 TypeScript 型別仍由 Pydantic 匯出生成。
+- **規則 4 的遵守**：`app/services/core_bridge.py` 不解讀、不驗證、不重新序列化 2.0 內容。
+

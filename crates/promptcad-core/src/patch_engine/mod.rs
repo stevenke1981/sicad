@@ -48,10 +48,12 @@ mod permissions;
 mod revert;
 mod standards;
 
+use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::fmt;
 use std::str::FromStr;
 
+use schemars::{json_schema, JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::bindings::recompute_bindings;
@@ -149,8 +151,43 @@ impl<'de> Deserialize<'de> for ReasonCode {
     }
 }
 
+impl ReasonCode {
+    /// Every reason code: the eight [`RejectCode`]s in spec order, then the P-class issue
+    /// [`Code`]s in table order.
+    pub fn all() -> Vec<ReasonCode> {
+        RejectCode::ALL
+            .into_iter()
+            .map(ReasonCode::Reject)
+            .chain(
+                Code::ALL
+                    .iter()
+                    .copied()
+                    .filter(|c| c.is_patch_blocking())
+                    .map(ReasonCode::Issue),
+            )
+            .collect()
+    }
+}
+
+impl JsonSchema for ReasonCode {
+    fn schema_name() -> Cow<'static, str> {
+        "ReasonCode".into()
+    }
+    fn json_schema(_: &mut SchemaGenerator) -> Schema {
+        let names: Vec<&'static str> = ReasonCode::all()
+            .into_iter()
+            .map(ReasonCode::as_str)
+            .collect();
+        json_schema!({
+            "description": "Patch reject reason (§9.2 last paragraph): a reject code or a P-class issue code.",
+            "type": "string",
+            "enum": names,
+        })
+    }
+}
+
 /// Structured reject diagnostics returned to the submitter and written to the op log.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RejectReason {
     /// Reason code.
@@ -270,6 +307,24 @@ impl<'de> Deserialize<'de> for PatchOrigin {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let s = String::deserialize(d)?;
         s.parse().map_err(serde::de::Error::custom)
+    }
+}
+
+impl JsonSchema for PatchOrigin {
+    fn schema_name() -> Cow<'static, str> {
+        "PatchOrigin".into()
+    }
+    fn json_schema(_: &mut SchemaGenerator) -> Schema {
+        let names: Vec<&'static str> = Role::ALL
+            .into_iter()
+            .map(Role::as_str)
+            .chain(["human"])
+            .collect();
+        json_schema!({
+            "description": "Who submitted a patch: an agent role or `human`.",
+            "type": "string",
+            "enum": names,
+        })
     }
 }
 

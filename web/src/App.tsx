@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { BackendInfo } from './api/bootstrap';
 import type { ApiClient } from './api/client';
+import {
+  CoreError,
+  CoreTransportError,
+  createCoreApi,
+  createCoreClient,
+  DocumentText,
+  isCoreUnavailable,
+  type CoreApi,
+  type CoreClient,
+  type ResultOf,
+} from './api/coreClient';
+import { findLossyNumbers, type LossyNumber } from './api/jsonText';
 import { createHttpClient, type HttpClientOptions } from './api/httpClient';
 import type {
   Artifact,
@@ -10,19 +22,22 @@ import type {
   JobManifest,
   OutputFormat,
   PlannerChoice,
-  ValidationReport,
 } from './api/types';
 import { ArtifactList } from './components/ArtifactList';
+import { ComponentTree, type Description } from './components/ComponentTree';
 import { JobHistory } from './components/JobHistory';
 import { StlViewer } from './components/StlViewer';
 import { SvgPreview } from './components/SvgPreview';
-import { ValidationPanel } from './components/ValidationPanel';
+import { ValidationPanel, type PanelReport } from './components/ValidationPanel';
 import { saveBlob } from './download';
+import { SAMPLE_DOCUMENT_2_0 } from './sample2';
 
 export interface AppProps {
   backend: BackendInfo;
   /** Injected for tests; defaults to the HTTP client. */
   createClient?: (options: HttpClientOptions) => ApiClient;
+  /** Injected for tests; defaults to the transport matching `backend.mode`. */
+  createCore?: (backend: BackendInfo, token: string | null) => CoreClient;
 }
 
 const DEFAULT_PROMPT =
@@ -62,6 +77,35 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** `"2.0"` when the editor text is a JSON object declaring `schema_version: "2.0"`. */
+function declaredVersion(text: string): '2.0' | null {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return (parsed as { schema_version?: unknown }).schema_version === '2.0' ? '2.0' : null;
+    }
+  } catch {
+    // Not valid JSON yet: treated as a 1.0 document; the existing flow reports the error.
+  }
+  return null;
+}
+
+/** Shown when a transport that cannot send text (Tauri `invoke`) would alter numbers. */
+function lossyNumbersWarning(lossy: LossyNumber[]): string {
+  const shown = lossy
+    .slice(0, 5)
+    .map((n) => `${n.pointer || '/'}：${n.token} → ${n.sent}`)
+    .join('；');
+  const more = lossy.length > 5 ? `；等共 ${lossy.length} 個` : '';
+  return (
+    '桌面版以 JavaScript 數值傳送文件，下列數值無法精確保留（超過 ±2^53 的整數、-0），' +
+    `Rust core 收到並驗證的是改變後的值：${shown}${more}。`
+  );
+}
+
+const NO_GENERATE_2_0 =
+  '目前無法輸出 2.0 文件：幾何編譯器尚未支援 CadDocument 2.0，只能驗證並檢視元件樹。';
+
 function findArtifact(manifest: JobManifest | null, ...names: string[]): Artifact | null {
   const artifacts = manifest?.artifacts ?? [];
   for (const name of names) {
@@ -71,7 +115,14 @@ function findArtifact(manifest: JobManifest | null, ...names: string[]): Artifac
   return null;
 }
 
-export function App({ backend, createClient = createHttpClient }: AppProps) {
+const defaultCreateCore = (backend: BackendInfo, token: string | null): CoreClient =>
+  createCoreClient(backend, { token });
+
+export function App({
+  backend,
+  createClient = createHttpClient,
+  createCore = defaultCreateCore,
+}: AppProps) {
   const isTauri = backend.mode === 'tauri';
   const [tokenDraft, setTokenDraft] = useState('');
   const [token, setToken] = useState('');
@@ -79,6 +130,12 @@ export function App({ backend, createClient = createHttpClient }: AppProps) {
     () =>
       createClient({ baseUrl: backend.baseUrl, token: isTauri ? backend.token : token || null }),
     [createClient, backend.baseUrl, backend.token, isTauri, token],
+  );
+
+  const coreToken = isTauri ? backend.token : token || null;
+  const core: CoreApi = useMemo(
+    () => createCoreApi(createCore(backend, coreToken)),
+    [createCore, backend, coreToken],
   );
 
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
@@ -98,9 +155,17 @@ export function App({ backend, createClient = createHttpClient }: AppProps) {
 
   const [manifest, setManifest] = useState<JobManifest | null>(null);
   const [specText, setSpecText] = useState('{}');
-  const [report, setReport] = useState<{ source: 'job' | 'validate'; value: ValidationReport } | null>(
-    null,
-  );
+  const [report, setReport] = useState<{
+    source: 'job' | 'validate';
+    value: PanelReport;
+    /** Warnings about the input itself (e.g. numbers the transport altered). */
+    inputWarnings?: string[];
+  } | null>(null);
+  // The tree is only shown while the editor still holds the text it was described from.
+  const [described, setDescribed] = useState<{ text: string; value: Description } | null>(null);
+  // Non-blocking: describe failed after a successful validate (same text rule as `described`).
+  const [treeNote, setTreeNote] = useState<{ text: string; message: string } | null>(null);
+  const [coreNote, setCoreNote] = useState<string | null>(null);
   const [tab, setTab] = useState<ViewTab>('2d');
 
   const [capabilities, setCapabilities] = useState<CapabilityResponse | null>(null);
@@ -198,9 +263,95 @@ export function App({ backend, createClient = createHttpClient }: AppProps) {
     }
   };
 
+  const specVersion = useMemo(() => declaredVersion(specText), [specText]);
+  const is2 = specVersion === '2.0';
+
+  const onValidateCore = async (text: string) => {
+    let document: DocumentText;
+    try {
+      // Sent verbatim over HTTP; Tauri `invoke` needs the parsed object.
+      document = new DocumentText(text);
+    } catch (error) {
+      say(`JSON 格式錯誤：${errorText(error)}`, true);
+      return;
+    }
+    const lossy = core.verbatimDocuments ? [] : findLossyNumbers(document.text);
+    const inputWarnings = lossy.length ? [lossyNumbersWarning(lossy)] : [];
+
+    setBusy(true);
+    say('正在以 Rust core 驗證 2.0 文件…');
+    setDescribed(null);
+    setTreeNote(null);
+    try {
+      let result: ResultOf<'validate'>;
+      try {
+        result = await core.validate(document);
+      } catch (error) {
+        showValidateCoreError(error, inputWarnings);
+        return; // nothing to describe
+      }
+      setCoreNote(null);
+      setReport({ source: 'validate', value: result.report, inputWarnings });
+      const issues = result.report.issues;
+      say(
+        result.report.valid
+          ? `驗證通過（2.0）${issues.length ? `（${issues.length} 項提示）` : ''}。`
+          : `驗證未通過（2.0）：${issues.filter((i) => i.severity === 'error').length} 個錯誤。`,
+        !result.report.valid,
+      );
+      try {
+        const value = await core.describe(document);
+        setDescribed({ text, value });
+      } catch (error) {
+        // The validation result above stands; a describe failure only replaces the tree.
+        setTreeNote({ text, message: `無法顯示元件樹：${errorText(error)}` });
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const showValidateCoreError = (error: unknown, inputWarnings: string[]) => {
+    if (error instanceof CoreError) {
+      setCoreNote(null);
+      setReport({
+        source: 'validate',
+        inputWarnings,
+        value: {
+          valid: false,
+          review_required: false,
+          issues: error.violations.length
+            ? error.violations.map((v) => ({
+                severity: 'error' as const,
+                code: error.code,
+                message: `${v.path || '/'}：${v.message}`,
+              }))
+            : [
+                {
+                  severity: 'error' as const,
+                  code: error.code,
+                  message: error.path ? `${error.path}：${error.message}` : error.message,
+                },
+              ],
+        },
+      });
+      say(`2.0 文件無法處理：${error.message}`, true);
+    } else if (error instanceof CoreTransportError) {
+      setCoreNote(
+        isCoreUnavailable(error)
+          ? `${error.message} 1.0 文件的驗證與輸出不受影響。`
+          : error.message,
+      );
+      say(error.message, true);
+    } else {
+      say(errorText(error), true);
+    }
+  };
+
   const onValidate = async () => {
     const spec = parseSpec();
     if (!spec) return;
+    if (is2) return onValidateCore(specText);
     setBusy(true);
     say('正在驗證 JSON…');
     try {
@@ -221,6 +372,7 @@ export function App({ backend, createClient = createHttpClient }: AppProps) {
   };
 
   const onRegenerate = () => {
+    if (is2) return say(NO_GENERATE_2_0, true);
     if (!selectedFormats.length) return say('請至少選擇一種輸出格式。', true);
     const spec = parseSpec();
     if (!spec) return;
@@ -448,7 +600,21 @@ export function App({ backend, createClient = createHttpClient }: AppProps) {
             report={report?.value ?? null}
             source={report?.source ?? 'job'}
             warnings={manifest?.warnings ?? []}
+            inputWarnings={report?.inputWarnings ?? []}
           />
+          {coreNote && (
+            <p className="core-note" role="status" data-testid="core-note">
+              {coreNote}
+            </p>
+          )}
+          {described && described.text === specText && is2 && (
+            <ComponentTree description={described.value} />
+          )}
+          {treeNote && treeNote.text === specText && is2 && (
+            <p className="core-note" role="status" data-testid="tree-note">
+              {treeNote.message}
+            </p>
+          )}
 
           {manifest && (
             <ArtifactList
@@ -473,10 +639,28 @@ export function App({ backend, createClient = createHttpClient }: AppProps) {
               <button type="button" className="secondary" disabled={busy} onClick={() => void onValidate()}>
                 驗證 JSON
               </button>
-              <button type="button" className="secondary" disabled={busy} onClick={onRegenerate}>
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy || is2}
+                aria-describedby={is2 ? 'no-generate-2' : undefined}
+                onClick={onRegenerate}
+              >
                 套用 JSON 並重新輸出
               </button>
             </div>
+            {is2 && (
+              <p id="no-generate-2" className="muted" data-testid="no-generate-2">
+                {NO_GENERATE_2_0}
+              </p>
+            )}
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => setSpecText(JSON.stringify(SAMPLE_DOCUMENT_2_0, null, 2))}
+            >
+              載入 2.0 範例
+            </button>
           </details>
         </section>
       </main>

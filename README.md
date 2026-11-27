@@ -27,7 +27,7 @@ Empty（空）→ Dot（點）→ Line（線）→ Plane（面）→ Volume（�
 - 技術選型架構決策紀錄（Tauri v2、React、Three.js、Rust 核心、OpenCascade sidecar）：[`docs/adr/`](docs/adr/README.md)
 - CadDocument 2.0 凍結規格與手寫範例：[`docs/CAD_DSL_2.md`](docs/CAD_DSL_2.md)、[`examples/cad2/`](examples/cad2/)
 
-> 狀態：2.0 規格已凍結（階段 0），程式依 ADR 0010 在第 2 階段以 Rust 實作，第 2 階段 2a 的 Rust core 已實作於 `crates/promptcad-core/`（獨立 crate，`cargo test` 驗證），但**尚未**被應用程式呼叫：執行中的應用程式、Python 編譯器與 REST API 仍只接受 1.0 文件。ADR 0010 第 1 階段的桌面／Web 前端切片已加入但尚未發佈（見下方「桌面版與新前端」與 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)）。其餘段落描述的是目前可執行的 v0.1.0 MVP。
+> 狀態：2.0 規格已凍結（階段 0），程式依 ADR 0010 在第 2 階段以 Rust 實作，第 2 階段 2a 的 Rust core 已實作於 `crates/promptcad-core/`（獨立 crate，`cargo test` 驗證），2b 起已由桌面版（Tauri 命令 `core_request`）與伺服器（`POST /api/v1/core`）呼叫，用於 2.0 文件的驗證與唯讀元件樹顯示；Python 編譯器仍不接受 2.0，2.0 文件目前不能輸出幾何，1.0 的生成流程與 REST API 不變。ADR 0010 第 1 階段的桌面／Web 前端切片已加入但尚未發佈（見下方「桌面版與新前端」與 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)）。其餘段落描述的是目前可執行的 v0.1.0 MVP。
 
 ## 已包含
 
@@ -45,7 +45,7 @@ Empty（空）→ Dot（點）→ Line（線）→ Plane（面）→ Volume（�
 
 ## 最快啟動：Docker
 
-Docker 環境內含 CadQuery 2.8.0，可實際產生 STEP、STL、DXF 與 SVG。Dockerfile 為多階段建置：第一階段以 `node:24-slim` 建置 `web/` 前端，再複製到映像的 `app/web_dist/`，因此不需在主機上安裝 Node.js。
+Docker 環境內含 CadQuery 2.8.0，可實際產生 STEP、STL、DXF 與 SVG。Dockerfile 為多階段建置：第一階段以 `node:24-slim` 建置 `web/` 前端，再複製到映像的 `app/web_dist/`，因此不需在主機上安裝 Node.js。另一個 `rust:1.90.0-slim-trixie` 階段建置 `promptcad-core`，複製到映像的 `/usr/local/bin/promptcad-core`；此階段尚未在本機以 Docker 驗證，待 CI 的 `docker` job。
 
 ```bash
 docker compose up --build
@@ -333,7 +333,7 @@ npm --prefix web run typecheck
 npm --prefix web test
 ```
 
-目前測試涵蓋規則解析、M 制孔徑、盲孔、沉頭孔、X/Y/Z 軸幾何原始碼、驗證閘門、可編輯 DSL、API Token、檔案下載與 ZIP；第 1 階段另加 schema 匯出、新前端服務（含未建置時的 503 說明頁）、sidecar 啟動、凍結 smoke／終止檢查、鎖檔與授權聲明產生器的純函式測試、2.0 範例的紙上驗證，以及前端的 vitest 測試。CI 另有 `docker` job 實際建置映像並確認 `/` 提供新前端、`lock-check` job 確認三份桌面鎖檔與 `pyproject.toml` 一致，以及三平台的 `desktop` job（`cargo fmt`／`clippy`／`test`）。
+目前測試涵蓋規則解析、M 制孔徑、盲孔、沉頭孔、X/Y/Z 軸幾何原始碼、驗證閘門、可編輯 DSL、API Token、檔案下載與 ZIP；第 1 階段另加 schema 匯出、新前端服務（含未建置時的 503 說明頁）、sidecar 啟動、凍結 smoke／終止檢查、鎖檔與授權聲明產生器的純函式測試、2.0 範例的紙上驗證，以及前端的 vitest 測試。CI 另有 `docker` job 實際建置映像並確認 `/` 提供新前端、`lock-check` job 確認三份桌面鎖檔與 `pyproject.toml` 一致，以及三平台的 `desktop` job（`cargo fmt`／`clippy`／`test`）。第 2 階段 2b 另有：Rust core 303 項測試、`src-tauri` 23 項測試、伺服器整合測試（對實際的 `promptcad-core` 執行，含 49 個 parity 案例）與前端 vitest 52 項；這些數字為撰寫時的本機結果。
 
 ## 專案結構
 
@@ -352,11 +352,11 @@ app/
   sidecar.py           桌面版 sidecar 進入點（印出 READY 行後提供 API）
 web/                   React + TypeScript + Vite 前端與 Three.js 檢視器
 src-tauri/             Tauri v2 桌面外殼（Rust）
-crates/promptcad-core/ CadDocument 2.0 的 Rust core（獨立 crate；尚未被應用程式呼叫；`cd crates/promptcad-core && cargo test`）
+crates/promptcad-core/ CadDocument 2.0 的 Rust core（獨立 crate；由 Tauri 命令與 `POST /api/v1/core` 呼叫；`cd crates/promptcad-core && cargo test`）
 schemas/               JSON Schema（生成物）：根目錄的 promptcad.schema.json 由 Pydantic 匯出（1.0），cad2/ 由 Rust core 匯出（2.0）
 docs/                  API、架構、DSL（1.0 與 2.0）、提示詞、安全說明與 ADR
 examples/generated/    可直接修改及重新輸出的完整範例（1.0）
-examples/cad2/         CadDocument 2.0 手寫範例（規格驗證用；只有 `crates/promptcad-core/` 的 Rust core 接受 2.0，應用程式不接受）
+examples/cad2/         CadDocument 2.0 手寫範例（規格驗證用；`crates/promptcad-core/` 的 Rust core 與其宿主接受 2.0，Python 編譯器不接受）
 scripts/               doctor、smoke test、export_schema.py、desktop_lock.py、desktop_env.py、
                        build_sidecar.py、frozen_smoke.py、frozen_kill_check.py、
                        gen_third_party_notices.py

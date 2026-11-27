@@ -1,0 +1,4068 @@
+{
+  "$defs": {
+    "Assembly": {
+      "additionalProperties": false,
+      "description": "An assembly (§6.2).",
+      "properties": {
+        "children": {
+          "description": "1–32 N2 ids (parts or assemblies).",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "type": "array"
+        },
+        "id": {
+          "$ref": "#/$defs/Id",
+          "description": "N2 identifier."
+        },
+        "name": {
+          "description": "1–80 chars.",
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "children"
+      ],
+      "type": "object"
+    },
+    "AssemblyView": {
+      "additionalProperties": false,
+      "description": "One assembly in the read model.",
+      "properties": {
+        "children": {
+          "description": "Child ids (parts or assemblies) as stored.",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "type": "array"
+        },
+        "id": {
+          "$ref": "#/$defs/Id",
+          "description": "Assembly id."
+        },
+        "name": {
+          "description": "Assembly name.",
+          "type": "string"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "First assembly (document order) listing this assembly as a child."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "children",
+        "parent"
+      ],
+      "type": "object"
+    },
+    "Axis": {
+      "description": "A world/local coordinate axis, serialized as `\"x\"`, `\"y\"`, `\"z\"`.",
+      "oneOf": [
+        {
+          "const": "x",
+          "description": "X axis.",
+          "type": "string"
+        },
+        {
+          "const": "y",
+          "description": "Y axis.",
+          "type": "string"
+        },
+        {
+          "const": "z",
+          "description": "Z axis (default, matching 1.0 `HoleFeature.axis`).",
+          "type": "string"
+        }
+      ]
+    },
+    "AxisDir": {
+      "description": "A signed axis direction, serialized as `\"+x\"`, `\"-x\"`, … `\"-z\"` (spec §1.1).\n\nDeclaration order (`+x, -x, +y, -y, +z, -z`) is the canonical order used by §5.4.",
+      "oneOf": [
+        {
+          "const": "+x",
+          "description": "`+x`",
+          "type": "string"
+        },
+        {
+          "const": "-x",
+          "description": "`-x`",
+          "type": "string"
+        },
+        {
+          "const": "+y",
+          "description": "`+y`",
+          "type": "string"
+        },
+        {
+          "const": "-y",
+          "description": "`-y`",
+          "type": "string"
+        },
+        {
+          "const": "+z",
+          "description": "`+z`",
+          "type": "string"
+        },
+        {
+          "const": "-z",
+          "description": "`-z`",
+          "type": "string"
+        }
+      ]
+    },
+    "BaseFeature": {
+      "description": "1.0 `BaseFeature`, discriminated by `kind`.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "`plate`",
+          "properties": {
+            "kind": {
+              "const": "plate",
+              "type": "string"
+            },
+            "length": {
+              "description": "Along local X.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "thickness": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "width": {
+              "description": "Along local Y.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "length",
+            "width",
+            "thickness"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`cylinder`",
+          "properties": {
+            "diameter": {
+              "description": "Diameter.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "height": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "cylinder",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "diameter",
+            "height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`ring`",
+          "properties": {
+            "height": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "inner_diameter": {
+              "description": "Inner (bore) diameter, must be smaller than `outer_diameter`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "ring",
+              "type": "string"
+            },
+            "outer_diameter": {
+              "description": "Outer diameter.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "outer_diameter",
+            "inner_diameter",
+            "height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`l_bracket`",
+          "properties": {
+            "depth": {
+              "description": "Along local Y.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "l_bracket",
+              "type": "string"
+            },
+            "thickness": {
+              "description": "Plate thickness.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "vertical_height": {
+              "description": "Height of the upright above the base plate.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "width": {
+              "description": "Along local X.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "width",
+            "depth",
+            "vertical_height",
+            "thickness"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`enclosure`",
+          "properties": {
+            "height": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "enclosure",
+              "type": "string"
+            },
+            "length": {
+              "description": "Along local X.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "wall_thickness": {
+              "description": "Wall and floor thickness.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "width": {
+              "description": "Along local Y.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "length",
+            "width",
+            "height",
+            "wall_thickness"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Binding": {
+      "additionalProperties": false,
+      "description": "`{target, expr}` (§4.2). The bound field keeps its cached numeric value.",
+      "properties": {
+        "expr": {
+          "description": "Expression text, 1–160 chars (closed grammar §4.3, parsed by [`crate::expr`]).",
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/FieldRef",
+          "description": "`id:field` being driven."
+        }
+      },
+      "required": [
+        "target",
+        "expr"
+      ],
+      "type": "object"
+    },
+    "BodyOp": {
+      "additionalProperties": false,
+      "description": "`{op, component}` (§6.1).",
+      "properties": {
+        "component": {
+          "$ref": "#/$defs/Id",
+          "description": "Component id."
+        },
+        "op": {
+          "$ref": "#/$defs/BodyOpKind",
+          "description": "Boolean op."
+        }
+      },
+      "required": [
+        "op",
+        "component"
+      ],
+      "type": "object"
+    },
+    "BodyOpKind": {
+      "description": "Body boolean operation (§6.1).",
+      "oneOf": [
+        {
+          "const": "add",
+          "description": "Union with a Volume.",
+          "type": "string"
+        },
+        {
+          "const": "cut",
+          "description": "Subtract a `cut` Empty.",
+          "type": "string"
+        },
+        {
+          "const": "intersect",
+          "description": "Intersect with a Volume or `envelope` Empty.",
+          "type": "string"
+        }
+      ]
+    },
+    "CadDocument1": {
+      "additionalProperties": false,
+      "description": "CadDocument 1.0 (`app/models/cad.py::CadDocument`).",
+      "properties": {
+        "assumptions": {
+          "default": [],
+          "description": "≤ 32.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "base": {
+          "$ref": "#/$defs/BaseFeature",
+          "description": "The single base solid."
+        },
+        "chamfers": {
+          "default": [],
+          "description": "≤ 8.",
+          "items": {
+            "$ref": "#/$defs/ChamferFeature"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
+        "fillets": {
+          "default": [],
+          "description": "≤ 8.",
+          "items": {
+            "$ref": "#/$defs/FilletFeature"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
+        "holes": {
+          "default": [],
+          "description": "≤ 64.",
+          "items": {
+            "$ref": "#/$defs/HoleFeature"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
+        "material": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Material"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default `null`."
+        },
+        "name": {
+          "default": "promptcad-part",
+          "description": "1–80 chars, default `\"promptcad-part\"`.",
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "notes": {
+          "default": [],
+          "description": "≤ 32.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "planner": {
+          "$ref": "#/$defs/PlannerMetadata",
+          "description": "Planner metadata."
+        },
+        "schema_version": {
+          "$ref": "#/$defs/SchemaVersion1",
+          "default": "1.0",
+          "description": "`\"1.0\"`."
+        },
+        "source_prompt": {
+          "description": "1–20000 chars.",
+          "maxLength": 20000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "unit": {
+          "$ref": "#/$defs/Unit",
+          "default": "mm",
+          "description": "`\"mm\"`."
+        }
+      },
+      "required": [
+        "schema_version",
+        "name",
+        "source_prompt",
+        "unit",
+        "material",
+        "base",
+        "holes",
+        "fillets",
+        "chamfers",
+        "assumptions",
+        "notes",
+        "planner"
+      ],
+      "type": "object"
+    },
+    "CadDocument2": {
+      "additionalProperties": false,
+      "description": "CadDocument 2.0 (§2).",
+      "properties": {
+        "assemblies": {
+          "default": [],
+          "description": "≤ 16.",
+          "items": {
+            "$ref": "#/$defs/Assembly"
+          },
+          "maxItems": 16,
+          "type": "array"
+        },
+        "assumptions": {
+          "default": [],
+          "description": "≤ 32.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "bindings": {
+          "default": [],
+          "description": "≤ 128.",
+          "items": {
+            "$ref": "#/$defs/Binding"
+          },
+          "maxItems": 128,
+          "type": "array"
+        },
+        "components": {
+          "default": [],
+          "description": "≤ 256 (≥ 1 only for completed documents).",
+          "items": {
+            "$ref": "#/$defs/Component"
+          },
+          "maxItems": 256,
+          "type": "array"
+        },
+        "constraints": {
+          "default": [],
+          "description": "≤ 512.",
+          "items": {
+            "$ref": "#/$defs/Constraint"
+          },
+          "maxItems": 512,
+          "type": "array"
+        },
+        "name": {
+          "default": "promptcad-design",
+          "description": "1–80 chars, default `\"promptcad-design\"`.",
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "notes": {
+          "default": [],
+          "description": "≤ 32.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "parameters": {
+          "default": [],
+          "description": "≤ 64.",
+          "items": {
+            "$ref": "#/$defs/Parameter"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
+        "parts": {
+          "default": [],
+          "description": "≤ 32 (≥ 1 only for completed documents).",
+          "items": {
+            "$ref": "#/$defs/Part"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "planner": {
+          "$ref": "#/$defs/PlannerMetadata",
+          "description": "Planner metadata."
+        },
+        "revision": {
+          "description": "Incremented by the coordinator on every accepted patch.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "root": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Root part or assembly, maintained by the coordinator (§6.3). `null` while the document\nhas no parts yet (mid-loop revisions); required for completed documents."
+        },
+        "schema_version": {
+          "$ref": "#/$defs/SchemaVersion2",
+          "description": "`\"2.0\"`."
+        },
+        "source_prompt": {
+          "description": "1–20000 chars.",
+          "maxLength": 20000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "unit": {
+          "$ref": "#/$defs/Unit",
+          "default": "mm",
+          "description": "`\"mm\"`."
+        }
+      },
+      "required": [
+        "schema_version",
+        "name",
+        "source_prompt",
+        "unit",
+        "revision",
+        "parameters",
+        "bindings",
+        "components",
+        "constraints",
+        "parts",
+        "assemblies",
+        "root",
+        "assumptions",
+        "notes",
+        "planner"
+      ],
+      "type": "object"
+    },
+    "ChamferFeature": {
+      "additionalProperties": false,
+      "description": "`{kind: \"chamfer\", distance, selector}` (1.0 `ChamferFeature`).",
+      "properties": {
+        "distance": {
+          "description": "`Dim`.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 100000.0,
+          "type": "number"
+        },
+        "kind": {
+          "$ref": "#/$defs/ChamferTag",
+          "default": "chamfer",
+          "description": "Always `\"chamfer\"`."
+        },
+        "selector": {
+          "$ref": "#/$defs/EdgeSelector",
+          "default": "vertical",
+          "description": "Edge selector."
+        }
+      },
+      "required": [
+        "kind",
+        "distance",
+        "selector"
+      ],
+      "type": "object"
+    },
+    "ChamferTag": {
+      "description": "`kind: \"chamfer\"`.",
+      "oneOf": [
+        {
+          "const": "chamfer",
+          "description": "`\"chamfer\"`",
+          "type": "string"
+        }
+      ]
+    },
+    "Component": {
+      "description": "Wire form of [`Component`] used for deserialization and JSON Schema.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "const": "empty",
+              "type": "string"
+            },
+            "label": {
+              "default": null,
+              "maxLength": 80,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "provenance": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Provenance"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "role": {
+              "$ref": "#/$defs/EmptyRole"
+            },
+            "shape": {
+              "$ref": "#/$defs/EmptyShape"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "role",
+            "shape",
+            "label",
+            "provenance"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "const": "dot",
+              "type": "string"
+            },
+            "label": {
+              "default": null,
+              "maxLength": 80,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "provenance": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Provenance"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "shape": {
+              "$ref": "#/$defs/DotShape"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "shape",
+            "label",
+            "provenance"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "const": "line",
+              "type": "string"
+            },
+            "label": {
+              "default": null,
+              "maxLength": 80,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "provenance": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Provenance"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "shape": {
+              "$ref": "#/$defs/LineShape"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "shape",
+            "label",
+            "provenance"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "const": "plane",
+              "type": "string"
+            },
+            "label": {
+              "default": null,
+              "maxLength": 80,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "provenance": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Provenance"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "shape": {
+              "$ref": "#/$defs/PlaneShape"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "shape",
+            "label",
+            "provenance"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "kind": {
+              "const": "volume",
+              "type": "string"
+            },
+            "label": {
+              "default": null,
+              "maxLength": 80,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "provenance": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Provenance"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "shape": {
+              "$ref": "#/$defs/VolumeShape"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "shape",
+            "label",
+            "provenance"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ComponentKind": {
+      "description": "Component `kind` (§3.1).",
+      "oneOf": [
+        {
+          "const": "empty",
+          "description": "Negative/space element; carries a `role`.",
+          "type": "string"
+        },
+        {
+          "const": "dot",
+          "description": "Point.",
+          "type": "string"
+        },
+        {
+          "const": "line",
+          "description": "Curve (always derived).",
+          "type": "string"
+        },
+        {
+          "const": "plane",
+          "description": "Planar region.",
+          "type": "string"
+        },
+        {
+          "const": "volume",
+          "description": "Solid.",
+          "type": "string"
+        }
+      ]
+    },
+    "ComponentView": {
+      "additionalProperties": false,
+      "description": "One component in the read model.",
+      "properties": {
+        "fields": {
+          "description": "Numeric shape fields (§3.3) in spec order with current values and binding state.",
+          "items": {
+            "$ref": "#/$defs/FieldView"
+          },
+          "type": "array"
+        },
+        "frame_port": {
+          "description": "Frame port name of an independent component (`null` for derived ones).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/Id",
+          "description": "Component id."
+        },
+        "independent": {
+          "description": "Independent (owns a pose) vs derived (§3.2).",
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/$defs/ComponentKind",
+          "description": "Component kind."
+        },
+        "label": {
+          "description": "Human-only label.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "part": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "First part (document order) whose `body` references this component, if any."
+        },
+        "ports": {
+          "description": "Ports (§3.4) in table order; Empty `of` uses its source Volume's table (empty when the\nsource does not resolve).",
+          "items": {
+            "$ref": "#/$defs/PortView"
+          },
+          "type": "array"
+        },
+        "provenance": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Provenance"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Provenance stamp."
+        },
+        "refs": {
+          "description": "Ids referenced from `shape` (promotion sources), in field order.",
+          "items": {
+            "$ref": "#/$defs/ShapeRef"
+          },
+          "type": "array"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EmptyRole"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Empty role (`null` for non-Empties)."
+        },
+        "shape": {
+          "$ref": "#/$defs/ShapeName",
+          "description": "`shape.kind`."
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "role",
+        "shape",
+        "independent",
+        "frame_port",
+        "label",
+        "provenance",
+        "part",
+        "refs",
+        "fields",
+        "ports"
+      ],
+      "type": "object"
+    },
+    "Constraint": {
+      "additionalProperties": false,
+      "description": "A constraint (§5.1): `{id, kind, a, b, value, u, v, frame}`.",
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/PortRef",
+          "description": "First port (for `fixed`: the frame port)."
+        },
+        "b": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PortRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Second port; `null` exactly for `fixed`."
+        },
+        "frame": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Frame"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "`fixed` only (required there)."
+        },
+        "id": {
+          "$ref": "#/$defs/Id",
+          "description": "N1 identifier."
+        },
+        "kind": {
+          "$ref": "#/$defs/ConstraintKind",
+          "description": "Constraint kind."
+        },
+        "u": {
+          "default": null,
+          "description": "`Coord | null` — `on_face` only.",
+          "maximum": 100000.0,
+          "minimum": -100000.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "v": {
+          "default": null,
+          "description": "`Coord | null` — `on_face` only.",
+          "maximum": 100000.0,
+          "minimum": -100000.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "value": {
+          "default": null,
+          "description": "`Coord | null` — see [`ConstraintKind::uses_value`].",
+          "maximum": 100000.0,
+          "minimum": -100000.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "a",
+        "b",
+        "value",
+        "u",
+        "v",
+        "frame"
+      ],
+      "type": "object"
+    },
+    "ConstraintKind": {
+      "description": "Constraint `kind` (§5.1).",
+      "oneOf": [
+        {
+          "const": "fixed",
+          "description": "Root a frame port at `frame`.",
+          "type": "string"
+        },
+        {
+          "const": "coincident",
+          "description": "point–point.",
+          "type": "string"
+        },
+        {
+          "const": "on_face",
+          "description": "point–face at `(u, v)`.",
+          "type": "string"
+        },
+        {
+          "const": "coaxial",
+          "description": "axis–axis.",
+          "type": "string"
+        },
+        {
+          "const": "mate",
+          "description": "face–face, opposite normals, gap `value ≥ 0`.",
+          "type": "string"
+        },
+        {
+          "const": "flush",
+          "description": "face–face, same normal, offset `value`.",
+          "type": "string"
+        },
+        {
+          "const": "distance",
+          "description": "point–face or face–face signed distance along `n_b`.",
+          "type": "string"
+        },
+        {
+          "const": "inside",
+          "description": "region–region containment (check only).",
+          "type": "string"
+        },
+        {
+          "const": "clearance",
+          "description": "region–region minimum gap ≥ `value` (check only).",
+          "type": "string"
+        }
+      ]
+    },
+    "ConstraintView": {
+      "additionalProperties": false,
+      "description": "One constraint in the read model.",
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/PortRef",
+          "description": "Port `a`."
+        },
+        "b": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PortRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Port `b` (`null` for `fixed`)."
+        },
+        "fields": {
+          "description": "Numeric fields of this kind (`value`, or `u`/`v`) with §5.1 defaults applied.",
+          "items": {
+            "$ref": "#/$defs/FieldView"
+          },
+          "type": "array"
+        },
+        "id": {
+          "$ref": "#/$defs/Id",
+          "description": "Constraint id."
+        },
+        "kind": {
+          "$ref": "#/$defs/ConstraintKind",
+          "description": "Constraint kind."
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "a",
+        "b",
+        "fields"
+      ],
+      "type": "object"
+    },
+    "CoreResult": {
+      "description": "Op-specific result, tagged by `op` (the request's op name).",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Result of `validate`.",
+          "properties": {
+            "document": {
+              "$ref": "#/$defs/CadDocument2",
+              "description": "The canonical 2.0 document that was validated (the upgraded one for 1.0 input)."
+            },
+            "input_version": {
+              "$ref": "#/$defs/DocumentVersion",
+              "description": "`schema_version` of the input document."
+            },
+            "op": {
+              "const": "validate",
+              "type": "string"
+            },
+            "report": {
+              "$ref": "#/$defs/ValidationReport",
+              "description": "Analytic validation report (all issues, including the solver's)."
+            },
+            "resolved": {
+              "$ref": "#/$defs/Resolved",
+              "description": "Solver output (empty when the solver was gated, see `validate` module docs)."
+            }
+          },
+          "required": [
+            "op",
+            "input_version",
+            "report",
+            "resolved",
+            "document"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Result of `solve`.",
+          "properties": {
+            "input_version": {
+              "$ref": "#/$defs/DocumentVersion",
+              "description": "`schema_version` of the input document."
+            },
+            "op": {
+              "const": "solve",
+              "type": "string"
+            },
+            "resolved": {
+              "$ref": "#/$defs/Resolved",
+              "description": "`resolved.json`."
+            }
+          },
+          "required": [
+            "op",
+            "input_version",
+            "resolved"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Result of `normalize`.",
+          "properties": {
+            "document": {
+              "$ref": "#/$defs/CadDocument2",
+              "description": "The canonical 2.0 document with bindings and `root` recomputed. Bindings with errors\nkeep their cached value. If the recomputed document violates the schema, the response\nis a `schema_violation` error instead."
+            },
+            "input_version": {
+              "$ref": "#/$defs/DocumentVersion",
+              "description": "`schema_version` of the input document."
+            },
+            "issues": {
+              "description": "Binding issues of the recomputation (empty when all bindings evaluated).",
+              "items": {
+                "$ref": "#/$defs/ValidationIssue"
+              },
+              "type": "array"
+            },
+            "op": {
+              "const": "normalize",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "input_version",
+            "document",
+            "issues"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Result of `upgrade`.",
+          "properties": {
+            "document": {
+              "$ref": "#/$defs/CadDocument2",
+              "description": "The canonical 2.0 document."
+            },
+            "op": {
+              "const": "upgrade",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "document"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Result of `downgrade`.",
+          "properties": {
+            "document": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CadDocument1"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The 1.0 document; `null` when not expressible."
+            },
+            "expressible": {
+              "description": "Whether the document is expressible as CadDocument 1.0 (spec §10.2).",
+              "type": "boolean"
+            },
+            "op": {
+              "const": "downgrade",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "expressible",
+            "document"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Result of `apply_patch`.",
+          "properties": {
+            "op": {
+              "const": "apply_patch",
+              "type": "string"
+            },
+            "outcome": {
+              "$ref": "#/$defs/PatchOutcomeView",
+              "description": "Accepted or rejected."
+            }
+          },
+          "required": [
+            "op",
+            "outcome"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Result of `describe`.",
+          "properties": {
+            "assemblies": {
+              "description": "Assemblies in document order.",
+              "items": {
+                "$ref": "#/$defs/AssemblyView"
+              },
+              "type": "array"
+            },
+            "components": {
+              "description": "Components in document order.",
+              "items": {
+                "$ref": "#/$defs/ComponentView"
+              },
+              "type": "array"
+            },
+            "computed_root": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The root the coordinator would compute (spec §6.3); `null` when it would be\n`invalid_root`."
+            },
+            "constraints": {
+              "description": "Constraints in document order.",
+              "items": {
+                "$ref": "#/$defs/ConstraintView"
+              },
+              "type": "array"
+            },
+            "input_version": {
+              "$ref": "#/$defs/DocumentVersion",
+              "description": "`schema_version` of the input document (1.0 input is described after upgrading)."
+            },
+            "name": {
+              "description": "Document `name`.",
+              "type": "string"
+            },
+            "op": {
+              "const": "describe",
+              "type": "string"
+            },
+            "parameters": {
+              "description": "Parameters as stored.",
+              "items": {
+                "$ref": "#/$defs/Parameter"
+              },
+              "type": "array"
+            },
+            "parts": {
+              "description": "Parts in document order.",
+              "items": {
+                "$ref": "#/$defs/PartView"
+              },
+              "type": "array"
+            },
+            "revision": {
+              "description": "Document `revision`.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "root": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Stored `root` (part or assembly id)."
+            },
+            "tree": {
+              "description": "Assembly tree: top-level nodes (assemblies that are no assembly's child, then parts\nthat are no assembly's child), each with its children expanded recursively. Every\npart / assembly is expanded at its first occurrence (pre-order) only; later\noccurrences are [`TreeNode::repeated`] leaves, so the tree has at most\n`assemblies + parts + Σ children` nodes (never more than [`MAX_TREE_NODES`]).",
+              "items": {
+                "$ref": "#/$defs/TreeNode"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "op",
+            "input_version",
+            "name",
+            "revision",
+            "root",
+            "computed_root",
+            "parameters",
+            "components",
+            "constraints",
+            "parts",
+            "assemblies",
+            "tree"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Result of `version`.",
+          "properties": {
+            "api_version": {
+              "description": "[`API_VERSION`] of this contract.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "crate_version": {
+              "description": "`promptcad-core` crate version.",
+              "type": "string"
+            },
+            "op": {
+              "const": "version",
+              "type": "string"
+            },
+            "schema_versions": {
+              "description": "Accepted document `schema_version`s.",
+              "items": {
+                "$ref": "#/$defs/DocumentVersion"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "op",
+            "crate_version",
+            "api_version",
+            "schema_versions"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "DocumentVersion": {
+      "description": "A document `schema_version`.",
+      "oneOf": [
+        {
+          "const": "1.0",
+          "description": "`\"1.0\"`",
+          "type": "string"
+        },
+        {
+          "const": "2.0",
+          "description": "`\"2.0\"`",
+          "type": "string"
+        }
+      ]
+    },
+    "DotShape": {
+      "description": "Dot shapes.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "`point` (no fields).",
+          "properties": {
+            "kind": {
+              "const": "point",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EdgeSelector": {
+      "description": "Edge selector for fillets and chamfers; default `vertical`.",
+      "oneOf": [
+        {
+          "const": "all",
+          "description": "`all`",
+          "type": "string"
+        },
+        {
+          "const": "vertical",
+          "description": "`vertical` (default)",
+          "type": "string"
+        },
+        {
+          "const": "top",
+          "description": "`top`",
+          "type": "string"
+        },
+        {
+          "const": "bottom",
+          "description": "`bottom`",
+          "type": "string"
+        }
+      ]
+    },
+    "EmptyRole": {
+      "description": "Empty `role` (§3.1), required on and exclusive to `kind = \"empty\"`.",
+      "oneOf": [
+        {
+          "const": "cut",
+          "description": "Subtracted from a part body.",
+          "type": "string"
+        },
+        {
+          "const": "reserve",
+          "description": "Space reserved for something (PCB, connector, …).",
+          "type": "string"
+        },
+        {
+          "const": "keep_out",
+          "description": "Space no solid may enter.",
+          "type": "string"
+        },
+        {
+          "const": "envelope",
+          "description": "Bounding envelope; may be `intersect`ed by several parts.",
+          "type": "string"
+        }
+      ]
+    },
+    "EmptyShape": {
+      "description": "Empty shapes, discriminated by `shape.kind`.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "`box`",
+          "properties": {
+            "height": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "box",
+              "type": "string"
+            },
+            "length": {
+              "description": "Along local X.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "width": {
+              "description": "Along local Y.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "length",
+            "width",
+            "height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`cylinder`",
+          "properties": {
+            "diameter": {
+              "description": "Diameter.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "height": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "cylinder",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "diameter",
+            "height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`hole`",
+          "properties": {
+            "axis": {
+              "$ref": "#/$defs/Axis",
+              "default": "z",
+              "description": "Local hole axis, default `z`."
+            },
+            "counterbore_depth": {
+              "description": "`Dim | null`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "counterbore_diameter": {
+              "description": "`Dim | null`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "countersink_angle": {
+              "description": "`0 < x < 180 | null`.",
+              "exclusiveMaximum": 180.0,
+              "exclusiveMinimum": 0.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "countersink_diameter": {
+              "description": "`Dim | null`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "depth": {
+              "description": "`Dim | null`; required for `blind`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "diameter": {
+              "description": "`Dim`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "hole_type": {
+              "$ref": "#/$defs/HoleType",
+              "default": "through",
+              "description": "Default `through`."
+            },
+            "kind": {
+              "const": "hole",
+              "type": "string"
+            },
+            "thread": {
+              "description": "`^M\\d{1,3}(\\.\\d)?(x\\d(\\.\\d{1,2})?)?$ | null`.",
+              "pattern": "^M\\d{1,3}(\\.\\d)?(x\\d(\\.\\d{1,2})?)?$",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "axis",
+            "diameter",
+            "hole_type",
+            "depth",
+            "thread",
+            "counterbore_diameter",
+            "counterbore_depth",
+            "countersink_diameter",
+            "countersink_angle"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`of`",
+          "properties": {
+            "kind": {
+              "const": "of",
+              "type": "string"
+            },
+            "source": {
+              "$ref": "#/$defs/Id",
+              "description": "Volume `id`."
+            }
+          },
+          "required": [
+            "kind",
+            "source"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EntryKind": {
+      "description": "What an entry records.",
+      "oneOf": [
+        {
+          "const": "patch",
+          "description": "A submitted patch (accepted or rejected).",
+          "type": "string"
+        },
+        {
+          "const": "undo",
+          "description": "An undo of an earlier accepted patch.",
+          "type": "string"
+        }
+      ]
+    },
+    "ErrorCode": {
+      "description": "Closed set of request-level error codes.",
+      "oneOf": [
+        {
+          "const": "bad_request",
+          "description": "The request is not valid JSON, has an unknown `op`, an unknown / missing field or a\nfield of the wrong type (including an unknown `origin`), or is not UTF-8.",
+          "type": "string"
+        },
+        {
+          "const": "too_large",
+          "description": "The request exceeds [`MAX_REQUEST_BYTES`].",
+          "type": "string"
+        },
+        {
+          "const": "unsupported_schema_version",
+          "description": "`document.schema_version` is missing, not a string, or not `\"1.0\"` / `\"2.0\"`.",
+          "type": "string"
+        },
+        {
+          "const": "wrong_schema_version",
+          "description": "A supported `schema_version` that this op does not accept (`upgrade` needs 1.0,\n`downgrade` and `apply_patch` need 2.0).",
+          "type": "string"
+        },
+        {
+          "const": "invalid_document",
+          "description": "The document does not deserialize into the typed model (not an object, wrong type,\nunknown field, malformed id or reference, missing required field, …).",
+          "type": "string"
+        },
+        {
+          "const": "schema_violation",
+          "description": "The document parsed but violates schema-level constraints (ranges, lengths, list caps,\ncross-field shape rules); `violations` lists them all, `path` is the first.",
+          "type": "string"
+        },
+        {
+          "const": "invalid_patch",
+          "description": "The patch does not deserialize into the typed `Patch` model.",
+          "type": "string"
+        },
+        {
+          "const": "response_too_large",
+          "description": "The response would exceed [`MAX_RESPONSE_BYTES`] and was discarded. Not expected for\ndocuments within the schema limits (a safety net against output amplification).",
+          "type": "string"
+        },
+        {
+          "const": "internal",
+          "description": "An internal failure (a caught panic, or a broken internal size invariant such as\n[`MAX_TREE_NODES`]). Never expected; please report.",
+          "type": "string"
+        }
+      ]
+    },
+    "FieldRef": {
+      "pattern": "^[a-z][a-z0-9_]{0,31}:[a-z][a-z0-9_]{0,31}$",
+      "type": "string"
+    },
+    "FieldView": {
+      "additionalProperties": false,
+      "description": "A numeric (bindable) field.",
+      "properties": {
+        "bound": {
+          "description": "Driven by a binding.",
+          "type": "boolean"
+        },
+        "expr": {
+          "description": "The binding expression when bound.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "Field name (`length`, `value`, `u`, …); `id:name` is its field reference.",
+          "type": "string"
+        },
+        "value": {
+          "description": "Current (cached) value; `null` for an optional field that is null (not bindable).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "value",
+        "bound",
+        "expr"
+      ],
+      "type": "object"
+    },
+    "FilletFeature": {
+      "additionalProperties": false,
+      "description": "`{kind: \"fillet\", radius, selector}` (1.0 `FilletFeature`).",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/FilletTag",
+          "default": "fillet",
+          "description": "Always `\"fillet\"`."
+        },
+        "radius": {
+          "description": "`Dim`.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 100000.0,
+          "type": "number"
+        },
+        "selector": {
+          "$ref": "#/$defs/EdgeSelector",
+          "default": "vertical",
+          "description": "Edge selector."
+        }
+      },
+      "required": [
+        "kind",
+        "radius",
+        "selector"
+      ],
+      "type": "object"
+    },
+    "FilletTag": {
+      "description": "`kind: \"fillet\"`.",
+      "oneOf": [
+        {
+          "const": "fillet",
+          "description": "`\"fillet\"`",
+          "type": "string"
+        }
+      ]
+    },
+    "Frame": {
+      "additionalProperties": false,
+      "description": "Wire form of [`Frame`] (also its JSON Schema).",
+      "properties": {
+        "origin": {
+          "items": {
+            "maximum": 100000.0,
+            "minimum": -100000.0,
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "x_axis": {
+          "$ref": "#/$defs/AxisDir"
+        },
+        "z_axis": {
+          "$ref": "#/$defs/AxisDir"
+        }
+      },
+      "required": [
+        "origin",
+        "x_axis",
+        "z_axis"
+      ],
+      "type": "object"
+    },
+    "HoleFeature": {
+      "additionalProperties": false,
+      "description": "1.0 `HoleFeature`.",
+      "properties": {
+        "axis": {
+          "$ref": "#/$defs/Axis",
+          "default": "z",
+          "description": "Hole axis, default `z`."
+        },
+        "counterbore_depth": {
+          "default": null,
+          "description": "`Dim | null`.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 100000.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "counterbore_diameter": {
+          "default": null,
+          "description": "`Dim | null`.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 100000.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "countersink_angle": {
+          "default": null,
+          "description": "`0 < x < 180 | null`.",
+          "exclusiveMaximum": 180.0,
+          "exclusiveMinimum": 0.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "countersink_diameter": {
+          "default": null,
+          "description": "`Dim | null`.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 100000.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "depth": {
+          "default": null,
+          "description": "`Dim | null`.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 100000.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "diameter": {
+          "description": "`Dim`.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 100000.0,
+          "type": "number"
+        },
+        "hole_type": {
+          "$ref": "#/$defs/HoleType",
+          "default": "through",
+          "description": "Default `through`."
+        },
+        "kind": {
+          "$ref": "#/$defs/HoleTag",
+          "default": "hole",
+          "description": "Always `\"hole\"`."
+        },
+        "thread": {
+          "default": null,
+          "description": "Free text, ≤ 32 chars.",
+          "maxLength": 32,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "x": {
+          "default": 0.0,
+          "description": "`Coord`, default 0.",
+          "maximum": 100000.0,
+          "minimum": -100000.0,
+          "type": "number"
+        },
+        "y": {
+          "default": 0.0,
+          "description": "`Coord`, default 0.",
+          "maximum": 100000.0,
+          "minimum": -100000.0,
+          "type": "number"
+        },
+        "z": {
+          "default": 0.0,
+          "description": "`Coord`, default 0.",
+          "maximum": 100000.0,
+          "minimum": -100000.0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "x",
+        "y",
+        "z",
+        "axis",
+        "diameter",
+        "hole_type",
+        "depth",
+        "thread",
+        "counterbore_diameter",
+        "counterbore_depth",
+        "countersink_diameter",
+        "countersink_angle"
+      ],
+      "type": "object"
+    },
+    "HoleTag": {
+      "description": "`kind: \"hole\"` of a 1.0 hole.",
+      "oneOf": [
+        {
+          "const": "hole",
+          "description": "`\"hole\"`",
+          "type": "string"
+        }
+      ]
+    },
+    "HoleType": {
+      "description": "Hole subtype (1.0 `HoleType`); default `through`.",
+      "oneOf": [
+        {
+          "const": "through",
+          "description": "`through` (default)",
+          "type": "string"
+        },
+        {
+          "const": "blind",
+          "description": "`blind` — requires `depth`",
+          "type": "string"
+        },
+        {
+          "const": "clearance",
+          "description": "`clearance`",
+          "type": "string"
+        },
+        {
+          "const": "tapped",
+          "description": "`tapped`",
+          "type": "string"
+        },
+        {
+          "const": "counterbore",
+          "description": "`counterbore` — requires `counterbore_diameter` and `counterbore_depth`",
+          "type": "string"
+        },
+        {
+          "const": "countersink",
+          "description": "`countersink` — requires `countersink_diameter` and `countersink_angle`",
+          "type": "string"
+        }
+      ]
+    },
+    "Id": {
+      "maxLength": 32,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]{0,31}$",
+      "type": "string"
+    },
+    "IssueSummary": {
+      "additionalProperties": false,
+      "description": "`{code, severity}` of one validation issue.",
+      "properties": {
+        "code": {
+          "description": "Issue code.",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity",
+          "description": "Severity."
+        }
+      },
+      "required": [
+        "code",
+        "severity"
+      ],
+      "type": "object"
+    },
+    "Layer": {
+      "description": "Which validation layer produced an issue (§9.1, §9.4).",
+      "oneOf": [
+        {
+          "const": "analytic",
+          "description": "Rust analytic validator (default).",
+          "type": "string"
+        },
+        {
+          "const": "kernel",
+          "description": "Geometry-kernel validation in the renderer sidecar.",
+          "type": "string"
+        }
+      ]
+    },
+    "LineShape": {
+      "description": "Line shapes (all derived components).",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "`segment`",
+          "properties": {
+            "end": {
+              "$ref": "#/$defs/Id",
+              "description": "End Dot."
+            },
+            "kind": {
+              "const": "segment",
+              "type": "string"
+            },
+            "start": {
+              "$ref": "#/$defs/Id",
+              "description": "Start Dot."
+            }
+          },
+          "required": [
+            "kind",
+            "start",
+            "end"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`polyline`",
+          "properties": {
+            "closed": {
+              "description": "Whether the polyline is closed.",
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "polyline",
+              "type": "string"
+            },
+            "points": {
+              "description": "Dot ids, 2–64.",
+              "items": {
+                "$ref": "#/$defs/Id"
+              },
+              "maxItems": 64,
+              "minItems": 2,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "points",
+            "closed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`arc`",
+          "properties": {
+            "end": {
+              "$ref": "#/$defs/Id",
+              "description": "End Dot."
+            },
+            "kind": {
+              "const": "arc",
+              "type": "string"
+            },
+            "start": {
+              "$ref": "#/$defs/Id",
+              "description": "Start Dot."
+            },
+            "through": {
+              "$ref": "#/$defs/Id",
+              "description": "A Dot the arc passes through."
+            }
+          },
+          "required": [
+            "kind",
+            "start",
+            "through",
+            "end"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`circle`",
+          "properties": {
+            "center": {
+              "$ref": "#/$defs/Id",
+              "description": "Center Dot."
+            },
+            "diameter": {
+              "description": "`Dim`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "circle",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "center",
+            "diameter"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Material": {
+      "description": "Part material (1.0 `Material`).",
+      "oneOf": [
+        {
+          "const": "aluminum",
+          "description": "`aluminum`",
+          "type": "string"
+        },
+        {
+          "const": "steel",
+          "description": "`steel`",
+          "type": "string"
+        },
+        {
+          "const": "stainless_steel",
+          "description": "`stainless_steel`",
+          "type": "string"
+        },
+        {
+          "const": "plastic",
+          "description": "`plastic`",
+          "type": "string"
+        },
+        {
+          "const": "wood",
+          "description": "`wood`",
+          "type": "string"
+        },
+        {
+          "const": "other",
+          "description": "`other`",
+          "type": "string"
+        }
+      ]
+    },
+    "OpLogEntry": {
+      "additionalProperties": false,
+      "description": "One line of `oplog.jsonl`.",
+      "properties": {
+        "accepted": {
+          "description": "Whether the document changed.",
+          "type": "boolean"
+        },
+        "base_revision": {
+          "description": "Document revision when the entry was made (for patches: the revision the patch was\nchecked against, which differs from `patch.base_revision` exactly when it was\nrejected as `stale_revision`).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "doc_sha256_after": {
+          "description": "SHA-256 of the canonical document after the entry (`null` when rejected).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "doc_sha256_before": {
+          "description": "SHA-256 of the canonical document before the entry.",
+          "type": "string"
+        },
+        "issues": {
+          "description": "Issues of the outcome: the full validation report when accepted, the attached P-class\nissues when rejected.",
+          "items": {
+            "$ref": "#/$defs/IssueSummary"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/EntryKind",
+          "description": "`patch` or `undo`."
+        },
+        "origin": {
+          "$ref": "#/$defs/PatchOrigin",
+          "description": "Who: `\"human\"` or the agent role."
+        },
+        "patch": {
+          "additionalProperties": true,
+          "description": "The patch as submitted (`null` for undo entries).\n\nIts JSON Schema is a plain object: a patch rejected as `schema_invalid` is logged as\nsubmitted and need not satisfy `patch.schema.json`'s range / length constraints.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "patch_sha256": {
+          "description": "SHA-256 of the canonical patch JSON (`null` for undo entries).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RejectReason"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Reject reason (`null` when accepted)."
+        },
+        "revert": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Revert"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Reverse delta of an accepted patch (what undo applies); `null` otherwise."
+        },
+        "revision_after": {
+          "description": "Revision after the entry; `null` when rejected.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "schema_version": {
+          "$ref": "#/$defs/SchemaVersion2",
+          "description": "Document schema version the entry was produced under (`\"2.0\"`)."
+        },
+        "seq": {
+          "description": "0-based position in the log.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "timestamp": {
+          "description": "Caller-supplied timestamp (the library never reads a clock).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "undoes": {
+          "description": "For undo entries: `seq` of the undone patch entry.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "seq",
+        "schema_version",
+        "kind",
+        "origin",
+        "timestamp",
+        "patch",
+        "patch_sha256",
+        "undoes",
+        "base_revision",
+        "revision_after",
+        "accepted",
+        "reject",
+        "issues",
+        "doc_sha256_before",
+        "doc_sha256_after",
+        "revert"
+      ],
+      "type": "object"
+    },
+    "Parameter": {
+      "additionalProperties": false,
+      "description": "A named parameter (§4.1). `name` is in namespace N3 and may not be `min` / `max`.",
+      "properties": {
+        "max": {
+          "default": null,
+          "description": "Optional upper bound.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "default": null,
+          "description": "Optional lower bound (`parameter_out_of_range` is a validator code).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "name": {
+          "$ref": "#/$defs/Id",
+          "description": "Parameter name (N3)."
+        },
+        "note": {
+          "default": null,
+          "description": "≤ 120 chars.",
+          "maxLength": 120,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "description": "Current value.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "value",
+        "min",
+        "max",
+        "note"
+      ],
+      "type": "object"
+    },
+    "Part": {
+      "additionalProperties": false,
+      "description": "A part (§6.2).",
+      "properties": {
+        "body": {
+          "description": "Boolean recipe, 1–128 ops, first must be `add`.",
+          "items": {
+            "$ref": "#/$defs/BodyOp"
+          },
+          "maxItems": 128,
+          "minItems": 1,
+          "type": "array"
+        },
+        "chamfers": {
+          "default": [],
+          "description": "≤ 8.",
+          "items": {
+            "$ref": "#/$defs/ChamferFeature"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
+        "fillets": {
+          "default": [],
+          "description": "≤ 8.",
+          "items": {
+            "$ref": "#/$defs/FilletFeature"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
+        "id": {
+          "$ref": "#/$defs/Id",
+          "description": "N2 identifier."
+        },
+        "material": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Material"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Material or `null`."
+        },
+        "name": {
+          "description": "1–80 chars.",
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "quantity": {
+          "description": "1–999.",
+          "format": "uint32",
+          "maximum": 999,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "source": {
+          "$ref": "#/$defs/PartSource",
+          "description": "`made` / `purchased`."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "material",
+        "quantity",
+        "source",
+        "body",
+        "fillets",
+        "chamfers"
+      ],
+      "type": "object"
+    },
+    "PartSource": {
+      "description": "Part source (§6.2).",
+      "oneOf": [
+        {
+          "const": "made",
+          "description": "Manufactured.",
+          "type": "string"
+        },
+        {
+          "const": "purchased",
+          "description": "Bought (BOM only, no manufacturing outputs).",
+          "type": "string"
+        }
+      ]
+    },
+    "PartView": {
+      "additionalProperties": false,
+      "description": "One part in the read model.",
+      "properties": {
+        "body": {
+          "description": "Boolean recipe.",
+          "items": {
+            "$ref": "#/$defs/BodyOp"
+          },
+          "type": "array"
+        },
+        "id": {
+          "$ref": "#/$defs/Id",
+          "description": "Part id."
+        },
+        "material": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Material"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Material."
+        },
+        "name": {
+          "description": "Part name.",
+          "type": "string"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "First assembly (document order) listing this part as a child."
+        },
+        "quantity": {
+          "description": "Quantity.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source": {
+          "$ref": "#/$defs/PartSource",
+          "description": "`made` / `purchased`."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "material",
+        "quantity",
+        "source",
+        "body",
+        "parent"
+      ],
+      "type": "object"
+    },
+    "PatchOrigin": {
+      "description": "Who submitted a patch: an agent role or `human`.",
+      "enum": [
+        "space_planner",
+        "component_smith",
+        "joiner",
+        "assembler",
+        "human"
+      ],
+      "type": "string"
+    },
+    "PatchOutcomeView": {
+      "description": "Outcome of `apply_patch`, tagged by `status`.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "The patch was accepted; the host replaces its document with `document`.",
+          "properties": {
+            "created": {
+              "description": "Components created by this patch, in document order.",
+              "items": {
+                "$ref": "#/$defs/Id"
+              },
+              "type": "array"
+            },
+            "doc_sha256_after": {
+              "description": "SHA-256 of the canonical `document`.",
+              "type": "string"
+            },
+            "doc_sha256_before": {
+              "description": "SHA-256 of the canonical input document.",
+              "type": "string"
+            },
+            "document": {
+              "$ref": "#/$defs/CadDocument2",
+              "description": "The normalized document at `revision_after`."
+            },
+            "log_entry": {
+              "$ref": "#/$defs/OpLogEntry",
+              "description": "The op-log entry to append (`seq` = request `log_seq`, `timestamp` = request\n`timestamp`; contains the reverse delta for undo)."
+            },
+            "log_line": {
+              "description": "`log_entry` as the exact `oplog.jsonl` line (compact JSON, no trailing newline).",
+              "type": "string"
+            },
+            "patch_id": {
+              "description": "`r<revision_after>`, the `provenance.patch_id` of created components.",
+              "type": "string"
+            },
+            "patch_sha256": {
+              "description": "SHA-256 of the canonical patch JSON.",
+              "type": "string"
+            },
+            "report": {
+              "$ref": "#/$defs/ValidationReport",
+              "description": "Validation of `document` (`completed = false`); only D-class issues."
+            },
+            "resolved": {
+              "$ref": "#/$defs/Resolved",
+              "description": "Solver output of `document`."
+            },
+            "revision_after": {
+              "description": "`revision_before + 1`.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "revision_before": {
+              "description": "Revision of the input document.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "status": {
+              "const": "accepted",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "document",
+            "report",
+            "resolved",
+            "revision_before",
+            "revision_after",
+            "patch_id",
+            "created",
+            "patch_sha256",
+            "doc_sha256_before",
+            "doc_sha256_after",
+            "log_entry",
+            "log_line"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The patch was rejected; the host keeps its document unchanged.",
+          "properties": {
+            "doc_sha256_before": {
+              "description": "SHA-256 of the canonical input document (unchanged).",
+              "type": "string"
+            },
+            "issues": {
+              "description": "The P-class issues behind a validation rejection (empty for other reasons).",
+              "items": {
+                "$ref": "#/$defs/ValidationIssue"
+              },
+              "type": "array"
+            },
+            "log_entry": {
+              "$ref": "#/$defs/OpLogEntry",
+              "description": "The op-log entry to append (rejections are logged too)."
+            },
+            "log_line": {
+              "description": "`log_entry` as the exact `oplog.jsonl` line (compact JSON, no trailing newline).",
+              "type": "string"
+            },
+            "patch_sha256": {
+              "description": "SHA-256 of the canonical patch JSON.",
+              "type": "string"
+            },
+            "reason": {
+              "$ref": "#/$defs/RejectReason",
+              "description": "Why."
+            },
+            "status": {
+              "const": "rejected",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reason",
+            "issues",
+            "patch_sha256",
+            "doc_sha256_before",
+            "log_entry",
+            "log_line"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PlaneShape": {
+      "description": "Plane shapes.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "`rect`",
+          "properties": {
+            "kind": {
+              "const": "rect",
+              "type": "string"
+            },
+            "length": {
+              "description": "Along local X.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "width": {
+              "description": "Along local Y.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "length",
+            "width"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`disc`",
+          "properties": {
+            "diameter": {
+              "description": "`Dim`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "disc",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "diameter"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`profile`",
+          "properties": {
+            "inners": {
+              "default": [],
+              "description": "Inner closed Lines (holes in the profile), ≤ 16.",
+              "items": {
+                "$ref": "#/$defs/Id"
+              },
+              "maxItems": 16,
+              "type": "array"
+            },
+            "kind": {
+              "const": "profile",
+              "type": "string"
+            },
+            "outer": {
+              "$ref": "#/$defs/Id",
+              "description": "Outer closed Line."
+            }
+          },
+          "required": [
+            "kind",
+            "outer",
+            "inners"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`section`",
+          "properties": {
+            "kind": {
+              "const": "section",
+              "type": "string"
+            },
+            "offset": {
+              "description": "Local Z of the horizontal section (`Coord`).",
+              "maximum": 100000.0,
+              "minimum": -100000.0,
+              "type": "number"
+            },
+            "source": {
+              "$ref": "#/$defs/Id",
+              "description": "Volume id."
+            }
+          },
+          "required": [
+            "kind",
+            "source",
+            "offset"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PlannerMetadata": {
+      "additionalProperties": false,
+      "description": "`{planner, confidence, review_required}` (1.0 `PlannerMetadata`).",
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "description": "`0 ≤ x ≤ 1`, default 1.",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "planner": {
+          "description": "Planner name, 1–64 chars.",
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "review_required": {
+          "default": false,
+          "description": "Planner's own review flag, default `false`.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "planner",
+        "confidence",
+        "review_required"
+      ],
+      "type": "object"
+    },
+    "PortRef": {
+      "pattern": "^[a-z][a-z0-9_]{0,31}\\.[a-z][a-z0-9_]{0,31}$",
+      "type": "string"
+    },
+    "PortType": {
+      "description": "The four port types of §3.4.",
+      "oneOf": [
+        {
+          "const": "point",
+          "description": "`point`",
+          "type": "string"
+        },
+        {
+          "const": "axis",
+          "description": "`axis`",
+          "type": "string"
+        },
+        {
+          "const": "face",
+          "description": "`face`",
+          "type": "string"
+        },
+        {
+          "const": "region",
+          "description": "`region`",
+          "type": "string"
+        }
+      ]
+    },
+    "PortView": {
+      "additionalProperties": false,
+      "description": "A port.",
+      "properties": {
+        "name": {
+          "description": "Port name; `id.name` is its port reference.",
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/PortType",
+          "description": "Port type."
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "type": "object"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "description": "`{agent, patch_id}`, stamped by the coordinator (§3.1).",
+      "properties": {
+        "agent": {
+          "$ref": "#/$defs/ProvenanceAgent",
+          "description": "Creating agent."
+        },
+        "patch_id": {
+          "description": "`r<revision_after>` of the creating patch; `null` for `migration`. ≤ 64 chars.",
+          "maxLength": 64,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "agent",
+        "patch_id"
+      ],
+      "type": "object"
+    },
+    "ProvenanceAgent": {
+      "description": "Who created a component (§3.1 `provenance.agent`).",
+      "oneOf": [
+        {
+          "const": "space_planner",
+          "description": "Space planner role.",
+          "type": "string"
+        },
+        {
+          "const": "component_smith",
+          "description": "Component smith role.",
+          "type": "string"
+        },
+        {
+          "const": "joiner",
+          "description": "Joiner role.",
+          "type": "string"
+        },
+        {
+          "const": "assembler",
+          "description": "Assembler role.",
+          "type": "string"
+        },
+        {
+          "const": "human",
+          "description": "A human edit (stamped by the coordinator).",
+          "type": "string"
+        },
+        {
+          "const": "migration",
+          "description": "Created by `upgrade_1_to_2`.",
+          "type": "string"
+        }
+      ]
+    },
+    "ReasonCode": {
+      "description": "Patch reject reason (§9.2 last paragraph): a reject code or a P-class issue code.",
+      "enum": [
+        "schema_invalid",
+        "stale_revision",
+        "permission_denied",
+        "unknown_target",
+        "field_is_bound",
+        "assumption_not_found",
+        "annotation_only_removal",
+        "standards_mismatch",
+        "duplicate_id",
+        "dangling_reference",
+        "unknown_port",
+        "unknown_field",
+        "reference_cycle",
+        "invalid_promotion",
+        "open_profile",
+        "profile_not_axis_aligned",
+        "multi_owner",
+        "body_first_not_add",
+        "invalid_body_component",
+        "invalid_root",
+        "port_type_mismatch",
+        "invalid_fixed_target",
+        "duplicate_binding",
+        "binding_parse_error",
+        "binding_unknown_name",
+        "binding_cycle",
+        "binding_eval_error",
+        "binding_out_of_range",
+        "parameter_out_of_range"
+      ],
+      "type": "string"
+    },
+    "RejectReason": {
+      "additionalProperties": false,
+      "description": "Structured reject diagnostics returned to the submitter and written to the op log.",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ReasonCode",
+          "description": "Reason code."
+        },
+        "message": {
+          "description": "Fixed-template message (ids, numbers and template text only; never free text such as\nlabels, notes or assumptions — §9.1).",
+          "type": "string"
+        },
+        "op_index": {
+          "description": "Index of the offending op, when one op is to blame.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "target": {
+          "description": "Offending `id` / `id:field`, when known.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "op_index",
+        "target",
+        "message"
+      ],
+      "type": "object"
+    },
+    "Resolved": {
+      "additionalProperties": false,
+      "description": "The whole `resolved.json`.",
+      "properties": {
+        "components": {
+          "additionalProperties": false,
+          "description": "World placement of every component.",
+          "patternProperties": {
+            "^[a-z][a-z0-9_]{0,31}$": {
+              "$ref": "#/$defs/ResolvedComponent"
+            }
+          },
+          "type": "object"
+        },
+        "holes": {
+          "additionalProperties": false,
+          "description": "Hole cut directions and main-hole cutter spans (§7).",
+          "patternProperties": {
+            "^[a-z][a-z0-9_]{0,31}$": {
+              "$ref": "#/$defs/ResolvedHole"
+            }
+          },
+          "type": "object"
+        },
+        "issues": {
+          "description": "Solver diagnostics only (§5.4, §5.5, §7.1 codes).",
+          "items": {
+            "$ref": "#/$defs/ValidationIssue"
+          },
+          "type": "array"
+        },
+        "ports": {
+          "additionalProperties": false,
+          "description": "Ports referenced by constraints plus every component's frame port.",
+          "patternProperties": {
+            "^[a-z][a-z0-9_]{0,31}\\.[a-z][a-z0-9_]{0,31}$": {
+              "$ref": "#/$defs/ResolvedPort"
+            }
+          },
+          "type": "object"
+        },
+        "revision": {
+          "description": "Document revision that was solved.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "schema_version": {
+          "$ref": "#/$defs/SchemaVersion2",
+          "description": "`\"2.0\"`."
+        }
+      },
+      "required": [
+        "schema_version",
+        "revision",
+        "components",
+        "ports",
+        "holes",
+        "issues"
+      ],
+      "type": "object"
+    },
+    "ResolvedComponent": {
+      "additionalProperties": false,
+      "description": "World placement of one component.",
+      "properties": {
+        "defaulted_axes": {
+          "description": "Axes defaulted to 0 by the under-constrained rule (§5.5 step 4), in axis order.",
+          "items": {
+            "$ref": "#/$defs/Axis"
+          },
+          "type": "array"
+        },
+        "origin": {
+          "description": "World translation `t` (the frame port's world position for independent components).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "x_axis": {
+          "$ref": "#/$defs/AxisDir",
+          "description": "World direction of local X."
+        },
+        "z_axis": {
+          "$ref": "#/$defs/AxisDir",
+          "description": "World direction of local Z."
+        }
+      },
+      "required": [
+        "origin",
+        "x_axis",
+        "z_axis",
+        "defaulted_axes"
+      ],
+      "type": "object"
+    },
+    "ResolvedHole": {
+      "additionalProperties": false,
+      "description": "Solved hole (§7).",
+      "properties": {
+        "cutter_end": {
+          "description": "Main-hole cutter end (world).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "cutter_start": {
+          "description": "Main-hole cutter start (world).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "diameter": {
+          "description": "Main-hole diameter.",
+          "format": "double",
+          "type": "number"
+        },
+        "direction": {
+          "$ref": "#/$defs/AxisDir",
+          "description": "Inward cut direction."
+        }
+      },
+      "required": [
+        "direction",
+        "cutter_start",
+        "cutter_end",
+        "diameter"
+      ],
+      "type": "object"
+    },
+    "ResolvedPort": {
+      "description": "A port's world geometry, discriminated by `type` (§3.4).",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "`point`",
+          "properties": {
+            "position": {
+              "description": "World position.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "type": {
+              "const": "point",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "position"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`axis`",
+          "properties": {
+            "direction": {
+              "$ref": "#/$defs/AxisDir",
+              "description": "World direction."
+            },
+            "position": {
+              "description": "World position.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "type": {
+              "const": "axis",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "position",
+            "direction"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`face`",
+          "properties": {
+            "extent": {
+              "description": "`[length along u, length along v]`.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "normal": {
+              "$ref": "#/$defs/AxisDir",
+              "description": "Outward normal."
+            },
+            "origin": {
+              "description": "Face center.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "type": {
+              "const": "face",
+              "type": "string"
+            },
+            "u": {
+              "$ref": "#/$defs/AxisDir",
+              "description": "In-face u direction."
+            },
+            "v": {
+              "$ref": "#/$defs/AxisDir",
+              "description": "In-face v direction (`u × v = normal`)."
+            }
+          },
+          "required": [
+            "type",
+            "origin",
+            "normal",
+            "u",
+            "v",
+            "extent"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`region` (axis-aligned bounding box).",
+          "properties": {
+            "max": {
+              "description": "Maximum corner.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "min": {
+              "description": "Minimum corner.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "type": {
+              "const": "region",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "min",
+            "max"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Revert": {
+      "additionalProperties": false,
+      "description": "Previous values of the top-level keys a patch changed.",
+      "properties": {
+        "sections": {
+          "additionalProperties": true,
+          "description": "Top-level key → value before the patch (raw JSON: each value is the previous\ncanonical value of that top-level CadDocument 2.0 key).",
+          "type": "object"
+        }
+      },
+      "required": [
+        "sections"
+      ],
+      "type": "object"
+    },
+    "Role": {
+      "description": "Agent roles (§8.1, §8.3). Used as issue `owner` and as the patch `agent`.",
+      "oneOf": [
+        {
+          "const": "space_planner",
+          "description": "Space planner: reserved-class Empties, parameters.",
+          "type": "string"
+        },
+        {
+          "const": "component_smith",
+          "description": "Component smith: Dots, Lines, Planes, Volumes, `cut` Empties.",
+          "type": "string"
+        },
+        {
+          "const": "joiner",
+          "description": "Joiner: constraints.",
+          "type": "string"
+        },
+        {
+          "const": "assembler",
+          "description": "Assembler: parts, bodies, assemblies.",
+          "type": "string"
+        }
+      ]
+    },
+    "SchemaVersion1": {
+      "description": "`schema_version: \"1.0\"`.",
+      "oneOf": [
+        {
+          "const": "1.0",
+          "description": "`\"1.0\"`",
+          "type": "string"
+        }
+      ]
+    },
+    "SchemaVersion2": {
+      "description": "`schema_version: \"2.0\"`.",
+      "oneOf": [
+        {
+          "const": "2.0",
+          "description": "`\"2.0\"`",
+          "type": "string"
+        }
+      ]
+    },
+    "SchemaViolation": {
+      "additionalProperties": false,
+      "description": "One schema-level violation (range, length, list cap, cross-field shape rule, …).",
+      "properties": {
+        "message": {
+          "description": "Human-readable, fixed-template message (embeds only ids and numbers).",
+          "type": "string"
+        },
+        "path": {
+          "description": "JSON pointer to the offending value (`\"\"` for the document root).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "message"
+      ],
+      "type": "object"
+    },
+    "Severity": {
+      "description": "Issue severity.",
+      "oneOf": [
+        {
+          "const": "error",
+          "description": "Blocks rendering (and, for P-class codes, the patch).",
+          "type": "string"
+        },
+        {
+          "const": "warning",
+          "description": "Does not block; sets `review_required`.",
+          "type": "string"
+        },
+        {
+          "const": "info",
+          "description": "Informational.",
+          "type": "string"
+        }
+      ]
+    },
+    "ShapeName": {
+      "description": "`shape.kind` of a component (the name; pair with the component `kind`).",
+      "oneOf": [
+        {
+          "const": "box",
+          "description": "Empty `box`.",
+          "type": "string"
+        },
+        {
+          "const": "cylinder",
+          "description": "Empty or Volume `cylinder`.",
+          "type": "string"
+        },
+        {
+          "const": "hole",
+          "description": "Empty `hole`.",
+          "type": "string"
+        },
+        {
+          "const": "of",
+          "description": "Empty `of`.",
+          "type": "string"
+        },
+        {
+          "const": "point",
+          "description": "Dot `point`.",
+          "type": "string"
+        },
+        {
+          "const": "segment",
+          "description": "Line `segment`.",
+          "type": "string"
+        },
+        {
+          "const": "polyline",
+          "description": "Line `polyline`.",
+          "type": "string"
+        },
+        {
+          "const": "arc",
+          "description": "Line `arc`.",
+          "type": "string"
+        },
+        {
+          "const": "circle",
+          "description": "Line `circle`.",
+          "type": "string"
+        },
+        {
+          "const": "rect",
+          "description": "Plane `rect`.",
+          "type": "string"
+        },
+        {
+          "const": "disc",
+          "description": "Plane `disc`.",
+          "type": "string"
+        },
+        {
+          "const": "profile",
+          "description": "Plane `profile`.",
+          "type": "string"
+        },
+        {
+          "const": "section",
+          "description": "Plane `section`.",
+          "type": "string"
+        },
+        {
+          "const": "plate",
+          "description": "Volume `plate`.",
+          "type": "string"
+        },
+        {
+          "const": "ring",
+          "description": "Volume `ring`.",
+          "type": "string"
+        },
+        {
+          "const": "l_bracket",
+          "description": "Volume `l_bracket`.",
+          "type": "string"
+        },
+        {
+          "const": "enclosure",
+          "description": "Volume `enclosure`.",
+          "type": "string"
+        },
+        {
+          "const": "extrude",
+          "description": "Volume `extrude`.",
+          "type": "string"
+        },
+        {
+          "const": "revolve",
+          "description": "Volume `revolve`.",
+          "type": "string"
+        }
+      ]
+    },
+    "ShapeRef": {
+      "additionalProperties": false,
+      "description": "A reference from a shape to another component.",
+      "properties": {
+        "field": {
+          "description": "Shape field holding the reference (`source`, `start`, `points`, `profile`, …).",
+          "type": "string"
+        },
+        "id": {
+          "$ref": "#/$defs/Id",
+          "description": "Referenced component id."
+        }
+      },
+      "required": [
+        "field",
+        "id"
+      ],
+      "type": "object"
+    },
+    "TreeNode": {
+      "additionalProperties": false,
+      "description": "A node of the assembly tree.",
+      "properties": {
+        "children": {
+          "description": "Children (an assembly's first occurrence only; empty for parts, `missing` and\nrepeated nodes).",
+          "items": {
+            "$ref": "#/$defs/TreeNode"
+          },
+          "type": "array"
+        },
+        "id": {
+          "$ref": "#/$defs/Id",
+          "description": "Part or assembly id."
+        },
+        "name": {
+          "description": "Part / assembly name (`null` for `missing`).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "node": {
+          "$ref": "#/$defs/TreeNodeKind",
+          "description": "Node kind."
+        },
+        "repeated": {
+          "description": "`true` when this part / assembly already occurs earlier in the tree (pre-order): the\nnode is a back-reference to that first occurrence and has no children. Only documents\nwhose assembly graph is not a tree have repeated nodes: a child listed twice in one\nassembly, a child of two assemblies (`multi_owner`) or a cycle (`reference_cycle`).\nAlways `false` for `missing` nodes.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "node",
+        "name",
+        "repeated",
+        "children"
+      ],
+      "type": "object"
+    },
+    "TreeNodeKind": {
+      "description": "What a tree node refers to.",
+      "oneOf": [
+        {
+          "const": "assembly",
+          "description": "An assembly.",
+          "type": "string"
+        },
+        {
+          "const": "part",
+          "description": "A part.",
+          "type": "string"
+        },
+        {
+          "const": "missing",
+          "description": "A child id that is neither (dangling reference).",
+          "type": "string"
+        }
+      ]
+    },
+    "Unit": {
+      "description": "The unit literal `\"mm\"`.",
+      "oneOf": [
+        {
+          "const": "mm",
+          "description": "`\"mm\"`",
+          "type": "string"
+        }
+      ]
+    },
+    "ValidationIssue": {
+      "additionalProperties": false,
+      "description": "ValidationIssue 2.0 (§9.1).",
+      "properties": {
+        "code": {
+          "description": "Issue code (see [`codes::Code`]); kept as a string so 1.0/kernel reports round-trip.",
+          "type": "string"
+        },
+        "feature_index": {
+          "default": null,
+          "description": "1.0 feature index, `null` in 2.0 issues.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "layer": {
+          "$ref": "#/$defs/Layer",
+          "default": "analytic",
+          "description": "Producing layer."
+        },
+        "message": {
+          "description": "Fixed-template message; may embed only ids, numbers and template text (§9.1).",
+          "type": "string"
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Role"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Role that should fix the issue."
+        },
+        "related": {
+          "default": [],
+          "description": "Other involved ids.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity",
+          "description": "Severity."
+        },
+        "target": {
+          "default": null,
+          "description": "Component/constraint/part id or `id:field` the issue is about.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "severity",
+        "code",
+        "message",
+        "feature_index",
+        "target",
+        "related",
+        "owner",
+        "layer"
+      ],
+      "type": "object"
+    },
+    "ValidationReport": {
+      "additionalProperties": false,
+      "description": "`{valid, review_required, issues}` (same shape and rules as 1.0).",
+      "properties": {
+        "issues": {
+          "default": [],
+          "description": "Issues in emission order.",
+          "items": {
+            "$ref": "#/$defs/ValidationIssue"
+          },
+          "type": "array"
+        },
+        "review_required": {
+          "description": "Planner flag, or any assumption, or any `error`/`warning`.",
+          "type": "boolean"
+        },
+        "valid": {
+          "description": "No `error` issues.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "valid",
+        "review_required",
+        "issues"
+      ],
+      "type": "object"
+    },
+    "VolumeShape": {
+      "description": "Volume shapes.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "`plate`",
+          "properties": {
+            "kind": {
+              "const": "plate",
+              "type": "string"
+            },
+            "length": {
+              "description": "Along local X.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "thickness": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "width": {
+              "description": "Along local Y.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "length",
+            "width",
+            "thickness"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`cylinder`",
+          "properties": {
+            "diameter": {
+              "description": "Diameter.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "height": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "cylinder",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "diameter",
+            "height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`ring`",
+          "properties": {
+            "height": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "inner_diameter": {
+              "description": "Inner (bore) diameter, must be smaller than `outer_diameter`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "ring",
+              "type": "string"
+            },
+            "outer_diameter": {
+              "description": "Outer diameter.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "outer_diameter",
+            "inner_diameter",
+            "height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`l_bracket`",
+          "properties": {
+            "depth": {
+              "description": "Along local Y.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "l_bracket",
+              "type": "string"
+            },
+            "thickness": {
+              "description": "Plate thickness.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "vertical_height": {
+              "description": "Height of the upright above the base plate.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "width": {
+              "description": "Along local X.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "width",
+            "depth",
+            "vertical_height",
+            "thickness"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`enclosure`",
+          "properties": {
+            "height": {
+              "description": "Along local Z.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "enclosure",
+              "type": "string"
+            },
+            "length": {
+              "description": "Along local X.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "wall_thickness": {
+              "description": "Wall and floor thickness.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "width": {
+              "description": "Along local Y.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "length",
+            "width",
+            "height",
+            "wall_thickness"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`extrude`",
+          "properties": {
+            "height": {
+              "description": "`Dim`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "extrude",
+              "type": "string"
+            },
+            "profile": {
+              "$ref": "#/$defs/Id",
+              "description": "Plane id."
+            }
+          },
+          "required": [
+            "kind",
+            "profile",
+            "height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`revolve`",
+          "properties": {
+            "angle": {
+              "description": "Degrees, `0 < angle ≤ 360`.",
+              "exclusiveMinimum": 0.0,
+              "maximum": 360.0,
+              "type": "number"
+            },
+            "axis": {
+              "$ref": "#/$defs/Id",
+              "description": "`segment` Line id."
+            },
+            "kind": {
+              "const": "revolve",
+              "type": "string"
+            },
+            "profile": {
+              "$ref": "#/$defs/Id",
+              "description": "Plane id."
+            }
+          },
+          "required": [
+            "kind",
+            "profile",
+            "axis",
+            "angle"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One response, tagged by `status`.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "The request was processed; `result.op` equals the request `op`.",
+      "properties": {
+        "result": {
+          "$ref": "#/$defs/CoreResult",
+          "description": "Op-specific result."
+        },
+        "status": {
+          "const": "ok",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "result"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "The request could not be processed at all.",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ErrorCode",
+          "description": "Error code."
+        },
+        "message": {
+          "description": "Human-readable English message.",
+          "type": "string"
+        },
+        "path": {
+          "description": "JSON pointer into the request (`/document`, `/document/components/3/shape/diameter`,\n`/patch`, …); `null` when the error is not about one location.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "const": "error",
+          "type": "string"
+        },
+        "violations": {
+          "description": "All schema violations (`schema_violation` only; empty otherwise), with request-relative\npaths.",
+          "items": {
+            "$ref": "#/$defs/SchemaViolation"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "status",
+        "code",
+        "message",
+        "path",
+        "violations"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "CoreResponse"
+}

@@ -21,6 +21,7 @@
 | [0009](0009-agent-orchestration.md) | Agent 編排：Claude API tool use + structured outputs，僅輸出 patch JSON | Accepted | 2026-11-17 |
 | [0010](0010-migration-phases.md) | 四階段遷移路線 | Accepted | 2026-11-17 |
 | [0011](0011-cross-platform-desktop.md) | 桌面版三平台（Windows、macOS、Linux） | Accepted | 2026-11-26 |
+| [0012](0012-server-host-for-rust-core.md) | 伺服器模式下 Rust core 的宿主形式 | Proposed（已依此實作，待負責人簽核） | 2026-11-26 |
 
 ## 決策之間的關係
 

@@ -110,3 +110,7 @@
 - 解析檢查對 `extrude`、`revolve` 與沉頭孔錐體使用保守的外包圖元：可能漏報，不會憑空產生 issue。核心層（kernel）驗證代碼未實作，屬於 sidecar 的工作。
 - Rust core 尚未接入 Tauri 命令或 FastAPI 伺服器；伺服器宿主形式仍待新 ADR（本 ADR 的回顧條件之一）。Python 驗證器尚未移除，兩套驗證邏輯目前並存。
 
+### 2026-11-26：伺服器宿主形式的回顧條件已觸發
+
+上一筆紀錄所述「伺服器宿主形式仍待新 ADR」的回顧條件已觸發，並記錄於 [0012](0012-server-host-for-rust-core.md)（待負責人簽核）：桌面端由 Tauri 命令行程內呼叫 core；伺服器端由 FastAPI 每次呼叫啟動一次 `promptcad-core rpc` 子行程，兩者共用 `promptcad_core::api` 的同一契約。上一筆紀錄中「Rust core 尚未接入 Tauri 命令或 FastAPI 伺服器」已不再成立。Core 仍不含幾何核心；Python 驗證器尚未移除，1.0 驗證路徑未改變。
+

@@ -1,6 +1,6 @@
 # Project Status — v0.1.0（含未發佈的第 1、2 階段切片）
 
-版本號仍為 0.1.0。下方「v0.1.0 可用功能」是已發佈的 MVP；「第 1 階段切片（Unreleased）」與「第 2 階段切片（Unreleased / Phase 2a）」是依 [ADR 0010](docs/adr/0010-migration-phases.md) 第 1、2 階段加入、尚未發佈的部分。
+版本號仍為 0.1.0。下方「v0.1.0 可用功能」是已發佈的 MVP；「第 1 階段切片（Unreleased）」與「第 2 階段切片（Unreleased / Phase 2a、2b）」是依 [ADR 0010](docs/adr/0010-migration-phases.md) 第 1、2 階段加入、尚未發佈的部分。
 
 ## v0.1.0 可用功能
 
@@ -65,7 +65,7 @@
 
 ## 第 2 階段切片（Unreleased / Phase 2a：Rust core）
 
-獨立的 library crate `crates/promptcad-core/`（不依賴 Tauri，自有 `Cargo.lock`；相依 serde、serde_json、schemars、sha2，開發相依 proptest），依 [`docs/CAD_DSL_2.md`](docs/CAD_DSL_2.md) 實作 [ADR 0010](docs/adr/0010-migration-phases.md) 第 2 階段的 Rust core。此切片**尚未被 Tauri 外殼或 FastAPI 伺服器呼叫**，執行中的應用程式仍只接受 CadDocument 1.0。
+獨立的 library crate `crates/promptcad-core/`（不依賴 Tauri，自有 `Cargo.lock`；相依 serde、serde_json、schemars、sha2，開發相依 proptest），依 [`docs/CAD_DSL_2.md`](docs/CAD_DSL_2.md) 實作 [ADR 0010](docs/adr/0010-migration-phases.md) 第 2 階段的 Rust core。2a 切片本身只有 library crate 與命令列工具；接入 Tauri 與 FastAPI 的部分見下方「第 2 階段 2b 切片」。
 
 | 項目 | 位置 | 狀態 |
 |---|---|---|
@@ -77,7 +77,7 @@
 | 1.0 ↔ 2.0 轉接（`upgrade_1_to_2` 為全函式、`downgrade_2_to_1` 為部分函式） | `src/migrate.rs` | 已實作；往返不變式有屬性測試 |
 | 命令列工具 `promptcad-core`（`schema --out-dir … [--check]`，另有 `validate`、`solve`、`upgrade`、`downgrade`、`normalize`、`apply-patch`；用法見 `crates/promptcad-core/README.md`） | `src/bin/promptcad-core.rs` | 已實作 |
 | 由 Rust 型別生成的 JSON Schema | `schemas/cad2/`（`cad-document-1`／`cad-document-2`／`patch`／`resolved`／`validation-report` 五份 `*.schema.json`） | 已實作；`cargo run -- schema --check` 檢查漂移 |
-| CI `core` job（`cargo fmt --check`、`clippy -D warnings`、`cargo test`、schema 漂移檢查） | `.github/workflows/ci.yml` | 已加入；**尚未在 GitHub 上執行過** |
+| CI `core` job（`cargo fmt --check`、`clippy -D warnings`、`cargo test`、schema 漂移檢查） | `.github/workflows/ci.yml` | 已加入；已於 PR #5 在 GitHub 上執行並通過 |
 
 ### 第 2 階段 2a 狀態（2026-11-26）
 
@@ -85,10 +85,10 @@
 
 尚未完成：
 
-- Rust core 尚未接進 Tauri 命令或 FastAPI 伺服器；伺服器模式下 Rust core 的宿主形式仍需新增 ADR。
+- （已於 2b 處理）Rust core 接進 Tauri 命令與 FastAPI 伺服器；伺服器宿主形式由 [ADR 0012](docs/adr/0012-server-host-for-rust-core.md) 記錄，待負責人簽核。
 - **Schema 來源尚未切換**：執行中的應用程式仍以 `app/models/cad.py` 為來源；2.0 的 Pydantic 與 TypeScript 生成型別尚不存在（目前只有 `schemas/cad2/` 的 JSON Schema 與漂移檢查）。
 - Python 編譯器不接受 2.0；Python `DesignValidator` 未移除。
-- 前端的元件樹與 port 顯示尚未開始。
+- 前端的屬性編輯、檢視器元件選取與 port 顯示尚未開始（唯讀元件樹已於 2b 加入）。
 - 1.0 直接輸出與經轉接後輸出的幾何等價測試（CadQuery 上的體積、包圍盒比對）尚未進行。
 - 核心層（kernel）驗證代碼未實作，屬於 sidecar 的工作。
 
@@ -105,6 +105,61 @@
 - `arc` 沒有 plane port，`circle` 的法線假設為 `+z`，`revolve` 只有 `origin` 與外包區域。
 - `Resolved.ports` 只含被約束引用的 port 與各元件的 frame port。
 - 升級後的文件若 1.0 螺紋無效，回報 `tapped_hole_without_thread`，而非 1.0 的 `thread_annotation_only`（§10.1 正規化已將 thread 設為 null）。
+
+## 第 2 階段 2b 切片（Unreleased / Phase 2b：接入 Tauri 與伺服器）
+
+Rust core 已被應用程式呼叫：一個與傳輸無關的請求／回應契約（`promptcad_core::api`），由三個宿主使用。伺服器宿主形式見 [ADR 0012](docs/adr/0012-server-host-for-rust-core.md)（待簽核）。
+
+| 項目 | 位置 | 狀態 |
+|---|---|---|
+| 契約 `CoreRequest`（以 `op` 區分：validate、solve、normalize、upgrade、downgrade、apply_patch、describe、version）與 `CoreResponse`（以 `status` 區分：ok／error）；`handle`、`handle_json`（請求上限 8 MiB） | `crates/promptcad-core/src/api.rs` | 已實作 |
+| 命令列 `promptcad-core rpc`（stdin 讀一個 JSON 請求，stdout 寫一行回應；寫出回應時結束碼為 0） | `crates/promptcad-core/src/bin/promptcad-core.rs` | 已實作 |
+| 請求與回應 JSON Schema（由 Rust 型別生成） | `schemas/cad2/core-request.schema.json`、`schemas/cad2/core-response.schema.json` | 已實作 |
+| 桌面：Tauri 命令 `core_request`，行程內於阻塞執行緒呼叫 core；權限 `allow-core-request` | `src-tauri/src/core.rs`、`src-tauri/capabilities/default.json` | 已實作 |
+| 伺服器：`POST /api/v1/core`，每次呼叫啟動一次 `promptcad-core rpc`，位元組原樣轉交；ok 與 error 皆回 HTTP 200，傳輸問題回 413／422／502／503／504 | `app/api/routes.py`、`app/services/core_bridge.py`、`app/core/config.py` | 已實作 |
+| 伺服器設定 `PROMPTCAD_CORE_BIN`、`PROMPTCAD_CORE_TIMEOUT_SECONDS`、`PROMPTCAD_CORE_MAX_REQUEST_BYTES`；子行程只保留白名單環境變數（不含 Token 與 API 金鑰） | `app/core/config.py`、`app/services/core_bridge.py` | 已實作 |
+| `/api/v1/capabilities` 新增 `core_available`、`core_crate_version`、`core_api_version`、`core_schema_versions` | `app/api/routes.py` | 已實作 |
+| TypeScript 型別由兩份 core schema 生成，CI 檢查漂移 | `web/scripts/gen-types.mjs`、`web/src/api/generated/core-request.d.ts`、`core-response.d.ts` | 已實作 |
+| 前端傳輸層：Tauri invoke 與 HTTP 兩種實作；只有 `bootstrap.ts` 接觸 Tauri 全域 | `web/src/api/coreClient.ts`、`web/src/api/bootstrap.ts` | 已實作 |
+| 編輯器持有 2.0 文件時，「驗證 JSON」經 core；1.0 流程不變 | `web/src/App.tsx` | 已實作 |
+| 唯讀元件樹：組裝、零件、body 操作、元件（欄位、綁定、port）、約束；不可編輯 | `web/src/components/ComponentTree.tsx` | 已實作 |
+| 2.0 文件的輸出（生成）停用，因幾何編譯器尚不接受 2.0 | `web/src/App.tsx` | 已停用 |
+| Docker：新增 `rust:1.90.0-slim-trixie` 建置階段，把 `promptcad-core` 複製到 `/usr/local/bin/promptcad-core` | `Dockerfile` | 已加入；**本機未驗證**（開發機沒有 Docker），待 CI `docker` job 於 PR 執行時驗證 |
+| CI：`test` job 建置 core 執行檔並跑整合測試；`docker` job 斷言 `/api/v1/core`；`web` job 檢查生成型別 | `.github/workflows/ci.yml` | 已加入；GitHub 上的執行結果本文件撰寫時未確認 |
+
+### 第 2 階段 2b 驗證（本機）
+
+- `crates/promptcad-core` 的 `cargo test`：317 個測試通過。
+- `src-tauri` 的 `cargo test`：26 個測試通過。
+- `pytest`：381 項通過、3 項略過；伺服器整合測試對實際的 `promptcad-core` 執行，並重播 49 個 parity 案例（Python `DesignValidator`）。
+- 同一請求經 Tauri 命令與 `promptcad-core rpc` 得到逐位元組相同的回應（測試）。
+- 前端 vitest：68 項通過。
+- 瀏覽器端到端（本機伺服器）：載入內建 2.0 範例 → 「驗證 JSON」→ 元件樹顯示。
+
+### 第 2 階段 2b 資源上限（獨立審查後加入）
+
+- core 回應上限 24 MiB（`api::MAX_RESPONSE_BYTES`），超過時回 `error` 信封，代碼 `response_too_large`；Tauri 與 `rpc` 共用同一實作。
+- `describe` 的樹：每個組裝與零件只在第一次出現時展開，其後以 `repeated: true` 的節點表示，節點總數上限 4096（`api::MAX_TREE_NODES`）。修正前，約 1.6 KB、5 層重複子項的文件會產生 1.8 GB 回應。
+- 各操作的最壞回應大小已以達到 schema 上限的文件量測並有測試（`crates/promptcad-core/tests/api_regressions.rs`）：`validate` 最大約 10.6 MB、`apply_patch` 最大約 14.5 MB（兩者因 `reserve_overlap` 成對回報而為平方成長），其餘操作為線性。
+- 伺服器：core 呼叫使用專用執行緒池，同時最多 `PROMPTCAD_CORE_MAX_CONCURRENCY`（預設 4）個子行程、最多 4 倍數量排隊；取不到名額時於 `PROMPTCAD_CORE_QUEUE_WAIT_SECONDS`（預設 3 秒）內回 `503` 並附 `Retry-After`，不啟動行程。取消請求或關閉伺服器時會結束子行程。
+- 伺服器尋找執行檔時不看工作目錄，Windows 只接受 `.exe`；`PROMPTCAD_ENV=production` 與凍結模式不使用 `crates/promptcad-core/target/` 的開發後備路徑。
+- 桌面版 release profile 為 `panic = "abort"`，因此 `api::handle` 內的 `catch_unwind` 在桌面版不生效；目前沒有已知可觸發的 panic，是否調整 profile 待負責人決定。
+- 前端經 Tauri 傳送文件時必須先解析成物件，超過 2^53 的整數會失真；此時驗證面板會列出「輸入警告」。經 HTTP 傳送時原文直接嵌入請求，不失真。
+
+### 第 2 階段 2b 未驗證
+
+- Tauri `invoke` 在真實 WebView 內的往返。
+- 完整的 `tauri build`。
+- Docker 映像建置（CI `docker` job）。
+
+### 第 2 階段 2b 尚未完成
+
+- Schema 來源仍為 `app/models/cad.py`；2.0 的 Pydantic 生成模型尚不存在。
+- Python 編譯器不接受 2.0。
+- Python `DesignValidator` 未移除。
+- 無 patch／op log UI；2.0 文件與 `oplog.jsonl` 未在 jobs 中持久化。
+- 3D 檢視器無元件選取。
+- 1.0 直接輸出與經轉接輸出的幾何等價測試（CadQuery 體積、包圍盒）未做。
 
 ## 已驗證
 
@@ -134,7 +189,7 @@ v0.1.0 發行包：
 - 共 253 個測試通過、0 失敗（單元測試加 19 個整合測試檔，含命令列測試 `tests/cli_commands.rs` 與審查後的回歸測試 `tests/solver_regressions.rs`、`tests/patch_regressions.rs`）。屬性測試使用 proptest。
 - `cargo fmt --check` 與 `cargo clippy --all-targets -- -D warnings` 通過。
 - Python 差異測試：`tests/fixtures/v1_parity.json` 的 49 個案例由 `tests/fixtures/gen_v1_parity.py` 實際執行 Python `DesignValidator` 產生，`tests/validate_parity_v1.rs` 比對 Rust 驗證器的判定。
-- CI 的 `core` job 尚未在 GitHub 上執行。
+- CI 的 `core` job 已於 PR #5 在 GitHub 上執行並通過。
 
 ## 封裝環境限制
 
@@ -145,12 +200,12 @@ v0.1.0 發行包：
 依 [ADR 0010](docs/adr/0010-migration-phases.md)：
 
 1. 完成第 1 階段：取得 `desktop-bundle.yml` 三平台矩陣的執行結果，依 CI 的 `--strict` 失敗補齊 unix 原生函式庫分類，macOS／Linux 的參考項目連續兩次全綠後改為必過（ADR 0011）。
-2. 完成第 2 階段：Rust core（CadDocument 2.0、驗證器、patch 引擎、op log、1.0 → 2.0 adapter）已於 `crates/promptcad-core/` 實作（見上方 Phase 2a）。剩餘項目：
-   - 把 Rust core 接進 Tauri 命令，並以新 ADR 決定伺服器模式下的宿主形式。
-   - 切換 schema 來源：由 Rust 生成 Pydantic 與 TypeScript 型別，`app/models/cad.py` 僅保留 1.0 相容用途或被生成檔取代（ADR 0008）。
+2. 完成第 2 階段：Rust core（CadDocument 2.0、驗證器、patch 引擎、op log、1.0 → 2.0 adapter）已於 `crates/promptcad-core/` 實作（見 Phase 2a），並已接入 Tauri 與伺服器（見 Phase 2b）。剩餘項目：
+   - 負責人簽核 [ADR 0012](docs/adr/0012-server-host-for-rust-core.md)；驗證 2b 未驗證項目（Tauri 真實 WebView 往返、`tauri build`、CI `docker` job）。
+   - 切換 schema 來源：由 Rust 生成 Pydantic 型別（TypeScript 的 core 請求／回應型別已於 2b 生成），`app/models/cad.py` 僅保留 1.0 相容用途或被生成檔取代（ADR 0008）。
    - Python 編譯器改為接受已驗證的 2.0 規格，並完成 1.0 直接輸出與經轉接輸出的幾何等價測試（CadQuery）。
    - 在實際系統中確認 Python 與 Rust 驗證器判定一致後，移除 Python 端的設計驗證邏輯。
-   - 前端的元件樹與 port 顯示。
+   - 前端的屬性編輯、檢視器元件選取與 port 顯示（唯讀元件樹已於 2b 完成）。
 3. 第 3 階段：約束求解器評估（[ADR 0007](docs/adr/0007-constraint-solver.md)）與多 agent 編排。
 
 仍保留的 1.0 功能構想（將併入 2.0 的對應階段）：

@@ -23,3 +23,6 @@ web/node_modules
 app/web_dist
 src-tauri
 .venv-desktop
+# Rust build output of crates/promptcad-core (the Dockerfile `core` stage builds it fresh);
+# the crate sources under crates/ stay in the context.
+**/target

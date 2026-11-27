@@ -5,7 +5,7 @@ import zipfile
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 
 from app.core.security import require_api_token, safe_job_file, validate_job_id
 from app.models.api import (
@@ -18,6 +18,7 @@ from app.models.api import (
     PlanResponse,
 )
 from app.models.cad import CadDocument, ValidationReport
+from app.services.core_bridge import CoreBusy, CoreFailed, CoreTimeout, CoreUnavailable
 
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(require_api_token)])
 
@@ -35,6 +36,7 @@ async def health(request: Request):
 async def capabilities(request: Request):
     service = _service(request)
     settings = request.app.state.settings
+    core = await request.app.state.core.version()
     return CapabilityResponse(
         planners=["auto", "rule", "llm"],
         base_features=["plate", "cylinder", "ring", "l_bracket", "enclosure"],
@@ -44,7 +46,66 @@ async def capabilities(request: Request):
         openscad_available=service.renderer.openscad_available(),
         configured_planner_mode=settings.planner_mode,
         configured_render_backend=settings.render_backend,
+        core_available=core is not None,
+        core_crate_version=core.crate_version if core else None,
+        core_api_version=core.api_version if core else None,
+        core_schema_versions=list(core.schema_versions) if core else [],
     )
+
+
+async def _read_limited_body(request: Request, limit: int) -> bytes:
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > limit:
+        raise HTTPException(status_code=413, detail=f"Request body exceeds {limit} bytes")
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > limit:
+            raise HTTPException(status_code=413, detail=f"Request body exceeds {limit} bytes")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+@router.post(
+    "/core",
+    include_in_schema=True,
+    responses={
+        200: {"description": "Core response envelope (status ok or error), unchanged"},
+        413: {"description": "Request body too large"},
+        422: {"description": "Body does not start with a JSON object"},
+        502: {"description": "Core crashed or wrote an unparseable response"},
+        503: {"description": "Core binary unavailable, or busy (Retry-After set)"},
+        504: {"description": "Core timed out"},
+    },
+)
+async def core_rpc(request: Request):
+    """Transparent transport to `promptcad-core rpc` (ADR 0008 rule 4, ADR 0012).
+
+    The body is forwarded byte for byte and the core's response is returned unchanged with
+    HTTP 200 for both `status: ok` and `status: error`.
+    """
+    settings = request.app.state.settings
+    body = await _read_limited_body(request, settings.core_max_request_bytes)
+    # Cheap shape check only: the core parses and rejects anything malformed with a
+    # `bad_request` envelope, so the server never parses up to 8 MiB on the event loop.
+    if body.lstrip(b" \t\r\n")[:1] != b"{":
+        raise HTTPException(status_code=422, detail="Body must be a JSON object")
+    try:
+        payload = await request.app.state.core.call_raw(body)
+    except CoreUnavailable as exc:
+        raise HTTPException(status_code=503, detail=f"Core unavailable: {exc}") from exc
+    except CoreBusy as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Core busy: {exc}",
+            headers={"Retry-After": str(exc.retry_after)},
+        ) from exc
+    except CoreTimeout as exc:
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
+    except CoreFailed as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return Response(content=payload, media_type="application/json")
 
 
 @router.post("/plan", response_model=PlanResponse)
