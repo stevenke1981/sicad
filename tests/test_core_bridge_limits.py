@@ -287,6 +287,8 @@ def _isolate(monkeypatch, tmp_path, path_entries):
     fake_python = tmp_path / "pyhome" / "python"
     fake_python.parent.mkdir(exist_ok=True)
     monkeypatch.setattr(sys, "executable", str(fake_python))
+    # CI exports PROMPTCAD_CORE_BIN for the integration tests; lookup tests must not see it.
+    monkeypatch.delenv("PROMPTCAD_CORE_BIN", raising=False)
     monkeypatch.setenv("PATH", core_bridge.os.pathsep.join(path_entries))
     work = tmp_path / "cwd"
     work.mkdir(exist_ok=True)
