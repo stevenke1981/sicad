@@ -253,3 +253,21 @@ def test_truncated_linux_comm_without_path_is_not_foreign():
     ]
     foreign = fs.foreign_processes(tree, "/opt/app/sidecar", "/")
     assert [f["pid"] for f in foreign] == [11]
+
+
+def test_check_core_requires_core_available_and_version_ok(monkeypatch):
+    replies = {
+        ("GET", "/api/v1/capabilities"): {"core_available": True, "core_crate_version": "0.1.0"},
+        ("POST", "/api/v1/core"): {"status": "ok", "result": {"crate_version": "0.1.0"}},
+    }
+    monkeypatch.setattr(fs, "_json", lambda sc, method, path, token, body=None: replies[(method, path)])
+    fs.check_core(object(), "t")
+
+    replies[("GET", "/api/v1/capabilities")] = {"core_available": False}
+    with pytest.raises(fs.SmokeFailure, match="core_available"):
+        fs.check_core(object(), "t")
+
+    replies[("GET", "/api/v1/capabilities")] = {"core_available": True}
+    replies[("POST", "/api/v1/core")] = {"status": "error"}
+    with pytest.raises(fs.SmokeFailure, match="version op"):
+        fs.check_core(object(), "t")

@@ -35,6 +35,11 @@ dev = [
 desktop = [
   "pyinstaller>=6.10,<7",
 ]
+# Generates app/models/generated from schemas/cad2 (scripts/gen_pydantic.py). Kept out of
+# `cad`/`desktop` so scripts/desktop_lock.py (which compiles those) stays byte-stable.
+schema = [
+  "datamodel-code-generator==0.103.0",
+]
 
 [project.scripts]
 promptcad = "app.cli:main"
@@ -52,7 +57,7 @@ addopts = "-q --disable-warnings --maxfail=1"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-exclude = ["generated", "examples/generated", "build", "node_modules", "web", "src-tauri", ".venv-desktop"]
+exclude = ["generated", "app/models/generated", "examples/generated", "build", "node_modules", "web", "src-tauri", ".venv-desktop"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
@@ -65,4 +70,3 @@ ignore = ["E501"]
 "app/services/openscad.py" = ["I001"]
 "app/services/planners/rule_based.py" = ["I001"]
 "app/services/preview.py" = ["I001", "F401"]
-"app/services/validator.py" = ["SIM102"]

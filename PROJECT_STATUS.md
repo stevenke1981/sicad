@@ -1,6 +1,6 @@
 # Project Status — v0.1.0（含未發佈的第 1、2 階段切片）
 
-版本號仍為 0.1.0。下方「v0.1.0 可用功能」是已發佈的 MVP；「第 1 階段切片（Unreleased）」與「第 2 階段切片（Unreleased / Phase 2a、2b）」是依 [ADR 0010](docs/adr/0010-migration-phases.md) 第 1、2 階段加入、尚未發佈的部分。
+版本號仍為 0.1.0。下方「v0.1.0 可用功能」是已發佈的 MVP；「第 1 階段切片（Unreleased）」與「第 2 階段切片（Unreleased / Phase 2a、2b、2c）」是依 [ADR 0010](docs/adr/0010-migration-phases.md) 第 1、2 階段加入、尚未發佈的部分。
 
 ## v0.1.0 可用功能
 
@@ -161,6 +161,59 @@ Rust core 已被應用程式呼叫：一個與傳輸無關的請求／回應契�
 - 3D 檢視器無元件選取。
 - 1.0 直接輸出與經轉接輸出的幾何等價測試（CadQuery 體積、包圍盒）未做。
 
+## 第 2 階段 2c 切片（Unreleased / Phase 2c：驗證器改由 Rust core 執行）
+
+所有 1.0 驗證改經 Rust core 的 `validate` 操作執行，Python 端不再含任何設計規則。`/api/v1/plan`、`/generate`、`/generate-from-spec`、`/validate`、CLI `promptcad validate|render|generate` 與桌面 sidecar 皆走此路徑。依 [ADR 0010](docs/adr/0010-migration-phases.md) 第 2 階段的完成條件，「移除 Python 端的設計驗證邏輯」已達成；Pydantic 生成僅涵蓋 validation report 與 2.0 spike，1.0 `CadDocument` 仍為手寫（見下方「尚未完成」）。
+
+| 項目 | 位置 | 狀態 |
+|---|---|---|
+| 1.0 驗證經 Rust core：`CoreValidator` 透過 `CoreBridge` 呼叫 `validate`；`JobService.validate` 改為 async | `app/services/core_validator.py`、`app/services/job_service.py`、`app/services/core_bridge.py` | 已實作；core 不可用時回 503，逾時 504，core 失敗 502（見 `docs/API.md`） |
+| Python 設計規則移除 | `app/services/validator.py`（`DesignValidator`）、`crates/promptcad-core/tests/fixtures/gen_v1_parity.py` | 已刪除；`crates/promptcad-core/tests/fixtures/v1_parity.json` 保留為凍結的對照基準 |
+| 1.0 issue 的 `feature_index` 回填（WP1） | core 的 `validate` 操作（`crates/promptcad-core/src/validate/`） | 已實作：`e_h{n}` 的 issue 為 0-based 孔索引；`fillet_too_large`、`chamfer_too_large` 為 `part.fillets`／`part.chamfers` 的索引（1.0、2.0 皆然）；`overlapping_holes` 取配對中第一個孔；其餘為 null。無 wire／schema 變動，`API_VERSION` 仍為 1 |
+| validation report 的 Pydantic 由 Rust 生成（ADR 0008） | `scripts/gen_pydantic.py`、`schemas/cad2/validation-report.schema.json`、`app/models/generated/validation_report.py`、`app/models/cad.py` | 已實作：生成器 `datamodel-code-generator==0.103.0`（`pyproject.toml` 的 `schema` extra 固定版本）；輸出 LF、含 DO-NOT-EDIT 標頭、無時間戳；`app/models/cad.py` 改為重新匯出 `ValidationReport`、`ValidationIssue`、`ValidationSeverity` |
+| 生成前置轉換 | `scripts/gen_pydantic.py` | 已實作：schemars 的字串 `const` 型 `oneOf` 先轉為 `enum`，`Severity`、`Role`、`Layer` 成為真正的 StrEnum（成員為小寫，如 `error`、`warning`、`info`） |
+| 生成檢查 | `Makefile`（`schema-py`、`schema-py-check`）、`.github/workflows/ci.yml` 的 `test` job | 已實作：CI 執行 `python scripts/gen_pydantic.py --check` |
+| 2.0 文件的 Pydantic 生成（spike） | `app/models/generated/cad_document_2.py`（根類別 `CadDocument2`） | spike：兩份 `examples/cad2/` 文件可精確來回；**尚未被應用程式使用**。已知瑕疵：`AxisDir` 成員為 `field_x`／`field_x_1`、形狀聯集名稱帶編號（`DotShape1`、`VolumeShape7`）、`RootModel` 包裝、非 discriminated 聯集 |
+| 1.0 `CadDocument` 模型 | `app/models/cad.py` | 仍為手寫；仍是 `schemas/promptcad.schema.json` 的來源 |
+| 桌面 sidecar 內含 core | `scripts/build_sidecar.py`（`--core-bin`）、`scripts/frozen_smoke.py`、`desktop-bundle.yml` | 已實作：`promptcad-core(.exe)` 複製到 `<onedir>/_internal/`，缺少執行檔即建置失敗；smoke 檢查 `core_available=true` 與 `POST /api/v1/core {"op":"version"}`；`desktop-bundle.yml` 凍結前以 cargo 建置 core |
+| Docker 映像內含 core；CI 斷言 | `Dockerfile`、`.github/workflows/ci.yml` 的 `docker` job | 映像已含 core；`docker` job 另斷言 `POST /api/v1/validate` 對 `examples/generated/plate-four-holes/spec.json` 回傳含非 null `target` 的 issue |
+| 前端驗證面板的 zh-TW 短標籤 | `web/src/components/issueCodeLabels.ts` | 已實作：60 個 issue 代碼各一個短標籤，顯示於訊息之前 |
+| 第三方授權聲明 | `THIRD_PARTY_NOTICES.md` | 已重新產生：Rust crate 228 → 230（補上 `schemars_derive`、`serde_derive_internals`） |
+
+### 第 2 階段 2c 的 1.0 行為變更（已接受）
+
+- issue 訊息改為 core 的英文 id 模板（例如 `hole e_h1 …`）。
+- `assumption` 的訊息不再回顯假設文字。
+- issue 新增 `target`、`related`、`owner`、`layer` 欄位；舊的四欄 manifest 仍可讀取。
+- issue 順序改變。
+- 2.0 專屬代碼可能出現在 1.0 流程（例如 `empty_cut_no_effect`）。
+- 無效的螺紋字串回報 `tapped_hole_without_thread`，取代 `thread_annotation_only`。
+
+### 第 2 階段 2c 驗證（本機）
+
+- `pytest`：423 項通過、3 項略過（移除 Python 驗證器後；回歸基準為 `tests/fixtures/v1_validation_golden.json`）。
+- `crates/promptcad-core` 的 `cargo test`：323 個測試通過（2b 為 317）。
+- `src-tauri` 的 `cargo test`：26 個測試通過。
+- 前端 vitest：71 項通過（10 個檔案）。
+- **差異閘門 G1**（移除 Python 驗證器前，`tests/test_validation_shadow.py`）：83 個輸入（49 個 parity 語料、6 個 `frozen_smoke` 案例、3 個 `kill_check` 規格、25 個規則 planner 提示詞，取自 `tests/README`、`PROMPT_GUIDE`）中，77 個在 (code, severity, feature_index) 多重集合、`valid`、`review_required` 上一致。
+  - 允許的 6 個差異：`plate_thread_invalid`（螺紋正規化）；`ring_hole_in_inner_void`、`lbracket_z_blind_too_deep`、`enclosure_z_blind_too_deep`（多出已知的 `empty_cut_no_effect`）；`frozen_smoke` 的 `l_bracket` 與 `enclosure`（多出 `e_h2` 的 `empty_cut_no_effect`：盲孔起點在無材料處）。
+  - core 結果存為黃金基準 `tests/fixtures/v1_validation_golden.json`（以 `PROMPTCAD_UPDATE_GOLDEN=1` 重新產生），移除後作為回歸依據。
+- **延遲**：經 bridge 的 `validate` 中位數約 20 ms（p95 約 21 ms、最大約 33 ms，共 83 次呼叫，本機 Windows）。
+- **桌面閘門 G2**（以新 core 重建的 sidecar 與隔離環境 smoke）：於本機 Windows 11 通過。onedir 由 402.4 MiB 增為 406.1 MiB（+3.7 MiB，低於 460 MiB 閘門）；隔離環境 smoke 的 `foreign_processes=[]`。
+
+### 第 2 階段 2c 未驗證
+
+- GitHub CI 對本切片的執行結果（本文件撰寫時尚待確認）。
+- macOS／Linux 桌面包內巢狀的 core 執行檔（含 macOS ad-hoc 簽章）。
+- Tauri WebView 內的真實往返。
+
+### 第 2 階段 2c 尚未完成
+
+- Python 編譯器尚不接受 2.0；1.0 直接輸出與經轉接輸出的幾何等價測試（CadQuery）尚未進行。
+- 1.0 `CadDocument` 的 Pydantic 模型尚未由 Rust 生成（仍手寫）；2.0 的 Pydantic 僅為 spike。
+- 前端的屬性編輯、檢視器元件選取與 port 顯示。
+- [ADR 0012](docs/adr/0012-server-host-for-rust-core.md) 待負責人簽核。
+
 ## 已驗證
 
 v0.1.0 發行包：
@@ -201,11 +254,11 @@ v0.1.0 發行包：
 
 1. 完成第 1 階段：取得 `desktop-bundle.yml` 三平台矩陣的執行結果，依 CI 的 `--strict` 失敗補齊 unix 原生函式庫分類，macOS／Linux 的參考項目連續兩次全綠後改為必過（ADR 0011）。
 2. 完成第 2 階段：Rust core（CadDocument 2.0、驗證器、patch 引擎、op log、1.0 → 2.0 adapter）已於 `crates/promptcad-core/` 實作（見 Phase 2a），並已接入 Tauri 與伺服器（見 Phase 2b）。剩餘項目：
-   - 負責人簽核 [ADR 0012](docs/adr/0012-server-host-for-rust-core.md)；驗證 2b 未驗證項目（Tauri 真實 WebView 往返、`tauri build`、CI `docker` job）。
-   - 切換 schema 來源：由 Rust 生成 Pydantic 型別（TypeScript 的 core 請求／回應型別已於 2b 生成），`app/models/cad.py` 僅保留 1.0 相容用途或被生成檔取代（ADR 0008）。
+   - 負責人簽核 [ADR 0012](docs/adr/0012-server-host-for-rust-core.md)；驗證 2b、2c 未驗證項目（Tauri 真實 WebView 往返、`tauri build`、CI `docker` job、2c 的 GitHub CI 執行、macOS／Linux 桌面包內的 core 執行檔）。
+   - 1.0 `CadDocument` 與 2.0 文件的 Pydantic 由 Rust 生成（TypeScript 的 core 請求／回應型別已於 2b 生成；validation report 的 Pydantic 已於 2c 生成；2.0 僅有 spike），`app/models/cad.py` 僅保留 1.0 相容用途或被生成檔取代（ADR 0008）。
    - Python 編譯器改為接受已驗證的 2.0 規格，並完成 1.0 直接輸出與經轉接輸出的幾何等價測試（CadQuery）。
-   - 在實際系統中確認 Python 與 Rust 驗證器判定一致後，移除 Python 端的設計驗證邏輯。
    - 前端的屬性編輯、檢視器元件選取與 port 顯示（唯讀元件樹已於 2b 完成）。
+   - （已於 2c 完成）移除 Python 端的設計驗證邏輯，見上方「第 2 階段 2c 切片」。
 3. 第 3 階段：約束求解器評估（[ADR 0007](docs/adr/0007-constraint-solver.md)）與多 agent 編排。
 
 仍保留的 1.0 功能構想（將併入 2.0 的對應階段）：

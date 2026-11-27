@@ -17,7 +17,6 @@ from pathlib import Path, PurePosixPath
 import pytest
 
 from app.models.cad import CadDocument
-from app.services.validator import DesignValidator
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -158,9 +157,9 @@ def test_job_limit_struct_size_and_flags():
 
 
 @pytest.mark.parametrize("attempt", [1, 2, 3])
-def test_kill_specs_are_valid_and_get_heavier(attempt):
+def test_kill_specs_are_valid_and_get_heavier(attempt, core_validate):
     spec = kill_check.kill_spec(attempt)
-    report = DesignValidator().validate(CadDocument.model_validate(spec))
+    report = core_validate(CadDocument.model_validate(spec))
     assert report.valid, report
     if attempt > 1:
         assert len(spec["holes"]) > len(kill_check.kill_spec(1)["holes"])

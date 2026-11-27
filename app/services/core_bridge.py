@@ -126,7 +126,7 @@ def locate_core_binary(settings: Settings) -> tuple[Path | None, str]:
 
     Order: ``PROMPTCAD_CORE_BIN`` (exclusive: no fallback), next to the executable / frozen
     bundle, PATH, then (source checkout only) ``crates/promptcad-core/target``. The frozen
-    desktop sidecar normally has none (the desktop UI calls the core through Tauri).
+    desktop sidecar ships it in ``_internal`` (``sys._MEIPASS``) for 1.0 validation.
     """
     if settings.core_bin is not None:
         configured = Path(settings.core_bin)

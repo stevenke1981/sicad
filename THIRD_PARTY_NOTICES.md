@@ -14,7 +14,7 @@ PromptCAD Studio 本身以 MIT 授權釋出（見 `LICENSE`）。
 | Python 套件（凍結 sidecar，CPython 3.12.10） | 39 |
 | Python wheel 隨附 DLL | 282 |
 | npm 套件（前端正式相依） | 4 |
-| Rust crates（桌面殼層，x86_64-pc-windows-msvc） | 228 |
+| Rust crates（桌面殼層，x86_64-pc-windows-msvc） | 230 |
 
 ## LGPL 元件與替換權利
 
@@ -298,6 +298,7 @@ PromptCAD Studio 本身以 MIT 授權釋出（見 `LICENSE`）。
 | schemars | 0.9.0 | MIT | [L-1ddb39b2b497](#l-1ddb39b2b497) |
 | schemars | 1.2.3 | MIT | [L-1ddb39b2b497](#l-1ddb39b2b497) |
 | schemars_derive | 0.8.22 | MIT | [L-1ddb39b2b497](#l-1ddb39b2b497) |
+| schemars_derive | 1.2.3 | MIT | [L-1ddb39b2b497](#l-1ddb39b2b497) |
 | scopeguard | 1.2.0 | MIT OR Apache-2.0 | [L-1a6aa2616e74](#l-1a6aa2616e74)、[L-769f80b5bcb4](#l-769f80b5bcb4) |
 | selectors | 0.38.0 | MPL-2.0 | —（套件未附授權檔，依授權運算式） |
 | semver | 1.0.28 | MIT OR Apache-2.0 | [L-30fefc3a7d6a](#l-30fefc3a7d6a)、[L-95bd3988beee](#l-95bd3988beee) |
@@ -306,6 +307,7 @@ PromptCAD Studio 本身以 MIT 授權釋出（見 `LICENSE`）。
 | serde_core | 1.0.229 | MIT OR Apache-2.0 | [L-30fefc3a7d6a](#l-30fefc3a7d6a)、[L-95bd3988beee](#l-95bd3988beee) |
 | serde_derive | 1.0.229 | MIT OR Apache-2.0 | [L-30fefc3a7d6a](#l-30fefc3a7d6a)、[L-95bd3988beee](#l-95bd3988beee) |
 | serde_derive_internals | 0.29.1 | MIT OR Apache-2.0 | [L-30fefc3a7d6a](#l-30fefc3a7d6a)、[L-95bd3988beee](#l-95bd3988beee) |
+| serde_derive_internals | 0.30.0 | MIT OR Apache-2.0 | [L-30fefc3a7d6a](#l-30fefc3a7d6a)、[L-95bd3988beee](#l-95bd3988beee) |
 | serde_json | 1.0.154 | MIT OR Apache-2.0 | [L-30fefc3a7d6a](#l-30fefc3a7d6a)、[L-95bd3988beee](#l-95bd3988beee) |
 | serde_repr | 0.1.21 | MIT OR Apache-2.0 | [L-30fefc3a7d6a](#l-30fefc3a7d6a)、[L-95bd3988beee](#l-95bd3988beee) |
 | serde_spanned | 1.1.3 | MIT OR Apache-2.0 | [L-4498464c2864](#l-4498464c2864)、[L-4e3938f8fe5d](#l-4e3938f8fe5d) |
@@ -629,7 +631,7 @@ limitations under the License.
 
 ### L-30fefc3a7d6a
 
-使用者：adler2 2.0.1（LICENSE-MIT）；anyhow 1.0.105（LICENSE-MIT）；camino 1.2.6（LICENSE-MIT）；cargo-platform 0.1.9（LICENSE-MIT）；cargo_metadata 0.19.2（LICENSE-MIT）；displaydoc 0.2.7（LICENSE-MIT）；dtoa 1.0.11（LICENSE-MIT）；dyn-clone 1.0.20（LICENSE-MIT）；erased-serde 0.4.11（LICENSE-MIT）；fastrand 2.5.0（LICENSE-MIT）；itoa 1.0.19（LICENSE-MIT）；once_cell 1.21.4（LICENSE-MIT）；pin-project-lite 0.2.18（LICENSE-MIT）；proc-macro2 1.0.107（LICENSE-MIT）；quote 1.0.47（LICENSE-MIT）；ref-cast 1.0.27（LICENSE-MIT）；ref-cast-impl 1.0.27（LICENSE-MIT）；rustc-hash 2.1.3（LICENSE-MIT）；semver 1.0.28（LICENSE-MIT）；serde 1.0.229（LICENSE-MIT）；serde-untagged 0.1.9（LICENSE-MIT）；serde_core 1.0.229（LICENSE-MIT）；serde_derive 1.0.229（LICENSE-MIT）；serde_derive_internals 0.29.1（LICENSE-MIT）；serde_json 1.0.154（LICENSE-MIT）；serde_repr 0.1.21（LICENSE-MIT）；servo_arc 0.4.3（LICENSE-MIT）；syn 2.0.119（LICENSE-MIT）；syn 3.0.10（LICENSE-MIT）；thiserror 2.0.21（LICENSE-MIT）；thiserror-impl 2.0.21（LICENSE-MIT）；typeid 1.0.3（LICENSE-MIT）；unicode-ident 1.0.27（LICENSE-MIT）；zmij 1.0.23（LICENSE-MIT）
+使用者：adler2 2.0.1（LICENSE-MIT）；anyhow 1.0.105（LICENSE-MIT）；camino 1.2.6（LICENSE-MIT）；cargo-platform 0.1.9（LICENSE-MIT）；cargo_metadata 0.19.2（LICENSE-MIT）；displaydoc 0.2.7（LICENSE-MIT）；dtoa 1.0.11（LICENSE-MIT）；dyn-clone 1.0.20（LICENSE-MIT）；erased-serde 0.4.11（LICENSE-MIT）；fastrand 2.5.0（LICENSE-MIT）；itoa 1.0.19（LICENSE-MIT）；once_cell 1.21.4（LICENSE-MIT）；pin-project-lite 0.2.18（LICENSE-MIT）；proc-macro2 1.0.107（LICENSE-MIT）；quote 1.0.47（LICENSE-MIT）；ref-cast 1.0.27（LICENSE-MIT）；ref-cast-impl 1.0.27（LICENSE-MIT）；rustc-hash 2.1.3（LICENSE-MIT）；semver 1.0.28（LICENSE-MIT）；serde 1.0.229（LICENSE-MIT）；serde-untagged 0.1.9（LICENSE-MIT）；serde_core 1.0.229（LICENSE-MIT）；serde_derive 1.0.229（LICENSE-MIT）；serde_derive_internals 0.29.1（LICENSE-MIT）；serde_derive_internals 0.30.0（LICENSE-MIT）；serde_json 1.0.154（LICENSE-MIT）；serde_repr 0.1.21（LICENSE-MIT）；servo_arc 0.4.3（LICENSE-MIT）；syn 2.0.119（LICENSE-MIT）；syn 3.0.10（LICENSE-MIT）；thiserror 2.0.21（LICENSE-MIT）；thiserror-impl 2.0.21（LICENSE-MIT）；typeid 1.0.3（LICENSE-MIT）；unicode-ident 1.0.27（LICENSE-MIT）；zmij 1.0.23（LICENSE-MIT）
 
 ```text
 Permission is hereby granted, free of charge, to any
@@ -817,7 +819,7 @@ SOFTWARE.
 
 ### L-95bd3988beee
 
-使用者：anyhow 1.0.105（LICENSE-APACHE）；dtoa 1.0.11（LICENSE-APACHE）；dyn-clone 1.0.20（LICENSE-APACHE）；erased-serde 0.4.11（LICENSE-APACHE）；itoa 1.0.19（LICENSE-APACHE）；libc 0.2.191（LICENSE-APACHE）；proc-macro2 1.0.107（LICENSE-APACHE）；quote 1.0.47（LICENSE-APACHE）；ref-cast 1.0.27（LICENSE-APACHE）；ref-cast-impl 1.0.27（LICENSE-APACHE）；rustc-hash 2.1.3（LICENSE-APACHE）；semver 1.0.28（LICENSE-APACHE）；serde 1.0.229（LICENSE-APACHE）；serde-untagged 0.1.9（LICENSE-APACHE）；serde_core 1.0.229（LICENSE-APACHE）；serde_derive 1.0.229（LICENSE-APACHE）；serde_derive_internals 0.29.1（LICENSE-APACHE）；serde_json 1.0.154（LICENSE-APACHE）；serde_repr 0.1.21（LICENSE-APACHE）；syn 2.0.119（LICENSE-APACHE）；syn 3.0.10（LICENSE-APACHE）；thiserror 2.0.21（LICENSE-APACHE）；thiserror-impl 2.0.21（LICENSE-APACHE）；typeid 1.0.3（LICENSE-APACHE）；unicode-ident 1.0.27（LICENSE-APACHE）
+使用者：anyhow 1.0.105（LICENSE-APACHE）；dtoa 1.0.11（LICENSE-APACHE）；dyn-clone 1.0.20（LICENSE-APACHE）；erased-serde 0.4.11（LICENSE-APACHE）；itoa 1.0.19（LICENSE-APACHE）；libc 0.2.191（LICENSE-APACHE）；proc-macro2 1.0.107（LICENSE-APACHE）；quote 1.0.47（LICENSE-APACHE）；ref-cast 1.0.27（LICENSE-APACHE）；ref-cast-impl 1.0.27（LICENSE-APACHE）；rustc-hash 2.1.3（LICENSE-APACHE）；semver 1.0.28（LICENSE-APACHE）；serde 1.0.229（LICENSE-APACHE）；serde-untagged 0.1.9（LICENSE-APACHE）；serde_core 1.0.229（LICENSE-APACHE）；serde_derive 1.0.229（LICENSE-APACHE）；serde_derive_internals 0.29.1（LICENSE-APACHE）；serde_derive_internals 0.30.0（LICENSE-APACHE）；serde_json 1.0.154（LICENSE-APACHE）；serde_repr 0.1.21（LICENSE-APACHE）；syn 2.0.119（LICENSE-APACHE）；syn 3.0.10（LICENSE-APACHE）；thiserror 2.0.21（LICENSE-APACHE）；thiserror-impl 2.0.21（LICENSE-APACHE）；typeid 1.0.3（LICENSE-APACHE）；unicode-ident 1.0.27（LICENSE-APACHE）
 
 ```text
                               Apache License
@@ -18354,7 +18356,7 @@ THE SOFTWARE.
 
 ### L-1ddb39b2b497
 
-使用者：schemars 0.8.22（LICENSE）；schemars 0.9.0（LICENSE）；schemars 1.2.3（LICENSE）；schemars_derive 0.8.22（LICENSE）
+使用者：schemars 0.8.22（LICENSE）；schemars 0.9.0（LICENSE）；schemars 1.2.3（LICENSE）；schemars_derive 0.8.22（LICENSE）；schemars_derive 1.2.3（LICENSE）
 
 ```text
 MIT License

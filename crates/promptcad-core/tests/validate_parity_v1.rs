@@ -1,14 +1,18 @@
-//! ADR 0005 differential test: the Rust validator on `upgrade_1_to_2(doc)` gives the same
-//! verdicts as the 1.0 Python `DesignValidator` on `doc`.
+//! ADR 0005 parity test: the Rust validator on `upgrade_1_to_2(doc)` gives the same verdicts
+//! as the (removed) 1.0 Python `DesignValidator` recorded for `doc` in the frozen corpus.
 //!
-//! The corpus `tests/fixtures/v1_parity.json` is produced by running the Python validator
-//! (`tests/fixtures/gen_v1_parity.py`, see its header for how to re-run): the fixed example
+//! The corpus `tests/fixtures/v1_parity.json` was produced by running the Python validator
+//! before its removal (the generator script was deleted; the file is now frozen): the fixed example
 //! `examples/generated/plate-four-holes/spec.json`, every case of `tests/test_validation.py`,
 //! and hand-built cases covering each base kind × each 1.0 rule.
 //!
 //! For each case the multiset of `(code, severity, location)` of the carried-over 1.0 codes
 //! must be equal. Locations map as: hole codes `feature_index i` → `e_h{i+1}`; base codes →
 //! `v_base`; fillet/chamfer codes → `p_main`; `assumption` → none.
+//!
+//! Through the `validate` op with the 1.0 document as input, the carried-over issues must also
+//! reproduce the Python `feature_index` exactly (hole issues from the migration id `e_h{n}`,
+//! fillet / chamfer issues from their list index, `base` and `assumption` issues `None`).
 //!
 //! 2.0-only codes that legitimately appear for upgraded documents are listed per case in
 //! [`EXTRAS`] with the reason; any other 2.0 issue fails the test.
@@ -146,6 +150,42 @@ fn rust_validator_matches_python_design_validator() {
         if extras != want {
             failures.push(format!(
                 "{name}: 2.0-only issues differ\n  listed: {want:?}\n  actual: {extras:?}"
+            ));
+        }
+        // feature_index through the validate op on the 1.0 document
+        let response = promptcad_core::api::handle_json(
+            &serde_json::json!({"op": "validate", "document": case["spec"]}).to_string(),
+        );
+        let response: Value = serde_json::from_str(&response).unwrap();
+        assert_eq!(response["status"], "ok", "{name}: {response}");
+        let index_key = |code: &str, index: Option<i64>| (code.to_owned(), index);
+        let mut want_index: Vec<_> = case["expected_issues"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|i| index_key(i["code"].as_str().unwrap(), i["feature_index"].as_i64()))
+            .collect();
+        let mut got_index: Vec<_> = response["result"]["report"]["issues"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|i| {
+                i["code"]
+                    .as_str()
+                    .unwrap()
+                    .parse::<Code>()
+                    .ok()
+                    .is_some_and(|c| CARRIED.contains(&c))
+            })
+            .map(|i| index_key(i["code"].as_str().unwrap(), i["feature_index"].as_i64()))
+            .collect();
+        want_index.sort();
+        got_index.sort();
+        if want_index != got_index {
+            failures.push(format!(
+                "{name}: feature_index differs
+  python: {want_index:?}
+  rust:   {got_index:?}"
             ));
         }
         // valid / review_required agree with 1.0 whenever no 2.0-only issue is involved

@@ -16,9 +16,7 @@ from fastapi.testclient import TestClient
 
 from app.core.config import Settings
 from app.main import create_app
-from app.models.cad import CadDocument
 from app.services.core_bridge import find_core_binary
-from app.services.validator import DesignValidator
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = sorted((ROOT / "examples" / "cad2").glob("*.cad2.json"))
@@ -158,7 +156,7 @@ def test_oversize_body_is_413_with_real_default_limit(client):
     assert client.post("/api/v1/core", content=big).status_code == 413
 
 
-# ---- parity with the 1.0 Python validator (ADR 0005 differential test) -------------------
+# ---- parity with the frozen 1.0 corpus (ADR 0005; the Python validator is gone) ----
 
 # 1.0 codes the core carries over; anything else on an upgraded document is a 2.0-only extra.
 CARRIED = {
@@ -178,31 +176,18 @@ ALLOWED_EXTRAS = {
     "enclosure_z_blind_too_deep": {("empty_cut_no_effect", "warning")},
 }
 
-_THREAD_CASES = {"plate_thread_normalized", "plate_thread_invalid"}
-
-
 def _corpus() -> list[dict]:
     cases = json.loads(PARITY_CORPUS.read_text(encoding="utf-8"))
     # The 1.0 example plus every case of tests/test_validation.py are in the corpus.
     return cases
 
 
-def _python_pairs(spec: dict) -> set[tuple[str, str]]:
-    report = DesignValidator().validate(CadDocument.model_validate(spec))
-    return {(issue.code, issue.severity.value) for issue in report.issues}
-
-
 @pytest.mark.parametrize("case", _corpus(), ids=lambda c: c["name"])
-def test_parity_with_python_validator(client, case):
+def test_parity_with_v1_corpus(client, case):
     name = case["name"]
     spec = case["spec"]
-    if name in _THREAD_CASES:
-        # 2.0 normalizes / drops the thread before validating (spec §10.1); the corpus
-        # records the verdict on the normalized document, so compare against that.
-        expected = {(i["code"], i["severity"]) for i in case["expected_issues"]}
-    else:
-        expected = _python_pairs(spec)
-        assert expected == {(i["code"], i["severity"]) for i in case["expected_issues"]}
+    # The corpus records the 1.0 verdict (thread cases: on the normalized document, spec 10.1).
+    expected = {(i["code"], i["severity"]) for i in case["expected_issues"]}
 
     body = rpc(client, {"op": "validate", "document": spec})
     assert body["status"] == "ok", body

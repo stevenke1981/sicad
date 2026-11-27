@@ -645,6 +645,16 @@ schema 子集只是降低產生錯誤的機率；**權限仍由協調器依 §8.
 
 `message` 只能嵌入 `id`、數值與固定範本文字；`label`、`notes`、`assumptions` 等自由文字不得出現在會回饋給 agent 的訊息中。`valid` 與 `review_required` 的計算規則同 1.0。
 
+**`feature_index` 的語意（第 2 階段 2c 補充）**：對 1.0 輸入（經 `upgrade_1_to_2` 升級後驗證，或直接以 1.0 文件呼叫 `validate`）：
+
+- 目標為升級 id `e_h{n}` 的 issue：`feature_index = n-1`（0-based 孔索引）。
+- `fillet_too_large`、`chamfer_too_large`：為 `part.fillets`、`part.chamfers` 的索引（1.0 與 2.0 輸入皆然）。
+- `overlapping_holes`：取該配對中第一個孔的索引。
+- 2.0 輸入的孔相關 issue 維持 `null`。
+- `thin_wall`、`thin_bracket`、`extreme_aspect_ratio`、`assumption` 維持 `null`。
+
+此補充只描述既有 `feature_index` 欄位的填入方式；無 wire 或 schema 變更，`API_VERSION` 仍為 1。
+
 ### 9.2 代碼清單（凍結）
 
 類別：**P** = patch 阻擋類（出現即拒絕 patch；人工輸入時阻擋渲染），**D** = 設計類（不拒絕 patch，`error` 阻擋渲染）。P 類問題的 `owner` 一律是提交該 patch 的角色。

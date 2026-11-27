@@ -87,8 +87,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = settings
-    app.state.jobs = JobService(settings)
     app.state.core = CoreBridge(settings)
+    app.state.jobs = JobService(settings, app.state.core)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,

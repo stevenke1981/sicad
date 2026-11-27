@@ -5,6 +5,13 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+# The validation report is generated from the core's JSON Schema (ADR 0008); re-exported here
+# so 1.0 call sites keep importing it from app.models.cad.
+from app.models.generated.validation_report import Severity as ValidationSeverity
+from app.models.generated.validation_report import ValidationIssue, ValidationReport
+
+__all__ = ["ValidationIssue", "ValidationReport", "ValidationSeverity"]
+
 MAX_DIMENSION_MM = 100_000.0
 
 
@@ -168,22 +175,3 @@ class CadDocument(StrictModel):
     assumptions: list[str] = Field(default_factory=list, max_length=32)
     notes: list[str] = Field(default_factory=list, max_length=32)
     planner: PlannerMetadata
-
-
-class ValidationSeverity(StrEnum):
-    ERROR = "error"
-    WARNING = "warning"
-    INFO = "info"
-
-
-class ValidationIssue(StrictModel):
-    severity: ValidationSeverity
-    code: str
-    message: str
-    feature_index: int | None = None
-
-
-class ValidationReport(StrictModel):
-    valid: bool
-    review_required: bool
-    issues: list[ValidationIssue] = Field(default_factory=list)

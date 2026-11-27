@@ -1,5 +1,6 @@
-//! Rules carried over from 1.0 `app/services/validator.py` (`DesignValidator`), re-expressed
-//! per component / part id with the same logic and thresholds.
+//! Rules carried over from the 1.0 Python `DesignValidator` (removed in Phase 2c; its verdicts
+//! live on as the frozen corpus `tests/fixtures/v1_parity.json`), re-expressed per component /
+//! part id with the same logic and thresholds.
 //!
 //! * Volume rules (`thin_wall`, `thin_bracket`, `extreme_aspect_ratio`) run on every Volume
 //!   in document order; `extreme_aspect_ratio` uses the 1.0 `_dimensions()` of shortcut
@@ -12,6 +13,9 @@
 //!   shortcut host the 1.0 formulas are used verbatim; for a derived host (`extrude`,
 //!   `revolve`) its local bounding box stands in for the 1.0 base box (conservative: the box
 //!   is a superset, so outside/too-deep verdicts are certain, some inside cases are missed).
+//! * `fillet_too_large` / `chamfer_too_large` carry `feature_index` = index in `part.fillets` /
+//!   `part.chamfers` (the 1.0 value). Hole issues leave it `None`; the `validate` op fills it
+//!   in for 1.0 input from the migration id `e_h{n}` (see `migrate::hole_feature_index`).
 //! * Edge rules (`fillet_too_large`, `chamfer_too_large`) use the 1.0 `_dimensions()` of
 //!   `body[0]` when it is the only `add` and a shortcut Volume, otherwise the part's bounding
 //!   box in `body[0]`'s frame (a superset, so never a false error).
@@ -367,7 +371,8 @@ fn part_rules(
                             fmt_num(s)
                         ),
                     )
-                    .with_target(part.id.as_str()),
+                    .with_target(part.id.as_str())
+                    .with_feature_index(Some(i as i64)),
                 );
             }
         }
@@ -386,7 +391,8 @@ fn part_rules(
                             fmt_num(s)
                         ),
                     )
-                    .with_target(part.id.as_str()),
+                    .with_target(part.id.as_str())
+                    .with_feature_index(Some(i as i64)),
                 );
             }
         }

@@ -824,6 +824,10 @@ def check_manifest(sidecar: Sidecar, token: str, label: str, manifest: dict[str,
         name = FORMAT_FILES[fmt]
         if sizes.get(name, 0) <= 0:
             problems.append(f"{name} missing or empty")
+    for issue in (manifest.get("validation") or {}).get("issues", []):
+        if "layer" not in issue or "target" not in issue:
+            problems.append(f"issue without core fields layer/target: {issue}")
+            break
     if not problems:
         status, step = _request(
             sidecar, "GET", f"/api/v1/jobs/{manifest['job_id']}/files/model.step", token
@@ -873,6 +877,28 @@ def check_watcher(watcher: ProcessTreeWatcher, results: dict[str, Any]) -> None:
     )
 
 
+def check_core(sidecar: Sidecar, token: str) -> None:
+    """The bundled promptcad-core is found (capabilities) and answers the version op."""
+    caps = _json(sidecar, "GET", "/api/v1/capabilities", token)
+    if caps.get("core_available") is not True:
+        raise SmokeFailure(f"core_available is not true (core binary not bundled?): {caps}")
+    print(f"capabilities: core_available=true (crate {caps.get('core_crate_version')})")
+    reply = _json(sidecar, "POST", "/api/v1/core", token, {"op": "version"})
+    if not isinstance(reply, dict) or reply.get("status") != "ok":
+        raise SmokeFailure(f"POST /api/v1/core version op did not return status ok: {reply}")
+    print(f"core version op: ok {json.dumps(reply.get('result'), sort_keys=True)[:200]}")
+
+
+def check_core_validation(sidecar: Sidecar, token: str) -> None:
+    """/validate is answered by the core: issues carry the core-only ``target``/``layer``."""
+    spec = json.loads((EXAMPLES_DIR / "plate-four-holes" / "spec.json").read_text("utf-8"))
+    report = _json(sidecar, "POST", "/api/v1/validate", token, spec)
+    issues = report.get("issues") or []
+    if not any(i.get("target") for i in issues):
+        raise SmokeFailure(f"/validate returned no issue with a core target: {report}")
+    print(f"validation: {len(issues)} issues from the core (target/layer present)")
+
+
 def _server_requests(sidecar: Sidecar, token: str, results: dict[str, Any]) -> None:
     status, _ = _request(sidecar, "GET", "/api/v1/capabilities", "wrong-token")
     if status != 401:
@@ -881,6 +907,8 @@ def _server_requests(sidecar: Sidecar, token: str, results: dict[str, Any]) -> N
     if caps.get("cadquery_available") is not True:
         raise SmokeFailure(f"cadquery_available is not true: {caps}")
     print("capabilities: cadquery_available=true")
+    check_core(sidecar, token)
+    check_core_validation(sidecar, token)
 
     timings: list[dict[str, Any]] = []
     for label, spec in smoke_cases():
