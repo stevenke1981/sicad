@@ -13,6 +13,11 @@
 //! `constraints`: `k_base`, then for each hole `k_dh{n}`, `k_eh{n}`.
 //! `parts[0].body`: `add v_base`, then `cut e_h1`, `cut e_h2`, ... in 1.0 hole order.
 //!
+//! # 1.0 `feature_index`
+//!
+//! Hole component `e_h{n}` corresponds to 1.0 `holes[n - 1]`; [`hole_feature_index`] is the
+//! inverse used by the `validate` op to give 1.0 input its 1.0 `feature_index` back.
+//!
 //! # `thread` overflow policy
 //!
 //! Invalid threads (after normalization) become `null` and their original text is merged into
@@ -258,6 +263,18 @@ pub fn upgrade_1_to_2(doc: &CadDocument1) -> CadDocument2 {
         notes: merged_notes(&doc.notes, line),
         planner: doc.planner.clone(),
     }
+}
+
+/// The 1.0 hole index of a migration id `e_h{n}` (`n - 1`); `None` for any other id.
+///
+/// Only the canonical spelling `e_h` + decimal digits without sign or leading zero, with
+/// `n >= 1`, is accepted (the ids [`upgrade_1_to_2`] generates).
+pub fn hole_feature_index(id: &str) -> Option<i64> {
+    let digits = id.strip_prefix("e_h")?;
+    if digits.is_empty() || digits.starts_with('0') || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    digits.parse::<i64>().ok().map(|n| n - 1)
 }
 
 /// Tolerance of the identity-pose / origin checks of [`downgrade_2_to_1`].

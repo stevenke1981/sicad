@@ -1,4 +1,4 @@
-.PHONY: core dev test lint format doctor docker-up docker-down clean schema schema-check web-deps web \
+.PHONY: core dev test lint format doctor docker-up docker-down clean schema schema-check schema-py schema-py-check web-deps web \
         desktop-lock desktop-lock-check desktop-env notices notices-check sidecar desktop
 
 PYTHON ?= python
@@ -45,6 +45,14 @@ schema:
 schema-check:
 	$(PYTHON) scripts/export_schema.py --check
 
+# Pydantic models generated from schemas/cad2 into app/models/generated (ADR 0008).
+# Needs the `schema` extra: pip install -e ".[schema]".
+schema-py:
+	$(PYTHON) scripts/gen_pydantic.py
+
+schema-py-check:
+	$(PYTHON) scripts/gen_pydantic.py --check
+
 web-deps:
 	$(NPM) --prefix web ci
 
@@ -79,7 +87,7 @@ notices-check:
 	$(DESKTOP_PYTHON) scripts/gen_third_party_notices.py --python $(DESKTOP_PYTHON) --check --strict
 
 # PyInstaller onedir -> src-tauri/binaries/promptcad-sidecar/ (run with .venv-desktop).
-sidecar:
+sidecar: core
 	$(DESKTOP_PYTHON) scripts/build_sidecar.py
 
 # Tauri bundle; beforeBuildCommand in src-tauri/tauri.conf.json builds the frontend.

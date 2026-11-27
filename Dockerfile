@@ -45,7 +45,7 @@ RUN python -m pip install --no-build-isolation --no-deps --editable .
 # "/" would only return the 503 "frontend not built" page.
 COPY --from=web --chown=$MAMBA_USER:$MAMBA_USER /src/app/web_dist /app/app/web_dist
 
-# The server runs `promptcad-core rpc` once per POST /api/v1/core call (ADR 0012).
+# The server runs `promptcad-core rpc` per core call: POST /api/v1/core and all 1.0 validation (ADR 0012).
 COPY --from=core --chmod=0755 /src/crates/promptcad-core/target/release/promptcad-core /usr/local/bin/promptcad-core
 ENV PROMPTCAD_CORE_BIN=/usr/local/bin/promptcad-core
 

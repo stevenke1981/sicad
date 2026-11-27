@@ -7,32 +7,42 @@ from pathlib import Path
 
 from app.core.config import Settings
 from app.models.api import Artifact, JobListItem, JobManifest, PlanResponse
-from app.models.cad import CadDocument
+from app.models.cad import CadDocument, ValidationReport
 from app.services.compiler import CadQueryCompiler
+from app.services.core_bridge import CoreBridge
+from app.services.core_validator import CoreValidator
 from app.services.openscad import OpenScadCompiler
 from app.services.planners.factory import PlannerFactory
 from app.services.preview import SvgPreview
 from app.services.renderer import Renderer
 from app.services.storage import JobStorage
-from app.services.validator import DesignValidator
 
 
 class JobService:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, core: CoreBridge | None = None):
         self.settings = settings
         self.planners = PlannerFactory(settings)
-        self.validator = DesignValidator()
+        self.core = core if core is not None else CoreBridge(settings)
+        self.core_validator = CoreValidator(self.core)
         self.compiler = CadQueryCompiler()
         self.openscad = OpenScadCompiler()
         self.preview = SvgPreview()
         self.storage = JobStorage(settings)
         self.renderer = Renderer(settings)
 
-    async def plan(self, prompt: str, planner_choice: str) -> PlanResponse:
+    async def _validate(self, spec: CadDocument) -> ValidationReport:
+        """Validate through the core; a missing binary is CoreUnavailable (HTTP 503)."""
+        return await self.core_validator.validate(spec)
+
+    async def _plan(self, prompt: str, planner_choice: str):
         if len(prompt) > self.settings.max_prompt_chars:
             raise ValueError(f"Prompt exceeds {self.settings.max_prompt_chars} characters")
         spec, planner_used = await self.planners.plan(prompt, planner_choice)
-        validation = self.validator.validate(spec)
+        validation = await self._validate(spec)
+        return spec, planner_used, validation
+
+    async def plan(self, prompt: str, planner_choice: str) -> PlanResponse:
+        spec, planner_used, validation = await self._plan(prompt, planner_choice)
         return PlanResponse(spec=spec, validation=validation, planner_used=planner_used)
 
     async def generate(
@@ -42,12 +52,12 @@ class JobService:
         formats: list[str],
         render: bool,
     ) -> JobManifest:
-        plan = await self.plan(prompt, planner_choice)
+        spec, planner_used, validation = await self._plan(prompt, planner_choice)
         return await self._materialize(
-            spec=plan.spec,
-            validation=plan.validation,
+            spec=spec,
+            validation=validation,
             prompt=prompt,
-            planner_used=plan.planner_used,
+            planner_used=planner_used,
             formats=formats,
             render=render,
         )
@@ -58,7 +68,7 @@ class JobService:
         formats: list[str],
         render: bool,
     ) -> JobManifest:
-        validation = self.validator.validate(spec)
+        validation = await self._validate(spec)
         return await self._materialize(
             spec=spec,
             validation=validation,
@@ -72,7 +82,7 @@ class JobService:
         self,
         *,
         spec: CadDocument,
-        validation,
+        validation: ValidationReport,
         prompt: str,
         planner_used: str,
         formats: list[str],
@@ -135,8 +145,8 @@ class JobService:
         self.storage.write_json(job_dir / "manifest.json", manifest.model_dump(mode="json"))
         return manifest
 
-    def validate(self, spec: CadDocument):
-        return self.validator.validate(spec)
+    async def validate(self, spec: CadDocument) -> ValidationReport:
+        return await self._validate(spec)
 
     def get(self, job_id: str) -> JobManifest | None:
         value = self.storage.read_manifest(job_id)

@@ -3,7 +3,7 @@
 //! [`ValidationIssue`] 2.0 is a superset of 1.0 (`severity, code, message, feature_index`) with
 //! `target`, `related`, `owner`, `layer`; the new fields default on input so 1.0 reports parse.
 //! [`ValidationReport`] computes `valid`/`review_required` exactly like 1.0
-//! (`app/services/validator.py`).
+//! (the Python `DesignValidator`, removed in Phase 2c).
 
 use std::fmt;
 use std::str::FromStr;
@@ -364,7 +364,7 @@ pub mod codes {
         ClearanceViolated = "clearance_violated", Error, Design, by(Joiner), Analytic;
         InsideViolated = "inside_violated", Error, Design, by(Joiner), Analytic;
         FloatingPart = "floating_part", Warning, Design, by(Joiner), Analytic;
-        // ---- carried over from 1.0 (severities as in app/services/validator.py) ----
+        // ---- carried over from 1.0 (severities as in the removed 1.0 Python validator) ----
         ThinWall = "thin_wall", Warning, Design, by(ComponentSmith), Analytic;
         ThinBracket = "thin_bracket", Warning, Design, by(ComponentSmith), Analytic;
         ExtremeAspectRatio = "extreme_aspect_ratio", Warning, Design, by(ComponentSmith), Analytic;

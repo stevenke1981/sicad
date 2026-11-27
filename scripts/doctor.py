@@ -10,6 +10,7 @@ import importlib.util
 import shutil
 
 from app.core.config import get_settings
+from app.services.core_bridge import locate_core_binary
 
 
 def main() -> int:
@@ -23,6 +24,15 @@ def main() -> int:
     print(f"LLM configured: {settings.llm_is_configured}")
     print(f"CadQuery: {'available' if cadquery else 'not installed'}")
     print(f"OpenSCAD: {openscad or 'not installed'}")
+    core_path, core_reason = locate_core_binary(settings)
+    print(f"promptcad-core: {core_path or f'not found ({core_reason})'}")
+    if core_path is None:
+        print(
+            "Result: promptcad-core is REQUIRED for validation and generation but missing. "
+            "Run `make core` (cargo build --release --locked --bins in crates/promptcad-core) "
+            "or set PROMPTCAD_CORE_BIN."
+        )
+        return 1
     if not cadquery and not openscad:
         print("Result: source-only mode. Use Docker/conda for STEP/STL/DXF.")
         return 1

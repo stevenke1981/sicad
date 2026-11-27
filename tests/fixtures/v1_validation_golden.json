@@ -1,0 +1,2113 @@
+[
+  {
+    "id": "example_plate_four_holes",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h1"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 1,
+          "layer": "analytic",
+          "message": "hole e_h2: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h2"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 2,
+          "layer": "analytic",
+          "message": "hole e_h3: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h3"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 3,
+          "layer": "analytic",
+          "message": "hole e_h4: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h4"
+        },
+        {
+          "code": "assumption",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "assumption 1 is recorded; review required",
+          "owner": null,
+          "related": [],
+          "severity": "info",
+          "target": null
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "5eb951f9ca92e642748180bade5ebcdb0f3b297a25967bfa68b710692ec58653"
+  },
+  {
+    "id": "test_overlapping_holes_are_error",
+    "report": {
+      "issues": [
+        {
+          "code": "overlapping_holes",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "holes e_h1 and e_h2 overlap: center distance 4 mm < 10 mm",
+          "owner": "component_smith",
+          "related": [
+            "e_h2",
+            "p_main"
+          ],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "f8545538c438b3ba8eb4b3b487d2d767bbddcd6fc58808243dbef6b9cbcaf656"
+  },
+  {
+    "id": "test_hole_outside_part_is_error",
+    "report": {
+      "issues": [
+        {
+          "code": "hole_outside_part",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1 extends beyond the part outline in the plane normal to Z",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "16ffb5212777f0f3f7b957dacb9b1f9585244a6d794c149d7062cb76eda2f220"
+  },
+  {
+    "id": "test_vertical_plate_fillet_can_equal_half_thickness",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "cb062414843832522b26d9e996b6842620cecf872cbc16bb64c8aab1262a1179"
+  },
+  {
+    "id": "test_blind_depth_equal_to_material_is_blocked",
+    "report": {
+      "issues": [
+        {
+          "code": "blind_depth_exceeds_material",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: blind depth 5 mm is not below the estimated material thickness 5 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "8b5c89aeba924e8cd216f95784603a2db5bcb19800fcc26c8d83beda31349156"
+  },
+  {
+    "id": "test_counterbore_effective_diameter_respects_edge",
+    "report": {
+      "issues": [
+        {
+          "code": "hole_outside_part",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1 extends beyond the part outline in the plane normal to Z",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "498cfe2f81ef91754eedff951e9ef163c9946c1619e04a9f3dcb657f1246a613"
+  },
+  {
+    "id": "plate_clean_through",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "f81dc6e1f852ed80b8e308bd7a76c589ebf9ce9aed4f417a5a748c5e817d4ab1"
+  },
+  {
+    "id": "plate_low_edge_clearance",
+    "report": {
+      "issues": [
+        {
+          "code": "low_edge_clearance",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: minimum edge clearance is only 0.50 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "warning",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "06d2a1d4161bee67d5420510ef70ae7c91cacb360146b5cba019b340e7d9d692"
+  },
+  {
+    "id": "plate_extreme_aspect_ratio",
+    "report": {
+      "issues": [
+        {
+          "code": "extreme_aspect_ratio",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "volume v_base: dimension ratio 2000 exceeds 1000; check the units",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "warning",
+          "target": "v_base"
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "a35f06b98262c5ddc927e2e0487ab24c6f5b4f15b5609cd38ab43444306ba2e1"
+  },
+  {
+    "id": "plate_fillet_all_too_large",
+    "report": {
+      "issues": [
+        {
+          "code": "fillet_too_large",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "part p_main: fillet 1 radius 3 mm is not below half the available edge size (2.5 mm)",
+          "owner": "assembler",
+          "related": [],
+          "severity": "error",
+          "target": "p_main"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "585bdb66cb52780912c1b957325cd2f17e6ff74993adf220924ad0dae68d941c"
+  },
+  {
+    "id": "plate_fillet_vertical_too_large",
+    "report": {
+      "issues": [
+        {
+          "code": "fillet_too_large",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "part p_main: fillet 1 radius 15 mm is not below half the available edge size (15 mm)",
+          "owner": "assembler",
+          "related": [],
+          "severity": "error",
+          "target": "p_main"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "bae025446b8ec2fb9c47abdc3c691d96833dd9b4e3098fcf53320e7ebf60ae34"
+  },
+  {
+    "id": "plate_chamfer_top_too_large",
+    "report": {
+      "issues": [
+        {
+          "code": "chamfer_too_large",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "part p_main: chamfer 1 distance 2.5 mm is not below half the available edge size (2.5 mm)",
+          "owner": "assembler",
+          "related": [],
+          "severity": "error",
+          "target": "p_main"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "e815c83561169b1adf98519bab59598244f7a5aab696fa88ef7719bfc8350a31"
+  },
+  {
+    "id": "plate_counterbore_depth",
+    "report": {
+      "issues": [
+        {
+          "code": "counterbore_depth_exceeds_material",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: counterbore depth 5 mm is not below the estimated material thickness 5 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "ea2d4db85179b9f9e358764b99ddc24fb9f765df789fb4cb45c91d08c7728116"
+  },
+  {
+    "id": "plate_countersink_depth",
+    "report": {
+      "issues": [
+        {
+          "code": "countersink_depth_exceeds_material",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: countersink depth 3 mm is not below the estimated material thickness 2 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "7c3cf4c176e0c60de3735541802ece09059998e6d319f83bfdf770beddbcd7b6"
+  },
+  {
+    "id": "plate_countersink_ok",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "b3ebf845138687fbe08757a919f239284e817593915cb13b892ab9ee39e8f6bc"
+  },
+  {
+    "id": "plate_tapped_without_thread",
+    "report": {
+      "issues": [
+        {
+          "code": "tapped_hole_without_thread",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: tapped hole without a thread specification",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "warning",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "c08a2dd3e5e574623cbc71503c750bab2a28f29425fe4df9332b83c832d4d198"
+  },
+  {
+    "id": "plate_tapped_with_thread",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "75655073ef2da37fd9ab8725886ed4546c1d275c08a6f5b38a7f232e5cdba031"
+  },
+  {
+    "id": "plate_thread_normalized",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "34fcc1945296bfa8a9361ecfd59d96a3ee8b5394bb5d01b7c345f8b1a5e569d4"
+  },
+  {
+    "id": "plate_thread_invalid",
+    "report": {
+      "issues": [
+        {
+          "code": "tapped_hole_without_thread",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: tapped hole without a thread specification",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "warning",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "de991e496cbf0876212bffd835d23460dc3366e5cee8ad0f4eaf3cd353a32bc8"
+  },
+  {
+    "id": "plate_x_axis_blind_too_deep",
+    "report": {
+      "issues": [
+        {
+          "code": "blind_depth_exceeds_material",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: blind depth 45 mm is not below the estimated material thickness 40 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "a726482ecf2b1430d1ae25bb56ea690529bc9eafd7668e5eb0e060ca96b47397"
+  },
+  {
+    "id": "plate_y_axis_hole_outside",
+    "report": {
+      "issues": [
+        {
+          "code": "hole_outside_part",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1 extends beyond the part outline in the plane normal to Y",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "177f43cff0040144c50d2ef28bc49719eed9d81faa1661ee5cff0235231e806b"
+  },
+  {
+    "id": "plate_y_axis_low_edge",
+    "report": {
+      "issues": [
+        {
+          "code": "low_edge_clearance",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: minimum edge clearance is only 0.50 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "warning",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "fa19620dba29d65848517a8ac8ca25cc9bf2d976c45454b79335517adb21bf9b"
+  },
+  {
+    "id": "plate_three_holes_two_overlaps",
+    "report": {
+      "issues": [
+        {
+          "code": "overlapping_holes",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "holes e_h1 and e_h2 overlap: center distance 5 mm < 6 mm",
+          "owner": "component_smith",
+          "related": [
+            "e_h2",
+            "p_main"
+          ],
+          "severity": "error",
+          "target": "e_h1"
+        },
+        {
+          "code": "overlapping_holes",
+          "feature_index": 1,
+          "layer": "analytic",
+          "message": "holes e_h2 and e_h3 overlap: center distance 5 mm < 6 mm",
+          "owner": "component_smith",
+          "related": [
+            "e_h3",
+            "p_main"
+          ],
+          "severity": "error",
+          "target": "e_h2"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "a97a8589329a61d05529aed6231d0954accf5a1f6ec3a68ed14d4d3fd28bbfb7"
+  },
+  {
+    "id": "plate_overlap_ignores_other_axis",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "214b7fbf9c0d705fdffd16dd6be0f365f9441ceac57d07c5eca2ed49b88381a5"
+  },
+  {
+    "id": "plate_assumptions",
+    "report": {
+      "issues": [
+        {
+          "code": "assumption",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "assumption 1 is recorded; review required",
+          "owner": null,
+          "related": [],
+          "severity": "info",
+          "target": null
+        },
+        {
+          "code": "assumption",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "assumption 2 is recorded; review required",
+          "owner": null,
+          "related": [],
+          "severity": "info",
+          "target": null
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "d1a49fb7a334eb1ce17de06ae7e91bbed52d8dff6ea8a69a6640c7c43c183dee"
+  },
+  {
+    "id": "cylinder_z_outside",
+    "report": {
+      "issues": [
+        {
+          "code": "hole_outside_part",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1 extends beyond the circular outline",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "677a066a1690c8331c0e6873cf32f5288aba29a4d971f4a58f0525c00c956885"
+  },
+  {
+    "id": "cylinder_z_low_edge",
+    "report": {
+      "issues": [
+        {
+          "code": "low_edge_clearance",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: minimum edge clearance is only 1.00 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "warning",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "759b181360b41169fd62e776c64120620ef050adaaa3bfc5fbbf3dbdcc4b1654"
+  },
+  {
+    "id": "cylinder_z_clean",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "408bf111511401a2a8a057b8f9d3e0bb561de3558d9332c55d6c88bce498ee7a"
+  },
+  {
+    "id": "cylinder_x_axis_blind_too_deep",
+    "report": {
+      "issues": [
+        {
+          "code": "blind_depth_exceeds_material",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: blind depth 20 mm is not below the estimated material thickness 20 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "49b00ef9ab30b96162fc2c88c50478dd453deb864dcea050b8f5929c2e6793e4"
+  },
+  {
+    "id": "cylinder_y_axis_outside",
+    "report": {
+      "issues": [
+        {
+          "code": "hole_outside_part",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1 extends beyond the part outline in the plane normal to Y",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "4c8b91bcf3c0221003aee2d00d0e140d468ee1345c4c7da6604904da08a7ad29"
+  },
+  {
+    "id": "cylinder_vertical_fillet_too_large",
+    "report": {
+      "issues": [
+        {
+          "code": "fillet_too_large",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "part p_main: fillet 1 radius 10 mm is not below half the available edge size (10 mm)",
+          "owner": "assembler",
+          "related": [],
+          "severity": "error",
+          "target": "p_main"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "8ccabed4456cef4359ce390c743433e413fc9955d34345bfa7cd2512cf1826ef"
+  },
+  {
+    "id": "cylinder_z_blind_too_deep",
+    "report": {
+      "issues": [
+        {
+          "code": "blind_depth_exceeds_material",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: blind depth 12 mm is not below the estimated material thickness 10 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "2579a24f2b268e0a02a31621611559e2d548238a6c113fb4742c86b6869d2d4d"
+  },
+  {
+    "id": "ring_hole_in_inner_void",
+    "report": {
+      "issues": [
+        {
+          "code": "empty_cut_no_effect",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "cut e_h1 does not intersect the material of part p_main",
+          "owner": "component_smith",
+          "related": [
+            "p_main"
+          ],
+          "severity": "warning",
+          "target": "e_h1"
+        },
+        {
+          "code": "hole_in_inner_void",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1 lies entirely inside the ring bore",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "c806fc828eae92eff750d1781cae5b676bc308bd719038f0afea8b7da8bcf334"
+  },
+  {
+    "id": "ring_hole_intersects_inner_void",
+    "report": {
+      "issues": [
+        {
+          "code": "hole_intersects_inner_void",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1 intersects the ring bore and opens into it",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "warning",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "5559ea280aefabf00c4e94865b5d485d0ec8504f39c74e29f23eed820b5a45d1"
+  },
+  {
+    "id": "ring_hole_clean",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "f60e7ab5d5755907121da704ee39cad0253878255423665c52d3f7d43d6ad91b"
+  },
+  {
+    "id": "ring_hole_outside",
+    "report": {
+      "issues": [
+        {
+          "code": "hole_outside_part",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1 extends beyond the circular outline",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "d6408cfc30a7ab145c1314e2ffb303f99bde273b42d878a97e4c9709414603f3"
+  },
+  {
+    "id": "ring_x_axis_hole",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "1f19f4ca4123817c9f68b07888520ceb3789bc93bd5fe62658ac7cf0ad7add96"
+  },
+  {
+    "id": "ring_chamfer_all_too_large",
+    "report": {
+      "issues": [
+        {
+          "code": "chamfer_too_large",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "part p_main: chamfer 1 distance 3 mm is not below half the available edge size (2.5 mm)",
+          "owner": "assembler",
+          "related": [],
+          "severity": "error",
+          "target": "p_main"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "0d62e08d9e49318723a9ee3f0d9cbad07420bb00bab618aa08111f6d11dcdbdc"
+  },
+  {
+    "id": "lbracket_thin",
+    "report": {
+      "issues": [
+        {
+          "code": "thin_bracket",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "l_bracket v_base: thickness 1.5 mm is below 2 mm; load capacity may be insufficient",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "warning",
+          "target": "v_base"
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "742d2a688189307d62020e7198f20ba246ebf956cd6e59ceeedc0d586d9bc375"
+  },
+  {
+    "id": "lbracket_x_axis_blind_too_deep",
+    "report": {
+      "issues": [
+        {
+          "code": "low_edge_clearance",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: minimum edge clearance is only 0.50 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "warning",
+          "target": "e_h1"
+        },
+        {
+          "code": "blind_depth_exceeds_material",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: blind depth 40 mm is not below the estimated material thickness 40 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "ef54d88c0ef4a02ed0b5d9c9cc2dafc5d47ebe5a9865b55a67cf3cecaaf0eb74"
+  },
+  {
+    "id": "lbracket_z_blind_too_deep",
+    "report": {
+      "issues": [
+        {
+          "code": "empty_cut_no_effect",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "cut e_h1 does not intersect the material of part p_main",
+          "owner": "component_smith",
+          "related": [
+            "p_main"
+          ],
+          "severity": "warning",
+          "target": "e_h1"
+        },
+        {
+          "code": "blind_depth_exceeds_material",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: blind depth 3 mm is not below the estimated material thickness 3 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "6c8f8d1271344032c5b3ba8db3be3440655376560ac8f5b0a718f284d3acda88"
+  },
+  {
+    "id": "lbracket_y_counterbore_too_deep",
+    "report": {
+      "issues": [
+        {
+          "code": "counterbore_depth_exceeds_material",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: counterbore depth 3 mm is not below the estimated material thickness 3 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "76d03cd7f27a5f7e9f4ae6b28acc063bc1c54bd2fd4b878f754b2161c8f7afb1"
+  },
+  {
+    "id": "lbracket_z_outside",
+    "report": {
+      "issues": [
+        {
+          "code": "hole_outside_part",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1 extends beyond the part outline in the plane normal to Z",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "75d2a81ad25d669c2bf97ac022d89fdac2b789440d29a7a1d636796a96b3e9cb"
+  },
+  {
+    "id": "enclosure_thin_wall",
+    "report": {
+      "issues": [
+        {
+          "code": "thin_wall",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "enclosure v_base: wall thickness 0.6 mm is thin; review for material and process",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "warning",
+          "target": "v_base"
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "423d2fef5ecc80ec7635e4ec67a3b7c0c052f65aa0dda6fd86550f5a08c70788"
+  },
+  {
+    "id": "enclosure_z_blind_too_deep",
+    "report": {
+      "issues": [
+        {
+          "code": "empty_cut_no_effect",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "cut e_h1 does not intersect the material of part p_main",
+          "owner": "component_smith",
+          "related": [
+            "p_main"
+          ],
+          "severity": "warning",
+          "target": "e_h1"
+        },
+        {
+          "code": "blind_depth_exceeds_material",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: blind depth 2 mm is not below the estimated material thickness 2 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "ef98a75e2d9bbf3dc7fe3b3c1bd9d4480fc468f5f1bc0a729ff94c02b679ab91"
+  },
+  {
+    "id": "enclosure_x_hole_zero_clearance",
+    "report": {
+      "issues": [
+        {
+          "code": "low_edge_clearance",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: minimum edge clearance is only 0.00 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "warning",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "2a52009c82f5b701c121f8515bd89144ad11e7a2aa96939b23985e78e858ec5e"
+  },
+  {
+    "id": "enclosure_chamfer_bottom_too_large",
+    "report": {
+      "issues": [
+        {
+          "code": "chamfer_too_large",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "part p_main: chamfer 1 distance 15 mm is not below half the available edge size (15 mm)",
+          "owner": "assembler",
+          "related": [],
+          "severity": "error",
+          "target": "p_main"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "5a001ac8a98d0a8664ef9621c9661bfbae8da102f03a9d976f90b9be31ee4e57"
+  },
+  {
+    "id": "enclosure_x_counterbore_too_deep",
+    "report": {
+      "issues": [
+        {
+          "code": "counterbore_depth_exceeds_material",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: counterbore depth 3 mm is not below the estimated material thickness 2 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "corpus",
+    "spec_sha256": "f35e4377015f9f02d2278403be69c12534cc82e60e17d8e06a32bed4d1862c94"
+  },
+  {
+    "id": "enclosure_extreme_aspect_ratio",
+    "report": {
+      "issues": [
+        {
+          "code": "thin_wall",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "enclosure v_base: wall thickness 0.5 mm is thin; review for material and process",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "warning",
+          "target": "v_base"
+        },
+        {
+          "code": "extreme_aspect_ratio",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "volume v_base: dimension ratio 1500 exceeds 1000; check the units",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "warning",
+          "target": "v_base"
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "corpus",
+    "spec_sha256": "abc8ee88617dbad12d9ebcd05bbe9545d70e661b908051a411dbf9f0d1e15220"
+  },
+  {
+    "id": "plate",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 2,
+          "layer": "analytic",
+          "message": "hole e_h3: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h3"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 3,
+          "layer": "analytic",
+          "message": "hole e_h4: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h4"
+        }
+      ],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "frozen_smoke",
+    "spec_sha256": "93f37139596d25d3e39a28208bc06a6d7ecc7f8543f7f9bb0ffa4366b7c59970"
+  },
+  {
+    "id": "cylinder",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 2,
+          "layer": "analytic",
+          "message": "hole e_h3: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h3"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 3,
+          "layer": "analytic",
+          "message": "hole e_h4: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h4"
+        }
+      ],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "frozen_smoke",
+    "spec_sha256": "1141db09802149b7120e6072274cac5e85e9b3d5d5ef2894eae76000c65fc4fc"
+  },
+  {
+    "id": "ring",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 2,
+          "layer": "analytic",
+          "message": "hole e_h3: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h3"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 3,
+          "layer": "analytic",
+          "message": "hole e_h4: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h4"
+        }
+      ],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "frozen_smoke",
+    "spec_sha256": "44dfd358bac4fd023ce0d355ddaec68f6711ae20dcd180e19c94fe19bf113741"
+  },
+  {
+    "id": "l_bracket",
+    "report": {
+      "issues": [
+        {
+          "code": "empty_cut_no_effect",
+          "feature_index": 1,
+          "layer": "analytic",
+          "message": "cut e_h2 does not intersect the material of part p_main",
+          "owner": "component_smith",
+          "related": [
+            "p_main"
+          ],
+          "severity": "warning",
+          "target": "e_h2"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 2,
+          "layer": "analytic",
+          "message": "hole e_h3: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h3"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 3,
+          "layer": "analytic",
+          "message": "hole e_h4: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h4"
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "frozen_smoke",
+    "spec_sha256": "fa7a80cac0ad96e3ba35f368c02463b90be4e77dc3c32fef28627e9670967b4d"
+  },
+  {
+    "id": "enclosure",
+    "report": {
+      "issues": [
+        {
+          "code": "empty_cut_no_effect",
+          "feature_index": 1,
+          "layer": "analytic",
+          "message": "cut e_h2 does not intersect the material of part p_main",
+          "owner": "component_smith",
+          "related": [
+            "p_main"
+          ],
+          "severity": "warning",
+          "target": "e_h2"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 2,
+          "layer": "analytic",
+          "message": "hole e_h3: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h3"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 3,
+          "layer": "analytic",
+          "message": "hole e_h4: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h4"
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "frozen_smoke",
+    "spec_sha256": "03a25ab5df1cebbd62a5c86447201db6143eb2c04dde7418412f28666e8d4b9a"
+  },
+  {
+    "id": "example:plate-four-holes",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h1"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 1,
+          "layer": "analytic",
+          "message": "hole e_h2: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h2"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 2,
+          "layer": "analytic",
+          "message": "hole e_h3: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h3"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 3,
+          "layer": "analytic",
+          "message": "hole e_h4: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h4"
+        },
+        {
+          "code": "assumption",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "assumption 1 is recorded; review required",
+          "owner": null,
+          "related": [],
+          "severity": "info",
+          "target": null
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "frozen_smoke",
+    "spec_sha256": "5eb951f9ca92e642748180bade5ebcdb0f3b297a25967bfa68b710692ec58653"
+  },
+  {
+    "id": "kill_spec_1",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 2,
+          "layer": "analytic",
+          "message": "hole e_h3: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h3"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 3,
+          "layer": "analytic",
+          "message": "hole e_h4: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h4"
+        }
+      ],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "kill_check",
+    "spec_sha256": "93f37139596d25d3e39a28208bc06a6d7ecc7f8543f7f9bb0ffa4366b7c59970"
+  },
+  {
+    "id": "kill_spec_2",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "kill_check",
+    "spec_sha256": "a32064958d9f13d2f61bbea698ad19cf2c92bbf08dddd14346765d3276587e2a"
+  },
+  {
+    "id": "kill_spec_3",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "kill_check",
+    "spec_sha256": "eebcf10908fa02d4c9d0cff032baa7225cd7a04087301aee91f387fba74b1a75"
+  },
+  {
+    "id": "00 鋁合金固定板，長120mm、寬60mm、厚10mm，四角 M6 通孔，邊距10mm，R5",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h1"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 1,
+          "layer": "analytic",
+          "message": "hole e_h2: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h2"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 2,
+          "layer": "analytic",
+          "message": "hole e_h3: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h3"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 3,
+          "layer": "analytic",
+          "message": "hole e_h4: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h4"
+        },
+        {
+          "code": "assumption",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "assumption 1 is recorded; review required",
+          "owner": null,
+          "related": [],
+          "severity": "info",
+          "target": null
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "prompt:test_rule_planner",
+    "spec_sha256": "f2181e7884e4c4365120bc98ef602b7280e45a3bd1717d816bec7c342930a37a"
+  },
+  {
+    "id": "01 做一個墊圈，外徑30mm、內徑15mm、厚5mm",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "prompt:test_rule_planner",
+    "spec_sha256": "21cdfb8132020e144d91b50cbb3320a257254bf2f48e30bd3e5a718db2f72914"
+  },
+  {
+    "id": "02 做一個100x70x30mm的開口盒，壁厚2mm",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "prompt:test_rule_planner",
+    "spec_sha256": "4dc8abe00638ee08f43b8c277f8f9c154e7d1d78d685a218bd73e88b1e070369"
+  },
+  {
+    "id": "03 Create an L bracket 80 mm wide, 50 mm deep, 60 mm tall, 4 mm thick, with two 5 mm holes.",
+    "report": {
+      "issues": [
+        {
+          "code": "assumption",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "assumption 1 is recorded; review required",
+          "owner": null,
+          "related": [],
+          "severity": "info",
+          "target": null
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "prompt:test_rule_planner",
+    "spec_sha256": "c2703351ec398799609c94be94f6562ff9f851cae545b89c031fbaa987fbaa36"
+  },
+  {
+    "id": "04 長100寬50厚8的板，兩個 M6 孔",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h1"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 1,
+          "layer": "analytic",
+          "message": "hole e_h2: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h2"
+        },
+        {
+          "code": "assumption",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "assumption 1 is recorded; review required",
+          "owner": null,
+          "related": [],
+          "severity": "info",
+          "target": null
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "prompt:test_rule_planner",
+    "spec_sha256": "c8b0b72e5b71aca8daf3e0fcdb5be30b0f6da5d4b4fa93c34342c01211a30115"
+  },
+  {
+    "id": "05 做一個長80寬40厚10的板，中央一個直徑5mm、深6mm盲孔",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "prompt:test_rule_planner",
+    "spec_sha256": "99df6e118f2cb8ce4152431a69b61303fb2c15c1e5d0c18165283e70bb90c7c3"
+  },
+  {
+    "id": "06 100x60x10mm plate with two 5mm blind holes 6mm deep",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "prompt:test_rule_planner",
+    "spec_sha256": "8e61b9cfe2bb4ebd218f9fda9473bfd118c77cf7b80770585443cd18238ea450"
+  },
+  {
+    "id": "07 做一個L型支架，寬80、深50、高60、厚4，立板兩個M5孔",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h1"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 1,
+          "layer": "analytic",
+          "message": "hole e_h2: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h2"
+        },
+        {
+          "code": "assumption",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "assumption 1 is recorded; review required",
+          "owner": null,
+          "related": [],
+          "severity": "info",
+          "target": null
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "prompt:test_rule_planner",
+    "spec_sha256": "67119db3e80c800bc170e3e29acca83bb11b0ff50208b798b01f84bf528eccee"
+  },
+  {
+    "id": "08 長100寬60厚10，兩個5mm沉頭孔",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "prompt:test_rule_planner",
+    "spec_sha256": "ce48ebcb8160fe8574a480b8d57f965881247527ddfc369a377b669a07e43208"
+  },
+  {
+    "id": "09 長120mm寬60mm厚10mm固定板，四角M6通孔，R5",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h1"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 1,
+          "layer": "analytic",
+          "message": "hole e_h2: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h2"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 2,
+          "layer": "analytic",
+          "message": "hole e_h3: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h3"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 3,
+          "layer": "analytic",
+          "message": "hole e_h4: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h4"
+        },
+        {
+          "code": "assumption",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "assumption 1 is recorded; review required",
+          "owner": null,
+          "related": [],
+          "severity": "info",
+          "target": null
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "prompt:test_api",
+    "spec_sha256": "57519897f84f518b9ca395c7b96d529ff3219ff9e7f29759bb61d0ec1fa8fbf1"
+  },
+  {
+    "id": "10 長100mm寬50mm厚8mm固定板，兩個5mm孔",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "prompt:test_api",
+    "spec_sha256": "0338f8accfc9be1e641988c23dddd513dd3cb94dce1a1082bba69bafcf30a84e"
+  },
+  {
+    "id": "11 長80寬40厚6的板",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "prompt:test_api",
+    "spec_sha256": "98b528f8815ee429c066e98c861574af4bd2dc785ce865a7a1f26984c322a6ed"
+  },
+  {
+    "id": "12 畫一個長120、寬60、厚10的固定板，四角M6孔，R5",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h1"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 1,
+          "layer": "analytic",
+          "message": "hole e_h2: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h2"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 2,
+          "layer": "analytic",
+          "message": "hole e_h3: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h3"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 3,
+          "layer": "analytic",
+          "message": "hole e_h4: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h4"
+        },
+        {
+          "code": "assumption",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "assumption 1 is recorded; review required",
+          "owner": null,
+          "related": [],
+          "severity": "info",
+          "target": null
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "prompt:README",
+    "spec_sha256": "1a6f3ba26a126d8129d8fd11a0d21352a78e780fc9f7ec7226a8ec504de55f23"
+  },
+  {
+    "id": "13 外徑30、內徑15、厚5的墊圈",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "prompt:README",
+    "spec_sha256": "558d65c199293217508ec1f43086490b8daf7f48c59693d7ccc7d806a6e761bf"
+  },
+  {
+    "id": "14 鋁合金固定座，長120mm、寬60mm、厚10mm，四角 M6 通孔，R5",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h1"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 1,
+          "layer": "analytic",
+          "message": "hole e_h2: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h2"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 2,
+          "layer": "analytic",
+          "message": "hole e_h3: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h3"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 3,
+          "layer": "analytic",
+          "message": "hole e_h4: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h4"
+        },
+        {
+          "code": "assumption",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "assumption 1 is recorded; review required",
+          "owner": null,
+          "related": [],
+          "severity": "info",
+          "target": null
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "prompt:README",
+    "spec_sha256": "2390aa611206f718ddb8f6251b2f10cb25fe92a2a5170a7339f4c51d18f132ed"
+  },
+  {
+    "id": "15 鋁合金固定板，長120mm、寬60mm、厚10mm，四角 M6 通孔，孔中心離邊10mm，垂直邊 R5。",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h1"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 1,
+          "layer": "analytic",
+          "message": "hole e_h2: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h2"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 2,
+          "layer": "analytic",
+          "message": "hole e_h3: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h3"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 3,
+          "layer": "analytic",
+          "message": "hole e_h4: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h4"
+        },
+        {
+          "code": "assumption",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "assumption 1 is recorded; review required",
+          "owner": null,
+          "related": [],
+          "severity": "info",
+          "target": null
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "prompt:PROMPT_GUIDE",
+    "spec_sha256": "7ae615a07888419670e066d27929484440c455c029d11669b3eaac9bed46ffd3"
+  },
+  {
+    "id": "16 長120、寬60、厚10的板，兩個直徑5mm通孔",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "prompt:PROMPT_GUIDE",
+    "spec_sha256": "bf129832020fd155ee5f8f04772ed73616a2b525f67d045a20a41eb2d55f5708"
+  },
+  {
+    "id": "17 長120、寬60、厚10的板，四角 M6 通孔，邊距10mm",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h1"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 1,
+          "layer": "analytic",
+          "message": "hole e_h2: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h2"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 2,
+          "layer": "analytic",
+          "message": "hole e_h3: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h3"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 3,
+          "layer": "analytic",
+          "message": "hole e_h4: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h4"
+        },
+        {
+          "code": "assumption",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "assumption 1 is recorded; review required",
+          "owner": null,
+          "related": [],
+          "severity": "info",
+          "target": null
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "prompt:PROMPT_GUIDE",
+    "spec_sha256": "90c4d980147509e2baabec35c4f1929544e985b005251c7ba5a1ef9b76943d35"
+  },
+  {
+    "id": "18 長120、寬60、厚10的板，兩個5mm沉頭孔，沉頭徑10mm，角度90度",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "prompt:PROMPT_GUIDE",
+    "spec_sha256": "10e605f0754d8848e518d452258be6aeaa8e7e8c4ed63f6ee85eb9d4ae0c96bf"
+  },
+  {
+    "id": "19 長120、寬60、厚10的板，兩個5mm沉孔，沉孔直徑9mm，沉孔深3mm",
+    "report": {
+      "issues": [
+        {
+          "code": "low_edge_clearance",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: minimum edge clearance is only 1.90 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "warning",
+          "target": "e_h1"
+        },
+        {
+          "code": "low_edge_clearance",
+          "feature_index": 1,
+          "layer": "analytic",
+          "message": "hole e_h2: minimum edge clearance is only 1.90 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "warning",
+          "target": "e_h2"
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "prompt:PROMPT_GUIDE",
+    "spec_sha256": "15c8679101cde3e36ad0efdd542f7c06ba1227c7d102e3d553e57aec8b3b79e8"
+  },
+  {
+    "id": "20 長120、寬60、厚10的板，直徑5mm孔，x=20mm, y=-10mm",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "prompt:PROMPT_GUIDE",
+    "spec_sha256": "7b2d9d253b7c05cf342f9135c10921148cb2a92002a19c778939f0a7874098b5"
+  },
+  {
+    "id": "21 長100寬60厚10的板，兩個 M6 攻牙孔",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h1"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 1,
+          "layer": "analytic",
+          "message": "hole e_h2: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h2"
+        }
+      ],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "prompt:PROMPT_GUIDE",
+    "spec_sha256": "c5a81cd3b0a5d4c0a13d68f642bca414708a3a8d87b0ef49a03cb48e8f1e18ee"
+  },
+  {
+    "id": "22 L 支架：寬80、深50、高60、厚4，立板兩個 M5 孔",
+    "report": {
+      "issues": [
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h1"
+        },
+        {
+          "code": "hole_outside_part",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1 extends beyond the part outline in the plane normal to Y",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h1"
+        },
+        {
+          "code": "thread_annotation_only",
+          "feature_index": 1,
+          "layer": "analytic",
+          "message": "hole e_h2: the thread is an annotation only; it is modelled as a plain cylinder",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "info",
+          "target": "e_h2"
+        },
+        {
+          "code": "hole_outside_part",
+          "feature_index": 1,
+          "layer": "analytic",
+          "message": "hole e_h2 extends beyond the part outline in the plane normal to Y",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "error",
+          "target": "e_h2"
+        },
+        {
+          "code": "assumption",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "assumption 1 is recorded; review required",
+          "owner": null,
+          "related": [],
+          "severity": "info",
+          "target": null
+        },
+        {
+          "code": "assumption",
+          "feature_index": null,
+          "layer": "analytic",
+          "message": "assumption 2 is recorded; review required",
+          "owner": null,
+          "related": [],
+          "severity": "info",
+          "target": null
+        }
+      ],
+      "review_required": true,
+      "valid": false
+    },
+    "source": "prompt:PROMPT_GUIDE",
+    "spec_sha256": "9f4f9cd2b3f999b3df2c3d94f8f23cb952e8722625941e9a9f9c3a73d5fc1e2f"
+  },
+  {
+    "id": "23 圓柱：直徑30、高50，中央一個直徑5mm通孔",
+    "report": {
+      "issues": [
+        {
+          "code": "low_edge_clearance",
+          "feature_index": 0,
+          "layer": "analytic",
+          "message": "hole e_h1: minimum edge clearance is only 0.00 mm",
+          "owner": "component_smith",
+          "related": [],
+          "severity": "warning",
+          "target": "e_h1"
+        }
+      ],
+      "review_required": true,
+      "valid": true
+    },
+    "source": "prompt:PROMPT_GUIDE",
+    "spec_sha256": "296fa944b6421f9a71d2be5556c39d0604ac5891f388db9ea1bff244e209cd0b"
+  },
+  {
+    "id": "24 外殼：100x70x30 mm，壁厚2，兩個5mm孔",
+    "report": {
+      "issues": [],
+      "review_required": false,
+      "valid": true
+    },
+    "source": "prompt:PROMPT_GUIDE",
+    "spec_sha256": "d7b3c3dbc5d5df4e533a4c0531cb5f8deec536705cd0a10a21ff9f9cb00ef65a"
+  }
+]

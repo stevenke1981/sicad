@@ -154,6 +154,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .ct-constraints { font-size:.84rem; }
 .core-note { margin:10px 0 0; color:var(--accent-2); font-size:.82rem; }
 .issue .msg .issue-ref { color:var(--muted); font-size:.72rem; }
+.issue .msg .issue-label { display:inline-block; margin-right:6px; padding:0 5px; border:1px solid var(--line); border-radius:4px; font-size:.72rem; font-weight:700; }
 .spec-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
 .job { text-align:left; font:inherit; color:var(--text); font-weight:400; }
 .job.active { border-color: var(--accent-2); }

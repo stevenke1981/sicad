@@ -117,3 +117,16 @@ Rust 型別（serde + schemars）
 - **1.0 應用程式的 schema 來源不變**：仍為 `app/models/cad.py`；`schemas/promptcad.schema.json` 與其 TypeScript 型別仍由 Pydantic 匯出生成。
 - **規則 4 的遵守**：`app/services/core_bridge.py` 不解讀、不驗證、不重新序列化 2.0 內容。
 
+### 2026-11-27：第 2 階段 2c — 第一個由 Rust 生成的 Pydantic 模型
+
+部分達成。第 2 階段的「Schema 來源切換為 Rust」只有 validation report 完成切換，其餘仍未完成。
+
+- **已完成（validation report）**：`scripts/gen_pydantic.py` 讀取 `schemas/cad2/validation-report.schema.json`，生成 `app/models/generated/validation_report.py`（含 DO-NOT-EDIT 標頭，LF 換行，無時間戳）。`app/models/cad.py` 改為重新匯出 `ValidationReport`、`ValidationIssue`、`ValidationSeverity`，不再以手寫類別定義；`ValidationSeverity` 即生成的 `Severity`，成員為小寫 `error`、`warning`、`info`。
+- **生成前置轉換**：schemars 對字串列舉產生的 `oneOf`（每項為 string `const`）在生成前被轉為 `enum`，否則 `Severity`、`Role`、`Layer` 只會退化為普通字串。這個轉換屬於生成腳本，不修改 `schemas/cad2/` 的內容。
+- **生成器版本**：`datamodel-code-generator==0.103.0`，固定於 `pyproject.toml` 的 `schema` extra，符合「鎖定生成工具版本」的風險緩解措施。
+- **漂移檢查**：`scripts/gen_pydantic.py --check` 在 CI 的 `test` job 執行；Makefile 提供 `schema-py` 與 `schema-py-check`。
+- **Spike（2.0 文件）**：`app/models/generated/cad_document_2.py`（根類別 `CadDocument2`）已生成，兩份 `examples/cad2/` 文件可精確來回。目前**未被應用程式使用**。觀察到的生成品質問題（與 0008 的「生成型別未必是最慣用的寫法」相符）：`AxisDir` 成員名為 `field_x`／`field_x_1`；形狀聯集的類別名稱帶編號（`DotShape1`、`VolumeShape7`）；使用 `RootModel` 包裝；聯集未以 `kind` 作為 discriminator。這些瑕疵是 2.0 Pydantic 正式啟用前必須處理的項目，不應以修改生成檔解決（應以生成參數或薄包裝處理）。
+- **1.0 尚未切換**：`app/models/cad.py` 的 1.0 `CadDocument` 仍為手寫，仍是 `schemas/promptcad.schema.json` 的來源。驗收項目「repo 中除 Rust core 外，不存在手寫的文件模型型別」因此仍未達成。
+- **規則 4 的遵守**：驗證規則仍只在 Rust core。Python 端的 `ValidationReport` 只描述 core 回傳的資料形狀；2c 之後 Python 不再含任何設計規則（`app/services/validator.py` 已刪除）。
+- **CI 狀態**：`gen_pydantic.py --check` 的 GitHub 執行結果於本文件撰寫時尚未確認。
+

@@ -32,6 +32,33 @@
 - 乾淨機器驗證以 `desktop-bundle.yml` 的實際執行結果為準：2026-11-26 於 GitHub `windows-latest`（Windows Server 2025，4 CPU）首次執行 [run 45723089074](https://github.com/stevenke1981/sicad/actions/runs/45723089074) 全數通過：建置與安裝後的 sidecar 皆在 isolated env 下通過 smoke（各觀察到 7 個 render worker，`foreign_processes=[]`）；安裝 sidecar 的 Job Object 中斷檢查 `KILL_CHECK_OK`；強制結束已安裝的 `promptcad-studio.exe` 後 sidecar 於 0.007 秒內結束（`job.rs` 實證，此步驟已改為必過）；安裝目錄含 `THIRD_PARTY_NOTICES.md`。量測：安裝檔 107.5 MiB、安裝後 554.1 MiB、READY 0.64–0.66 s、warm render 2.38 s、端到端 generate 2.42 s。
 - 檢視器只支援 STL；GLB、元件選取與 port 圖層尚未實作。
 
+## Unreleased / Phase 2c：驗證器改由 Rust core 執行
+
+這是 [ADR 0010](docs/adr/0010-migration-phases.md) 第 2 階段的第三個切片，尚未發佈；第 2 階段尚未結束（見 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)）。
+
+新增與變更：
+
+- **1.0 驗證經 Rust core**：`/api/v1/plan`、`/generate`、`/generate-from-spec`、`/validate`、CLI `promptcad validate|render|generate` 與桌面 sidecar 的驗證，皆經 `promptcad-core rpc` 的 `validate` 操作（`app/services/core_validator.py`）。`app/services/validator.py`（Python 設計規則）已刪除。
+- **需要 core 執行檔**：原始碼執行請先 `make core`，或設定 `PROMPTCAD_CORE_BIN`。找不到時上述端點回 `503`；core 忙碌回 `503`（附 `Retry-After`）；逾時回 `504`；core 失敗或 core 回 `status: error` 回 `502`。CLI 遇到 core 傳輸錯誤以結束碼 `3` 結束。Docker 映像與桌面安裝包已內含 core。
+- **桌面安裝包**：sidecar 內含 `promptcad-core`（`<onedir>/_internal/`）。Windows onedir 由 402.4 MiB 增為 406.1 MiB。
+- **1.0 `feature_index`**：由 core 填入孔相關與圓角、倒角相關 issue 的索引（見 `docs/CAD_DSL_2.md` §9.1）。
+- **Pydantic 由 Rust 生成（validation report）**：`app/models/generated/validation_report.py` 由 `scripts/gen_pydantic.py` 生成（`make schema-py`），CI 檢查漂移。2.0 文件的 Pydantic 僅為 spike，尚未被應用程式使用。
+- **前端**：驗證面板在每個 issue 訊息前顯示 zh-TW 短標籤（60 個代碼）。
+
+1.0 的行為變更（已接受）：
+
+- issue 訊息改為 core 的英文 id 模板（例如 `hole e_h1 …`）。
+- `assumption` 的訊息不再回顯假設文字。
+- issue 新增 `target`、`related`、`owner`、`layer`；舊的四欄 manifest 仍可讀取。
+- issue 順序改變。
+- 2.0 專屬代碼可能出現在 1.0 流程（例如 `empty_cut_no_effect`）。
+- 無效的螺紋字串回報 `tapped_hole_without_thread`，取代 `thread_annotation_only`。
+
+已知限制與未驗證：
+
+- GitHub CI 對本切片的執行結果尚待確認；macOS／Linux 桌面包內的 core 執行檔（含 macOS ad-hoc 簽章）未驗證；Tauri WebView 內的真實往返未驗證。
+- 1.0 `CadDocument` 的 Pydantic 仍為手寫；Python 編譯器仍不接受 2.0；1.0 直接輸出與經轉接輸出的幾何等價測試尚未進行。
+
 ## Unreleased / Phase 2b：Rust core 接入 Tauri 與伺服器
 
 這是 [ADR 0010](docs/adr/0010-migration-phases.md) 第 2 階段的第二個切片，尚未發佈；第 2 階段尚未結束（見 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)）。伺服器宿主形式見 [ADR 0012](docs/adr/0012-server-host-for-rust-core.md)，待負責人簽核。

@@ -11,7 +11,6 @@ from pathlib import Path
 import pytest
 
 from app.models.cad import CadDocument, HoleType
-from app.services.validator import DesignValidator
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -119,13 +118,12 @@ def test_refuses_without_cadquery(monkeypatch, capsys):
     assert "--no-cad" in capsys.readouterr().err
 
 
-def test_smoke_cases_cover_every_base_and_hole_type():
+def test_smoke_cases_cover_every_base_and_hole_type(core_validate):
     cases = frozen_smoke.smoke_cases()
-    validator = DesignValidator()
     bases = set()
     for label, spec in cases:
         doc = CadDocument.model_validate(spec)
-        assert validator.validate(doc).valid, label
+        assert core_validate(doc).valid, label
         bases.add(doc.base.kind)
         if not label.startswith("example:"):
             assert {hole.hole_type for hole in doc.holes} == set(HoleType), label
@@ -459,3 +457,33 @@ def test_prune_bundle_refuses_on_unresolved_vtk_dependency(tmp_path):
             onedir, ["vtkmodules.vtkCommonCore"], kind=nd.ELF, deps_of=lambda p: deps[p.name]
         )
     assert (onedir / "_internal/vtkmodules/libvtkIOMovie-9.6.so.1").exists()
+
+
+def test_install_core_binary_copies_into_internal(tmp_path):
+    onedir = _bundle(tmp_path, {"promptcad-sidecar": b"e", "_internal/base.dll": b"b"})
+    core = tmp_path / "src" / "promptcad-core"
+    core.parent.mkdir()
+    core.write_bytes(b"CORE")
+    core.chmod(0o755)
+    dest = build_sidecar.install_core_binary(onedir, core)
+    assert dest == onedir / "_internal" / ("promptcad-core" + build_sidecar.EXE_SUFFIX)
+    assert dest.read_bytes() == b"CORE"
+    if sys.platform != "win32":
+        assert os.access(dest, os.X_OK)
+
+
+@pytest.mark.parametrize("content", [None, b""])
+def test_install_core_binary_missing_or_empty_is_a_build_error(tmp_path, content):
+    onedir = _bundle(tmp_path, {"promptcad-sidecar": b"e", "_internal/base.dll": b"b"})
+    core = tmp_path / "promptcad-core"
+    if content is not None:
+        core.write_bytes(content)
+    with pytest.raises(build_sidecar.BuildError, match="promptcad-core binary not found"):
+        build_sidecar.install_core_binary(onedir, core)
+    assert not (onedir / "_internal" / ("promptcad-core" + build_sidecar.EXE_SUFFIX)).exists()
+
+
+def test_default_core_bin_is_the_release_build():
+    parts = build_sidecar.DEFAULT_CORE_BIN.parts
+    assert parts[-4:-1] == ("promptcad-core", "target", "release")
+    assert build_sidecar.DEFAULT_CORE_BIN.name == "promptcad-core" + build_sidecar.EXE_SUFFIX

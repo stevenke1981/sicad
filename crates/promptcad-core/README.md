@@ -26,7 +26,7 @@ CadDocument 2.0 文件模型、驗證、solver 前處理、1.0 遷移，以及 p
 | `ports` | 固定的 port 表與 port 幾何（spec §3.4）（Phase 2a 填寫中） |
 | `solver` | 方向與固定點平移 solver、hole 方向、`resolved.json`（spec §5.4、§5.5、§7）（Phase 2a 填寫中） |
 | `migrate` | 1.0 ↔ 2.0 遷移（spec §10）（Phase 2a 填寫中） |
-| `validate` | 解析式驗證器，輸出 spec §9.2 的 issue 代碼（Phase 2a 填寫中） |
+| `validate` | 分層驗證器，輸出 spec §9.2 的 issue 代碼；1.0 輸入的 `feature_index` 由 2c 填寫（見 `docs/CAD_DSL_2.md` §9.1） |
 | `patch_engine` | 原子 patch 套用、權限與拒絕原因（spec §8.4–§8.7）（Phase 2a 填寫中） |
 | `oplog` | 只能附加的 `oplog.jsonl` 紀錄（ADR 0005）（Phase 2a 填寫中） |
 
@@ -137,6 +137,8 @@ unsolvable, rejected or not expressible), 2 usage or unreadable / unparsable inp
 `timestamp`、`log_seq`）、`version`。`document`／`patch` 是原始 JSON：由 core 依 `schema_version`
 解析（1.0 會先升級），解析失敗會得到結構化的 `error` 回應（含指向請求內位置的 JSON pointer），
 而不是整個請求失敗。文件不會自動移除範例專用的 `expected_resolved`，呼叫端需先移除。
+
+第 2 階段 2c 起，Python 伺服器與桌面 sidecar 的 1.0 驗證皆以 `validate` 呼叫本 crate。`tests/fixtures/gen_v1_parity.py` 已刪除；`tests/fixtures/v1_parity.json` 保留為凍結的對照基準，不再重新生成。
 
 回應以 `status` 標記：`ok` 帶 `result`（以同名 `op` 標記）；`error` 帶 `code`、`message`、`path`、
 `violations`。`code` 是封閉列舉：`bad_request`、`too_large`、`unsupported_schema_version`、

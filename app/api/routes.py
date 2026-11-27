@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import io
 import zipfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -21,6 +23,25 @@ from app.models.cad import CadDocument, ValidationReport
 from app.services.core_bridge import CoreBusy, CoreFailed, CoreTimeout, CoreUnavailable
 
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(require_api_token)])
+
+
+@contextmanager
+def core_http_errors() -> Iterator[None]:
+    """Map core transport failures to HTTP: 503 (+Retry-After when busy), 504, 502."""
+    try:
+        yield
+    except CoreUnavailable as exc:
+        raise HTTPException(status_code=503, detail=f"Core unavailable: {exc}") from exc
+    except CoreBusy as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Core busy: {exc}",
+            headers={"Retry-After": str(exc.retry_after)},
+        ) from exc
+    except CoreTimeout as exc:
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
+    except CoreFailed as exc:  # includes CoreRejected (status: error for a valid 1.0 doc)
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 def _service(request: Request):
@@ -91,27 +112,16 @@ async def core_rpc(request: Request):
     # `bad_request` envelope, so the server never parses up to 8 MiB on the event loop.
     if body.lstrip(b" \t\r\n")[:1] != b"{":
         raise HTTPException(status_code=422, detail="Body must be a JSON object")
-    try:
+    with core_http_errors():
         payload = await request.app.state.core.call_raw(body)
-    except CoreUnavailable as exc:
-        raise HTTPException(status_code=503, detail=f"Core unavailable: {exc}") from exc
-    except CoreBusy as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Core busy: {exc}",
-            headers={"Retry-After": str(exc.retry_after)},
-        ) from exc
-    except CoreTimeout as exc:
-        raise HTTPException(status_code=504, detail=str(exc)) from exc
-    except CoreFailed as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
     return Response(content=payload, media_type="application/json")
 
 
 @router.post("/plan", response_model=PlanResponse)
 async def plan(request: Request, body: PlanRequest):
     try:
-        return await _service(request).plan(body.prompt, body.planner)
+        with core_http_errors():
+            return await _service(request).plan(body.prompt, body.planner)
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -119,7 +129,10 @@ async def plan(request: Request, body: PlanRequest):
 @router.post("/generate", response_model=JobManifest)
 async def generate(request: Request, body: GenerateRequest):
     try:
-        return await _service(request).generate(body.prompt, body.planner, body.formats, body.render)
+        with core_http_errors():
+            return await _service(request).generate(
+                body.prompt, body.planner, body.formats, body.render
+            )
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -127,18 +140,20 @@ async def generate(request: Request, body: GenerateRequest):
 @router.post("/generate-from-spec", response_model=JobManifest)
 async def generate_from_spec(request: Request, body: GenerateFromSpecRequest):
     try:
-        return await _service(request).generate_from_spec(
-            body.spec,
-            body.formats,
-            body.render,
-        )
+        with core_http_errors():
+            return await _service(request).generate_from_spec(
+                body.spec,
+                body.formats,
+                body.render,
+            )
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post("/validate", response_model=ValidationReport)
 async def validate(request: Request, body: CadDocument):
-    return _service(request).validate(body)
+    with core_http_errors():
+        return await _service(request).validate(body)
 
 
 @router.get("/jobs", response_model=list[JobListItem])

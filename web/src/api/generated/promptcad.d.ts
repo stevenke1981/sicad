@@ -30,10 +30,28 @@ export type EdgeSelector2 = 'all' | 'vertical' | 'top' | 'bottom';
 export type HoleType1 =
   'through' | 'blind' | 'clearance' | 'tapped' | 'counterbore' | 'countersink';
 /**
- * This interface was referenced by `PromptCADStudio`'s JSON-Schema
- * via the `definition` "ValidationSeverity".
+ * Producing layer.
  */
-export type ValidationSeverity = 'error' | 'warning' | 'info';
+export type Layer = 'analytic' | 'kernel';
+/**
+ * This interface was referenced by `PromptCADStudio`'s JSON-Schema
+ * via the `definition` "Role".
+ */
+export type Role = 'space_planner' | 'component_smith' | 'joiner' | 'assembler';
+/**
+ * Severity.
+ */
+export type Severity = 'error' | 'warning' | 'info';
+/**
+ * This interface was referenced by `PromptCADStudio`'s JSON-Schema
+ * via the `definition` "Layer".
+ */
+export type Layer1 = 'analytic' | 'kernel';
+/**
+ * This interface was referenced by `PromptCADStudio`'s JSON-Schema
+ * via the `definition` "Severity".
+ */
+export type Severity1 = 'error' | 'warning' | 'info';
 
 /**
  * Generated from app/models by scripts/export_schema.py. Do not edit by hand.
@@ -261,8 +279,17 @@ export interface JobManifest {
  * via the `definition` "ValidationReport".
  */
 export interface ValidationReport {
+  /**
+   * Issues in emission order.
+   */
   issues?: ValidationIssue[];
+  /**
+   * Planner flag, or any assumption, or any `error`/`warning`.
+   */
   review_required: boolean;
+  /**
+   * No `error` issues.
+   */
   valid: boolean;
 }
 /**
@@ -270,10 +297,32 @@ export interface ValidationReport {
  * via the `definition` "ValidationIssue".
  */
 export interface ValidationIssue {
+  /**
+   * Issue code (see [`codes::Code`]); kept as a string so 1.0/kernel reports round-trip.
+   */
   code: string;
+  /**
+   * 1.0 feature index, `null` in 2.0 issues.
+   */
   feature_index?: number | null;
+  layer?: Layer;
+  /**
+   * Fixed-template message; may embed only ids, numbers and template text (§9.1).
+   */
   message: string;
-  severity: ValidationSeverity;
+  /**
+   * Role that should fix the issue.
+   */
+  owner?: Role | null;
+  /**
+   * Other involved ids.
+   */
+  related?: string[];
+  severity: Severity;
+  /**
+   * Component/constraint/part id or `id:field` the issue is about.
+   */
+  target?: string | null;
 }
 /**
  * This interface was referenced by `PromptCADStudio`'s JSON-Schema

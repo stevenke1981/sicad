@@ -243,3 +243,19 @@
 - **編譯器改為接受 2.0 的已驗證規格**：**未達成**。2.0 文件的輸出在前端停用。
 
 結論：第 2 階段尚未結束，階段順序不變。2b 之後的剩餘項目與驗證缺口見 `PROJECT_STATUS.md`。
+
+### 2026-11-27：第 2 階段 2c — 驗證器改由 Rust core 執行
+
+2c 的內容與細節見 `PROJECT_STATUS.md` 的「第 2 階段 2c 切片」。1.0 的所有驗證（`/api/v1/plan`、`/generate`、`/generate-from-spec`、`/validate`、CLI `validate|render|generate`、桌面 sidecar）改經 `promptcad-core rpc` 的 `validate` 操作，`app/services/validator.py` 已刪除。逐項對照第 2 階段的完成條件：
+
+- **所有 `examples/generated/` 的 1.0 文件經 adapter 後輸出等價幾何**：**仍為部分達成**。2c 未新增 CadQuery 上的幾何等價測試；Python 編譯器仍不接受 2.0。
+- **Python 與 Rust 驗證器判定一致後，移除 Python 端的設計驗證邏輯**：**達成**。移除前的差異閘門 G1 在 83 個輸入上，77 個判定一致（(code, severity, feature_index) 多重集合、`valid`、`review_required`），其餘 6 個為已記錄的允許差異（螺紋正規化與已知的 `empty_cut_no_effect` 多出項）。移除後以 core 的結果作為黃金基準 `tests/fixtures/v1_validation_golden.json` 做回歸。桌面 smoke 的 `foreign_processes=[]` 與 onedir 增量（+3.7 MiB）亦已量測，見 `PROJECT_STATUS.md`。
+- **CI 的 schema 生成比對檢查已啟用**：**部分達成**。Rust → Pydantic 已涵蓋 validation report：`scripts/gen_pydantic.py --check` 在 CI `test` job 執行，生成器版本固定於 `pyproject.toml` 的 `schema` extra。1.0 `CadDocument` 的 Pydantic 仍為手寫（`app/models/cad.py`），2.0 的 Pydantic 僅為 spike（`app/models/generated/cad_document_2.py`，尚未被應用程式使用）。
+- **REST API 與 CLI 在伺服器模式下仍可用（可透過相容層接受 1.0 文件）**：**達成（有行為變更）**。端點與 CLI 指令維持不變；但 issue 訊息改為英文 id 模板、issue 新增欄位、順序改變，2.0 專屬代碼可能出現在 1.0 流程，螺紋錯誤代碼改為 `tapped_hole_without_thread`。當 core 不可用時，上述端點回 503。行為變更清單見 `docs/API.md` 與 `RELEASE_NOTES.md`。
+
+第 2 階段「內容」的狀態變化：
+
+- **Schema 來源切換為 Rust**：**部分達成**。validation report 的 Pydantic 已由 Rust 生成並取代手寫型別；1.0 `CadDocument` 與 2.0 文件尚未由 Rust 生成為應用程式使用的型別。
+- **Python 驗證器移除**：**已完成**（見上）。
+
+結論：第 2 階段尚未結束（編譯器接受 2.0 與幾何等價測試、1.0 模型生成、前端編輯與元件選取尚未完成），階段順序不變。ADR 0012 仍待負責人簽核。

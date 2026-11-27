@@ -12,10 +12,12 @@ export type {
   PlanResponse,
   ValidationIssue,
   ValidationReport,
-  ValidationSeverity,
 } from './generated/promptcad';
 
-import type { GenerateRequest, JobManifest } from './generated/promptcad';
+import type { GenerateRequest, JobManifest, Severity } from './generated/promptcad';
+
+// The report is generated from the Rust core's schema (ADR 0008), where the enum is `Severity`.
+export type ValidationSeverity = Severity;
 
 export type OutputFormat = NonNullable<GenerateRequest['formats']>[number];
 export type PlannerChoice = NonNullable<GenerateRequest['planner']>;

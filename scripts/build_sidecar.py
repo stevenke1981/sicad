@@ -38,7 +38,13 @@ Slimming (ADR 0011), after PyInstaller and unless ``--no-prune``:
    Nothing else is ever deleted.
 
 ``build/sidecar/bundle-manifest.json`` records the result (:func:`build_manifest`). The
-build fails when the dereferenced onedir exceeds ``--max-mib`` (Windows default 460; ``0``
+promptcad-core release binary (``crates/promptcad-core/target/release``, built with
+``cargo build --release --locked --bins``; override with ``--core-bin``) is copied into
+``_internal/`` after the prune: that is ``sys._MEIPASS``, the first place
+``locate_core_binary`` looks, so the frozen sidecar validates through the core. A missing
+binary fails the build.
+
+The build fails when the dereferenced onedir exceeds ``--max-mib`` (Windows default 460; ``0``
 disables; no default with ``--no-prune``) or when a dist of :data:`PRUNED_DISTS` turns up
 in the bundle.
 """
@@ -74,6 +80,10 @@ MANIFEST_PATH = BUILD_DIR / "bundle-manifest.json"
 SHIM_DIR = BUILD_DIR / "vtk_shim"
 EXAMPLES_DIR = ROOT / "examples" / "generated"
 MANIFEST_SCHEMA = 1
+CORE_NAME = "promptcad-core"
+DEFAULT_CORE_BIN = ROOT / "crates" / "promptcad-core" / "target" / "release" / (
+    CORE_NAME + EXE_SUFFIX
+)
 # Size gate (MiB, dereferenced onedir) per sys.platform; unix limits once CI measured them.
 DEFAULT_MAX_MIB: Mapping[str, float] = {"win32": 460.0}
 
@@ -359,6 +369,30 @@ def size_summary(onedir: Path, top: int = 10) -> list[str]:
     for size, name in sorted(entries, reverse=True)[:top]:
         lines.append(f"  {size / 1_048_576:8.1f} MiB  _internal/{name}")
     return lines
+
+
+# --------------------------------------------------------------------------- core binary
+
+
+def install_core_binary(onedir: Path, core_bin: Path = DEFAULT_CORE_BIN) -> Path:
+    """Copy the promptcad-core binary into ``<onedir>/_internal/`` (``sys._MEIPASS``).
+
+    Raises :class:`BuildError` when it is missing or empty. Keeps the exec bit (copy2).
+    """
+    if not core_bin.is_file() or core_bin.stat().st_size == 0:
+        raise BuildError(
+            f"promptcad-core binary not found: {core_bin}\n"
+            "build it first: cargo build --release --locked --bins "
+            "--manifest-path crates/promptcad-core/Cargo.toml (or pass --core-bin)"
+        )
+    internal = onedir / "_internal"
+    if not internal.is_dir():
+        raise BuildError(f"no _internal/ under {onedir}")
+    dest = internal / (CORE_NAME + EXE_SUFFIX)
+    shutil.copy2(core_bin, dest)
+    if EXE_SUFFIX == "":
+        dest.chmod(dest.stat().st_mode | 0o111)
+    return dest
 
 
 # --------------------------------------------------------------------------- VTK prune
@@ -717,6 +751,12 @@ def main(argv: list[str] | None = None) -> int:
         help="fail when the onedir exceeds this many MiB (default: 460 on Windows, none "
         "elsewhere or with --no-prune; 0 disables)",
     )
+    parser.add_argument(
+        "--core-bin",
+        type=Path,
+        default=DEFAULT_CORE_BIN,
+        help="promptcad-core binary to ship in _internal/ (default: the crate's release build)",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -733,6 +773,14 @@ def main(argv: list[str] | None = None) -> int:
             "cadquery is not importable from this interpreter "
             f"({sys.executable}).\nRun `python scripts/desktop_env.py` and build with "
             ".venv-desktop's python, or pass --no-cad for a source-only sidecar.",
+            file=sys.stderr,
+        )
+        return 2
+    if not args.core_bin.is_file() or args.core_bin.stat().st_size == 0:
+        print(f"promptcad-core binary not found: {args.core_bin}", file=sys.stderr)
+        print(
+            "build it first: cargo build --release --locked --bins "
+            "--manifest-path crates/promptcad-core/Cargo.toml (or pass --core-bin)",
             file=sys.stderr,
         )
         return 2
@@ -768,6 +816,8 @@ def main(argv: list[str] | None = None) -> int:
         result = _slim(onedir, exe) if prune else None
         if result is not None:
             _print_lines(size_summary(onedir))
+        core_dest = install_core_binary(onedir, args.core_bin)
+        print(f"Installed {core_dest} ({core_dest.stat().st_size / 1_048_576:.1f} MiB)")
         bundled = bundle_top_levels(onedir, exe)
         absent, present = split_pruned_dists(
             PRUNED_DISTS, _installed_records(PRUNED_DISTS), bundled

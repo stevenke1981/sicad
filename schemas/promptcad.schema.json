@@ -798,6 +798,14 @@
       "title": "LBracketBase",
       "type": "object"
     },
+    "Layer": {
+      "enum": [
+        "analytic",
+        "kernel"
+      ],
+      "title": "Layer",
+      "type": "string"
+    },
     "Material": {
       "enum": [
         "aluminum",
@@ -958,10 +966,30 @@
       "title": "RingBase",
       "type": "object"
     },
+    "Role": {
+      "enum": [
+        "space_planner",
+        "component_smith",
+        "joiner",
+        "assembler"
+      ],
+      "title": "Role",
+      "type": "string"
+    },
+    "Severity": {
+      "enum": [
+        "error",
+        "warning",
+        "info"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
     "ValidationIssue": {
       "additionalProperties": false,
       "properties": {
         "code": {
+          "description": "Issue code (see [`codes::Code`]); kept as a string so 1.0/kernel reports round-trip.",
           "title": "Code",
           "type": "string"
         },
@@ -975,20 +1003,62 @@
             }
           ],
           "default": null,
+          "description": "1.0 feature index, `null` in 2.0 issues.",
           "title": "Feature Index"
         },
+        "layer": {
+          "$ref": "#/$defs/Layer",
+          "default": "analytic",
+          "description": "Producing layer."
+        },
         "message": {
+          "description": "Fixed-template message; may embed only ids, numbers and template text (§9.1).",
           "title": "Message",
           "type": "string"
         },
+        "owner": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Role"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Role that should fix the issue."
+        },
+        "related": {
+          "default": [],
+          "description": "Other involved ids.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Related",
+          "type": "array"
+        },
         "severity": {
-          "$ref": "#/$defs/ValidationSeverity"
+          "$ref": "#/$defs/Severity",
+          "description": "Severity."
+        },
+        "target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Component/constraint/part id or `id:field` the issue is about.",
+          "title": "Target"
         }
       },
       "required": [
-        "severity",
         "code",
-        "message"
+        "message",
+        "severity"
       ],
       "title": "ValidationIssue",
       "type": "object"
@@ -997,6 +1067,8 @@
       "additionalProperties": false,
       "properties": {
         "issues": {
+          "default": [],
+          "description": "Issues in emission order.",
           "items": {
             "$ref": "#/$defs/ValidationIssue"
           },
@@ -1004,29 +1076,22 @@
           "type": "array"
         },
         "review_required": {
+          "description": "Planner flag, or any assumption, or any `error`/`warning`.",
           "title": "Review Required",
           "type": "boolean"
         },
         "valid": {
+          "description": "No `error` issues.",
           "title": "Valid",
           "type": "boolean"
         }
       },
       "required": [
-        "valid",
-        "review_required"
+        "review_required",
+        "valid"
       ],
       "title": "ValidationReport",
       "type": "object"
-    },
-    "ValidationSeverity": {
-      "enum": [
-        "error",
-        "warning",
-        "info"
-      ],
-      "title": "ValidationSeverity",
-      "type": "string"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",

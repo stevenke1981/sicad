@@ -96,4 +96,27 @@
 
 ## 回顧紀錄
 
-（尚無）
+### 2026-11-27：第 2 階段 2c — core 進入 1.0 生成路徑與桌面 sidecar
+
+2c 把 core 接進 1.0 的驗證路徑：`/api/v1/plan`、`/generate`、`/generate-from-spec`、`/validate`、CLI `promptcad validate|render|generate` 與桌面 sidecar 的驗證，皆由 `app/services/core_validator.py`（`CoreValidator`，經 `CoreBridge` 呼叫 `validate`）執行，`app/services/validator.py` 已刪除。本 ADR 的宿主形式（每次呼叫一個 `promptcad-core rpc` 子行程）不變。
+
+**量測（回顧條件所列的「尚未量測」已補上）**：
+
+- 經 bridge 的 `validate` 呼叫，中位數約 20 ms（p95 約 21 ms、最大約 33 ms，共 83 次呼叫，本機 Windows）。這是驗證路徑的延遲；生成端點的整體延遲另見 `PROJECT_STATUS.md`。
+- 負責人尚未依本 ADR 的回顧條件訂定可接受門檻；上述數字只作為記錄，不構成該門檻。
+
+**錯誤對應（伺服器）**：
+
+- core 執行檔不存在：`503`，detail 說明執行 `make core` 或設定 `PROMPTCAD_CORE_BIN`。
+- core 忙碌（取不到名額）：`503` 並附 `Retry-After`。
+- 逾時：`504`。
+- core 行程失敗：`502`。
+- Pydantic 合法的 1.0 文件，若 core 回傳 `status: error`：`502`，並附 core 的代碼與路徑。
+
+REST 與 CLI 的完整說明見 [`../API.md`](../API.md)。
+
+**桌面**：sidecar 的建置腳本 `scripts/build_sidecar.py` 把 `promptcad-core(.exe)` 複製到 `<onedir>/_internal/`（`--core-bin`；缺少執行檔即建置失敗）。Windows onedir 由 402.4 MiB 增為 406.1 MiB。隔離環境 smoke 於本機 Windows 11 通過（`core_available=true`，`POST /api/v1/core {"op":"version"}` 成功，`foreign_processes=[]`）。Tauri 的 `invoke` 真實往返與 macOS／Linux 的巢狀 core 執行檔仍未驗證。
+
+**子行程環境與上限**：與上方「決策」一致（白名單環境變數、逾時後結束子行程、24 MiB 回應上限）。
+
+**本 ADR 狀態**：仍為 Proposed，待負責人簽核。

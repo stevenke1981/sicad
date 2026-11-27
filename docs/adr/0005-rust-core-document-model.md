@@ -110,6 +110,15 @@
 - 解析檢查對 `extrude`、`revolve` 與沉頭孔錐體使用保守的外包圖元：可能漏報，不會憑空產生 issue。核心層（kernel）驗證代碼未實作，屬於 sidecar 的工作。
 - Rust core 尚未接入 Tauri 命令或 FastAPI 伺服器；伺服器宿主形式仍待新 ADR（本 ADR 的回顧條件之一）。Python 驗證器尚未移除，兩套驗證邏輯目前並存。
 
+### 2026-11-27：第 2 階段 2c — Python 設計驗證器移除
+
+- **驗收項目「DesignValidator 的既有測試案例在 Rust 驗證器上得到相同的判定」**：**達成（有記錄的例外）**。移除前的差異閘門 G1 以 83 個輸入比對 Python 與 Rust 的判定：77 個在 (code, severity, feature_index) 多重集合、`valid`、`review_required` 上一致；6 個為允許的差異（`plate_thread_invalid` 的螺紋正規化，以及 3 個 `empty_cut_no_effect` 多出項與 2 個 `frozen_smoke` 案例的同類多出項，詳見 `PROJECT_STATUS.md`）。
+- **移除**：`app/services/validator.py`（`DesignValidator`）已刪除。`crates/promptcad-core/tests/fixtures/gen_v1_parity.py` 也已刪除，因此 Python 不再參與 Rust 測試；`tests/fixtures/v1_parity.json` 保留為凍結的對照基準，不再重新生成。
+- **回歸基準**：移除後，core 的結果存為黃金基準 `tests/fixtures/v1_validation_golden.json`（`PROMPTCAD_UPDATE_GOLDEN=1` 重新產生）。
+- **1.0 行為變更**：issue 訊息改為 core 的英文 id 模板；issue 新增 `target`、`related`、`owner`、`layer`；`assumption` 不再回顯假設文字；2.0 專屬代碼可能出現。詳見 `PROJECT_STATUS.md` 與 `RELEASE_NOTES.md`。
+- **風險中「驗證規則移植時行為改變」**：已依上述差異閘門評估並記錄。其中 `empty_cut_no_effect` 的多出項屬於 core 已知的額外代碼（記為 known EXTRAS），Python 版未產生；是否視為需修正的缺陷，留待後續決定。
+- **未完成**：`app/models/cad.py` 的 1.0 Pydantic 模型仍為手寫，尚未由 Rust 生成（見 [0008](0008-single-schema-source-of-truth.md)）。
+
 ### 2026-11-26：伺服器宿主形式的回顧條件已觸發
 
 上一筆紀錄所述「伺服器宿主形式仍待新 ADR」的回顧條件已觸發，並記錄於 [0012](0012-server-host-for-rust-core.md)（待負責人簽核）：桌面端由 Tauri 命令行程內呼叫 core；伺服器端由 FastAPI 每次呼叫啟動一次 `promptcad-core rpc` 子行程，兩者共用 `promptcad_core::api` 的同一契約。上一筆紀錄中「Rust core 尚未接入 Tauri 命令或 FastAPI 伺服器」已不再成立。Core 仍不含幾何核心；Python 驗證器尚未移除，1.0 驗證路徑未改變。

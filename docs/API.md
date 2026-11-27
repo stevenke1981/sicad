@@ -88,6 +88,29 @@ Body 是完整 `CadDocument`。回傳：
 
 `error` 會阻止 renderer；`warning` 要求人工覆核；`info` 用於假設與螺紋近似資訊。
 
+## 1.0 驗證的執行位置（第 2 階段 2c）
+
+`/plan`、`/generate`、`/generate-from-spec`、`/validate`，以及 CLI 的 `promptcad validate|render|generate` 與桌面 sidecar，所有 1.0 驗證都經 Rust core 的 `validate` 操作執行（`app/services/core_validator.py`）。Python 端不再含任何設計規則；請求本文仍先經 1.0 Pydantic 模型解析（`422` 的情況不變）。
+
+這些端點需要 core 執行檔（`make core` 或 `PROMPTCAD_CORE_BIN`，見下方「`POST /core`」的設定）。傳輸層錯誤回應如下，與 `POST /core` 相同的代碼定義：
+
+| HTTP | 情況 |
+|---|---|
+| `503` | 找不到 core 執行檔（`detail` 提示執行 `make core` 或設定 `PROMPTCAD_CORE_BIN`），或 core 忙碌（附 `Retry-After`） |
+| `504` | core 逾時 |
+| `502` | core 行程失敗；或 Pydantic 合法的 1.0 文件經 core 回 `status: error`（`detail` 含 core 的代碼與路徑） |
+
+CLI 遇到 core 傳輸錯誤時以結束碼 `3` 結束。
+
+### 2c 的 1.0 回應變更（已接受）
+
+- issue 的 `message` 改為 core 的英文 id 模板（例如 `hole e_h1 …`）；`assumption` 的訊息不再回顯假設文字。
+- issue 新增 `target`、`related`、`owner`、`layer` 欄位。舊的 manifest 仍可讀取。
+- issue 的順序改變；不應依賴順序。
+- 2.0 專屬代碼可能出現在 1.0 流程（例如 `empty_cut_no_effect`）。
+- 無效的螺紋字串回報 `tapped_hole_without_thread`，取代 `thread_annotation_only`。
+- `feature_index` 對 1.0 文件有值：孔相關 issue 為 0-based 孔索引，`fillet_too_large`、`chamfer_too_large` 為對應清單的索引；其餘為 `null`。
+
 ## `POST /core`
 
 CadDocument 2.0 的唯一入口：把請求原封不動轉交給 Rust core（`promptcad-core rpc`，每次呼叫啟動一次子行程），
@@ -125,7 +148,7 @@ curl -X POST http://localhost:8000/api/v1/core -H "Content-Type: application/jso
   `PATH`（只搜尋絕對路徑目錄，不含目前工作目錄；Windows 只接受 `.exe`，不接受 `.cmd`／`.bat`）、
   `crates/promptcad-core/target/{release,debug}`（僅限原始碼 checkout，`PROMPTCAD_ENV=production` 或凍結的 bundle 不使用）。
   設定後必須指向既有檔案，否則視為 core 不可用（`/capabilities` 的 `core_available` 為 `false`），不會退回其他位置。Docker 映像已內建並設定為 `/usr/local/bin/promptcad-core`；
-  本機以 `make core` 建置。桌面 sidecar 不含 core（桌面前端經由 Tauri 呼叫），找不到屬正常狀態。
+  本機以 `make core` 建置。桌面版的 sidecar 內含 core（`<onedir>/_internal/`，由 `scripts/build_sidecar.py` 複製），桌面前端另可經 Tauri 命令呼叫 core。
 - `PROMPTCAD_CORE_TIMEOUT_SECONDS`（預設 `15`）、`PROMPTCAD_CORE_MAX_REQUEST_BYTES`（預設 `8388608`）。
 - `PROMPTCAD_CORE_MAX_CONCURRENCY`（預設 `4`，1–64）：同時執行的 core 子行程上限，使用專用執行緒池，不佔用 render 工作的預設池。
   最多再有 4 倍此數量的請求可等待；等待超過 `PROMPTCAD_CORE_QUEUE_WAIT_SECONDS`（預設 `3`，秒）即回 `503` + `Retry-After`。
@@ -165,6 +188,7 @@ curl http://localhost:8000/api/v1/capabilities \
 
 - `401`：Token 缺少或錯誤。
 - `404`：工作或檔案不存在，或識別碼／檔名不符合安全格式。
-- `413`、`502`、`503`、`504`：僅 `POST /core`，見該節。
+- `413`：僅 `POST /core`，見該節。
+- `502`、`503`、`504`：`POST /core`，以及所有 1.0 驗證端點（見「1.0 驗證的執行位置」）。
 - `422`：Prompt、DSL、格式或 LLM 規劃結果不符合 schema。
 - HTTP `200` 且 manifest `status=failed`：工作已被記錄，但驗證閘門阻止渲染；請查看 `validation.issues`。

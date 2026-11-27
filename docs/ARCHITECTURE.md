@@ -10,14 +10,14 @@ LLMIntent / normalized intent
 CadDocument 1.0
 (Pydantic, extra=forbid, units=mm, bounded lists/numbers)
           ↓
-DesignValidator
+Rust core（validate，經 app/services/core_validator.py）
   ├─ valid ───→ CadQueryCompiler + OpenScadCompiler → Renderer
   └─ invalid ─→ 保存 DSL／原始碼／預覽，但 validation-blocked
           ↓
 Job manifest + downloadable artifacts
 ```
 
-本文描述目前可執行的 v0.1.0 架構，以及 [ADR 0010](adr/0010-migration-phases.md) 第 1 階段加入、尚未發佈的前端與桌面外殼（見「前端、桌面外殼與 schema 管線」一節）。目標架構見 [`adr/overview.md`](adr/overview.md)；CadDocument 2.0 的凍結規格見 [`CAD_DSL_2.md`](CAD_DSL_2.md)，2.0 的 Rust core 已實作於 `crates/promptcad-core/`（見「Rust core crate」一節），並已由桌面版（Tauri 命令）與伺服器（`POST /api/v1/core`）兩種宿主呼叫（見「Rust core 的宿主與資料流」）。1.0 的生成流程不變；2.0 文件目前可以經 core 驗證，並以唯讀元件樹查看，但不能輸出幾何（幾何編譯器尚不接受 2.0）。
+本文描述目前可執行的 v0.1.0 架構，以及 [ADR 0010](adr/0010-migration-phases.md) 第 1 階段加入、尚未發佈的前端與桌面外殼（見「前端、桌面外殼與 schema 管線」一節）。目標架構見 [`adr/overview.md`](adr/overview.md)；CadDocument 2.0 的凍結規格見 [`CAD_DSL_2.md`](CAD_DSL_2.md)，2.0 的 Rust core 已實作於 `crates/promptcad-core/`（見「Rust core crate」一節），並已由桌面版（Tauri 命令）與伺服器（`POST /api/v1/core`）兩種宿主呼叫（見「Rust core 的宿主與資料流」）。自第 2 階段 2c 起，1.0 的驗證也由 core 執行，Python 端不再含任何設計規則；生成流程的其餘部分不變。2.0 文件目前可以經 core 驗證，並以唯讀元件樹查看，但不能輸出幾何（幾何編譯器尚不接受 2.0）。
 
 ## 為何加入 DSL
 
@@ -57,7 +57,7 @@ Renderer 只執行系統編譯器生成的固定程式，使用 `shell=false`、
 驗證分為 schema 與設計兩層：
 
 1. Pydantic schema：型別、必填欄位、未知欄位、正數、最大尺寸、最大特徵數。
-2. DesignValidator：邊界、有效孔徑、孔重疊、材料深度、圓環內孔、薄壁、邊距、圓角／倒角。
+2. 設計規則（Rust core 的 `validate` 操作，經 `CoreValidator` 呼叫）：邊界、有效孔徑、孔重疊、材料深度、圓環內孔、薄壁、邊距、圓角／倒角。
 
 只要出現 `error`，renderer 就不會啟動。`warning` 不阻止輸出，但 `review_required=true`。
 
@@ -106,7 +106,7 @@ app/web_dist/ ──served at "/" by FastAPI when index.html exists (else 503 "b
 - **第三方授權聲明**：`scripts/gen_third_party_notices.py` 由 `.venv-desktop` 的 `importlib.metadata`、`web/package-lock.json` 的正式相依與 `cargo metadata`（`x86_64-pc-windows-msvc`）加上手動維護的原生元件表，產生確定性的 `THIRD_PARTY_NOTICES.md`（授權全文以 SHA-256 去重）；`tauri.conf.json` 以 `bundle.resources` 將它安裝到 `<安裝目錄>\THIRD_PARTY_NOTICES.md`。LGPL 元件（OCCT／OCP、casadi、NLopt）在 onedir 版面下是 `sidecar\_internal\` 內的獨立檔案，可由使用者替換。
 - **Schema 管線**：`scripts/export_schema.py` 以確定性方式（排序鍵、LF、結尾換行）輸出 `schemas/promptcad.schema.json`；`--check` 在漂移時以非零狀態結束。CI 另檢查 `npm run gen:types` 之後生成的型別沒有差異（[ADR 0008](adr/0008-single-schema-source-of-truth.md) 的過渡安排；第 2 階段 schema 來源改為 Rust）。
 
-## Rust core crate（第 2 階段 2a、2b，未發佈）
+## Rust core crate（第 2 階段 2a、2b、2c，未發佈）
 
 `crates/promptcad-core/` 是依 [`CAD_DSL_2.md`](CAD_DSL_2.md) 與 [ADR 0005](adr/0005-rust-core-document-model.md) 實作的獨立 library crate，不依賴 Tauri，有自己的 `Cargo.lock`。**2b 起，兩個應用程式宿主呼叫它**：桌面版的 Tauri 命令 `core_request`（`src-tauri/src/core.rs`，行程內呼叫）與伺服器的 `POST /api/v1/core`（每次呼叫啟動一次 `promptcad-core rpc` 子行程）。兩者共用 `promptcad_core::api` 的同一契約。Python 編譯器仍不接受 2.0。命令列用法見 `crates/promptcad-core/README.md`。
 
@@ -126,7 +126,7 @@ bin/promptcad-core    命令列工具（schema 匯出與其他子命令）
 
 - **Schema**：`promptcad-core schema --out-dir ../../schemas/cad2` 由 Rust 型別生成 `schemas/cad2/` 的五份 JSON Schema，`ci.yml` 的 `core` job 以 `--check` 比對漂移（該 job 已於 PR #5 在 GitHub 上執行並通過）。2.0 的 core 請求與回應 TypeScript 型別已由這兩份 schema 生成（`web/src/api/generated/core-request.d.ts`、`core-response.d.ts`，由 `web/scripts/gen-types.mjs` 產生）；2.0 文件本身的 Pydantic 生成型別尚不存在；1.0 應用程式仍以 `app/models/cad.py` 為 schema 來源。
 - **驗證範圍**：解析檢查對 `extrude`、`revolve` 與沉頭孔錐體使用保守的外包圖元（可能漏報，不會憑空產生 issue）；核心層（kernel）驗證代碼不在此 crate，屬於 sidecar。
-- **與 1.0 的關係**：Rust 驗證器對 Python `DesignValidator` 有 49 個案例的差異測試；Python 驗證器仍是實際使用的驗證器。
+- **與 1.0 的關係**：2c 起，1.0 的驗證也經 core 的 `validate` 執行。移除 Python 驗證器前，以 83 個輸入做差異閘門（77 個判定一致，6 個為記錄的允許差異）；移除後以黃金基準 `tests/fixtures/v1_validation_golden.json` 做回歸。細節見 `PROJECT_STATUS.md` 的「第 2 階段 2c 切片」。
 
 ## Rust core 的宿主與資料流（第 2 階段 2b，未發佈）
 
@@ -165,14 +165,15 @@ Rust core 有三個宿主，共用 `promptcad_core::api` 的 `CoreRequest`（以
 ```
 
 - 伺服器不解讀 2.0 內容（[ADR 0008](adr/0008-single-schema-source-of-truth.md) 規則 4）；驗證規則只存在於 Rust core。
-- 找不到 core 執行檔時，`/api/v1/capabilities` 的 `core_available` 為 `false`；桌面 sidecar 不含 core，這是正常狀態。
+- 1.0 驗證（2c）：`/plan`、`/generate`、`/generate-from-spec`、`/validate` 與 CLI 經 `app/services/core_validator.py`（`CoreValidator`，透過 `CoreBridge`）呼叫 `validate`。core 不可用時這些端點回 `503`，逾時 `504`，core 失敗 `502`；錯誤對應見 `docs/API.md`。
+- 找不到 core 執行檔時，`/api/v1/capabilities` 的 `core_available` 為 `false`，1.0 驗證端點回 `503`。桌面版 sidecar 內含 core（`<onedir>/_internal/`），由 `scripts/build_sidecar.py` 複製。
 - 執行檔的查找順序與設定見 `docs/API.md` 的 `POST /core` 一節。
 
 ## 擴充新特徵
 
 1. 在 `app/models/cad.py` 加入新的 base 或 feature 型別與 schema 限制。
 2. 在 `compiler.py` 與 `openscad.py` 實作確定性編譯。
-3. 在 `validator.py` 加入邊界、材料深度與特徵互動檢查。
+3. 在 `crates/promptcad-core/src/validate/` 加入邊界、材料深度與特徵互動檢查（設計規則只存在於 Rust core；Python 端不再實作）。
 4. 更新 `LLMIntent`、system prompt 與 rule parser。
 5. 新增語意、原始碼與 API 回歸測試。
 6. 更新 DSL 文件與範例。

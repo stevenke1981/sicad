@@ -56,7 +56,7 @@ use serde_json::Value;
 use crate::bindings::recompute_bindings;
 use crate::canonical::canonical_sha256;
 use crate::fields::{component_field, constraint_field};
-use crate::migrate::{downgrade_2_to_1, upgrade_1_to_2};
+use crate::migrate::{downgrade_2_to_1, hole_feature_index, upgrade_1_to_2};
 use crate::model::ids::{FieldRef, Id, PortRef};
 use crate::model::issue::{ValidationIssue, ValidationReport};
 use crate::model::resolved::{PortType, Resolved};
@@ -1090,13 +1090,21 @@ fn dispatch(request: CoreRequest) -> Result<CoreResult, CoreError> {
             completed,
         } => {
             let (doc, input_version) = parse_any_document(document)?;
-            let validation = validate(
+            let mut validation = validate(
                 &doc,
                 &ValidateOptions {
                     completed,
                     submitter: None,
                 },
             );
+            if input_version == DocumentVersion::V1_0 {
+                // 1.0 input: issues on migration hole `e_h{n}` carry 1.0 `feature_index = n - 1`.
+                for issue in &mut validation.report.issues {
+                    if let Some(index) = issue.target.as_deref().and_then(hole_feature_index) {
+                        issue.feature_index = Some(index);
+                    }
+                }
+            }
             CoreResult::Validate(Box::new(ValidateResult {
                 input_version,
                 report: validation.report,

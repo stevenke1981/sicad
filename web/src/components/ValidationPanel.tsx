@@ -1,4 +1,5 @@
 import type { ValidationIssue, ValidationReport, ValidationSeverity } from '../api/types';
+import { issueCodeLabel } from './issueCodeLabels';
 
 /** 1.0 issues plus the optional fields a 2.0 (Rust core) issue carries. */
 export type PanelIssue = ValidationIssue & {
@@ -92,6 +93,9 @@ export function ValidationPanel({ report, source, warnings, inputWarnings = [] }
             <li key={`${issue.code}-${index}`} className={`issue ${issue.severity}`}>
               <span className="sev">{SEVERITY_LABEL[issue.severity]}</span>
               <span className="msg">
+                {issueCodeLabel(issue.code) && (
+                  <span className="issue-label">{issueCodeLabel(issue.code)}</span>
+                )}
                 {issue.message}
                 <small>
                   {issue.code}
