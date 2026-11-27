@@ -130,3 +130,9 @@ Rust 型別（serde + schemars）
 - **規則 4 的遵守**：驗證規則仍只在 Rust core。Python 端的 `ValidationReport` 只描述 core 回傳的資料形狀；2c 之後 Python 不再含任何設計規則（`app/services/validator.py` 已刪除）。
 - **CI 狀態**：`gen_pydantic.py --check` 的 GitHub 執行結果於本文件撰寫時尚未確認。
 
+### 2026-11-27：第 2 階段 2e — 1.0 Pydantic 生成仍延後
+
+- **未切換**：2e 只移除了 `app/services/compiler.py` 這一個 `cad.py` 的依賴方。1.0 `CadDocument` 仍為手寫，仍是 `schemas/promptcad.schema.json` 的來源。
+- **仍需 `cad.py` 的依賴方**：`planners/intent.py`（建構與 isinstance 檢查）、`openscad.py`、`preview.py`、API 422 驗證（模型驗證器與大小限制）與 `export_schema.py`（產生 TypeScript 型別）。因此 1.0 由 Rust 生成 Pydantic 模型仍延後，列為第 2 階段尚未完成的項目。
+- **不變的規則**：驗證規則仍只在 Rust core；本切片未改變 validation report 的生成方式。
+

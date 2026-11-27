@@ -11,13 +11,13 @@ CadDocument 1.0
 (Pydantic, extra=forbid, units=mm, bounded lists/numbers)
           ↓
 Rust core（validate，經 app/services/core_validator.py）
-  ├─ valid ───→ CadQueryCompiler + OpenScadCompiler → Renderer
+  ├─ valid ───→ Cad2Compiler（model.py）+ OpenScadCompiler → Renderer
   └─ invalid ─→ 保存 DSL／原始碼／預覽，但 validation-blocked
           ↓
 Job manifest + downloadable artifacts
 ```
 
-本文描述目前可執行的 v0.1.0 架構，以及 [ADR 0010](adr/0010-migration-phases.md) 第 1 階段加入、尚未發佈的前端與桌面外殼（見「前端、桌面外殼與 schema 管線」一節）。目標架構見 [`adr/overview.md`](adr/overview.md)；CadDocument 2.0 的凍結規格見 [`CAD_DSL_2.md`](CAD_DSL_2.md)，2.0 的 Rust core 已實作於 `crates/promptcad-core/`（見「Rust core crate」一節），並已由桌面版（Tauri 命令）與伺服器（`POST /api/v1/core`）兩種宿主呼叫（見「Rust core 的宿主與資料流」）。自第 2 階段 2c 起，1.0 的驗證也由 core 執行，Python 端不再含任何設計規則；生成流程的其餘部分不變。2.0 文件可經 core 驗證並輸出幾何（第 2 階段 2d，未發佈）：`Cad2Compiler` 只讀取 core 的 `resolved`，不使用 OpenSCAD，支援的構造見下節與 `PROJECT_STATUS.md`。1.0 流程仍使用舊的 `CadQueryCompiler`。
+本文描述目前可執行的 v0.1.0 架構，以及 [ADR 0010](adr/0010-migration-phases.md) 第 1 階段加入、尚未發佈的前端與桌面外殼（見「前端、桌面外殼與 schema 管線」一節）。目標架構見 [`adr/overview.md`](adr/overview.md)；CadDocument 2.0 的凍結規格見 [`CAD_DSL_2.md`](CAD_DSL_2.md)，2.0 的 Rust core 已實作於 `crates/promptcad-core/`（見「Rust core crate」一節），並已由桌面版（Tauri 命令）與伺服器（`POST /api/v1/core`）兩種宿主呼叫（見「Rust core 的宿主與資料流」）。自第 2 階段 2c 起，1.0 的驗證也由 core 執行，Python 端不再含任何設計規則；生成流程的其餘部分不變。2.0 文件可經 core 驗證並輸出幾何（第 2 階段 2d，未發佈）：`Cad2Compiler` 只讀取 core 的 `resolved`，不使用 OpenSCAD，支援的構造見下節與 `PROJECT_STATUS.md`。自第 2 階段 2e 起，1.0 的 `model.py` 也由 `Cad2Compiler` 產生（見「1.0 生成路徑」一節），`CadQueryCompiler` 已移除。
 
 ## 為何加入 DSL
 
@@ -178,12 +178,25 @@ Rust core 有三個宿主，共用 `promptcad_core::api` 的 `CoreRequest`（以
 3. `Cad2Compiler`（`app/services/compiler2.py`）只讀取 `document` 與 `resolved` 產生 `model.py`。零件依 `resolved.components` 剛體放置，主孔切刀依 `resolved.holes`，沉頭與埋頭的入口依 `resolved.ports["<id>.entry"]` 以 §7.2 算術計算。Python 不做求解。不支援的構造拋出 `CompileUnsupported`，工作為 `failed`／`compile-unsupported`。
 4. `model.py` 沿用 1.0 的契約，由 renderer 與 render worker 執行（兩者未改動）。2.0 不回退到 OpenSCAD。
 
-等價性由 `scripts/geometry_equivalence.py`（`make geometry-check`）檢查，比較對象是 1.0 `CadQueryCompiler` 的輸出。
+等價性由 `scripts/geometry_equivalence.py`（`make geometry-check`）檢查，見「1.0 生成路徑」一節。
+
+## 1.0 生成路徑（第 2 階段 2e，未發佈）
+
+`POST /api/v1/generate`、`POST /api/v1/generate-from-spec` 與 CLI 的 `generate`、`render` 共用同一條路徑，`model.py` 由與 2.0 相同的 `Cad2Compiler` 產生：
+
+1. `CoreValidator.validate_spec` 呼叫 core 的 `validate` 一次，取得報告、`resolved` 與正規化的 2.0 文件（每個工作只呼叫 core 一次）。
+2. `Cad2Compiler` 產生 `model.py`。不論報告是否合法都會嘗試產生；報告不合法時工作仍為 `failed`／`validation-blocked`，且 `model.py` 仍會寫入（與 2e 之前相同）。
+3. `CompileUnsupported` 時工作為 `failed`／`compile-unsupported`，不產生 `model.py`。
+4. `model.scad` 與 `preview.svg` 仍由 1.0 規格產生（`openscad.py`、`preview.py`），不經 core。這兩個檔案在 `compile-unsupported` 時仍寫入。1.0 工作不產生 `resolved.json`。
+
+由於 `model.py` 改由 `Cad2Compiler` 產生，1.0 的 `model.py` 有以下變更：不再內嵌 `CAD_SPEC`；文件字串說明它由 2.0 文件產生；含 `place()` 輔助函式。完整清單見 `PROJECT_STATUS.md` 的「第 2 階段 2e 的 1.0 行為變更」。
+
+幾何回歸由 `scripts/geometry_equivalence.py`（`make geometry-check`）檢查。預設的 golden 模式比對凍結的 `tests/fixtures/v1_geometry_golden.json`，而不再比對舊編譯器；該檔的數值取自舊編譯器移除前的輸出。metrics 層需要 CadQuery，source 層（`tests/test_v1_compile_golden.py`）不需要。
 
 ## 擴充新特徵
 
 1. 在 `app/models/cad.py` 加入新的 base 或 feature 型別與 schema 限制。
-2. 在 `compiler.py` 與 `openscad.py` 實作確定性編譯。
+2. 在 `app/services/compiler2.py`（`Cad2Compiler`，1.0 與 2.0 共用）與 `openscad.py` 實作確定性編譯。
 3. 在 `crates/promptcad-core/src/validate/` 加入邊界、材料深度與特徵互動檢查（設計規則只存在於 Rust core；Python 端不再實作）。
 4. 更新 `LLMIntent`、system prompt 與 rule parser。
 5. 新增語意、原始碼與 API 回歸測試。

@@ -9,7 +9,6 @@ from typing import Any
 from app.core.config import Settings
 from app.models.api import Artifact, JobListItem, JobManifest, PlanResponse
 from app.models.cad import CadDocument, ValidationReport
-from app.services.compiler import CadQueryCompiler
 from app.services.compiler2 import Cad2Compiler, CompileUnsupported
 from app.services.core_bridge import CoreBridge
 from app.services.core_validator import CoreValidator
@@ -26,26 +25,32 @@ class JobService:
         self.planners = PlannerFactory(settings)
         self.core = core if core is not None else CoreBridge(settings)
         self.core_validator = CoreValidator(self.core)
-        self.compiler = CadQueryCompiler()
         self.compiler2 = Cad2Compiler()
         self.openscad = OpenScadCompiler()
         self.preview = SvgPreview()
         self.storage = JobStorage(settings)
         self.renderer = Renderer(settings)
 
-    async def _validate(self, spec: CadDocument) -> ValidationReport:
-        """Validate through the core; a missing binary is CoreUnavailable (HTTP 503)."""
-        return await self.core_validator.validate(spec)
+    async def _validate(
+        self, spec: CadDocument
+    ) -> tuple[ValidationReport, dict[str, Any], dict[str, Any]]:
+        """One core call: ``(report, resolved, canonical 2.0 document)``.
+
+        A missing binary is CoreUnavailable (HTTP 503).
+        """
+        return await self.core_validator.validate_spec(spec)
 
     async def _plan(self, prompt: str, planner_choice: str):
         if len(prompt) > self.settings.max_prompt_chars:
             raise ValueError(f"Prompt exceeds {self.settings.max_prompt_chars} characters")
         spec, planner_used = await self.planners.plan(prompt, planner_choice)
-        validation = await self._validate(spec)
-        return spec, planner_used, validation
+        validation, resolved, canonical = await self._validate(spec)
+        return spec, planner_used, validation, resolved, canonical
 
     async def plan(self, prompt: str, planner_choice: str) -> PlanResponse:
-        spec, planner_used, validation = await self._plan(prompt, planner_choice)
+        spec, planner_used, validation, _resolved, _canonical = await self._plan(
+            prompt, planner_choice
+        )
         return PlanResponse(spec=spec, validation=validation, planner_used=planner_used)
 
     async def generate(
@@ -55,10 +60,14 @@ class JobService:
         formats: list[str],
         render: bool,
     ) -> JobManifest:
-        spec, planner_used, validation = await self._plan(prompt, planner_choice)
+        spec, planner_used, validation, resolved, canonical = await self._plan(
+            prompt, planner_choice
+        )
         return await self._materialize(
             spec=spec,
             validation=validation,
+            resolved=resolved,
+            canonical=canonical,
             prompt=prompt,
             planner_used=planner_used,
             formats=formats,
@@ -71,10 +80,12 @@ class JobService:
         formats: list[str],
         render: bool,
     ) -> JobManifest:
-        validation = await self._validate(spec)
+        validation, resolved, canonical = await self._validate(spec)
         return await self._materialize(
             spec=spec,
             validation=validation,
+            resolved=resolved,
+            canonical=canonical,
             prompt=spec.source_prompt,
             planner_used="manual-dsl",
             formats=formats,
@@ -86,6 +97,8 @@ class JobService:
         *,
         spec: CadDocument,
         validation: ValidationReport,
+        resolved: dict[str, Any],
+        canonical: dict[str, Any],
         prompt: str,
         planner_used: str,
         formats: list[str],
@@ -99,9 +112,10 @@ class JobService:
             job_dir / "validation.json",
             validation.model_dump(mode="json"),
         )
-        self.storage.write_text(job_dir / "model.py", self.compiler.compile(spec))
         self.storage.write_text(job_dir / "model.scad", self.openscad.compile(spec))
         self.preview.write(spec, job_dir / "preview.svg")
+        # Attempted even for an invalid report: geometry-invalid specs keep their source.
+        failure = self._compile_model(job_dir, canonical, resolved)
 
         return await self._finish(
             job_id=job_id,
@@ -113,7 +127,23 @@ class JobService:
             formats=formats,
             render=render,
             payload={"spec": spec},
+            failure=failure,
         )
+
+    def _compile_model(
+        self, job_dir: Path, canonical: dict[str, Any], resolved: dict[str, Any]
+    ) -> tuple[str, str] | None:
+        """Write model.py from the core's canonical document; return a failure on unsupported."""
+        try:
+            source = self.compiler2.compile(canonical, resolved)
+        except CompileUnsupported as exc:
+            detail = "; ".join(f"{item}: {reason}" for item, reason in exc.items)
+            return (
+                "compile-unsupported",
+                f"Cannot generate geometry for this document yet: {detail or exc}",
+            )
+        self.storage.write_text(job_dir / "model.py", source)
+        return None
 
     async def generate_from_document(
         self,
@@ -136,18 +166,7 @@ class JobService:
         self.storage.write_json(job_dir / "validation.json", report.model_dump(mode="json"))
         self.storage.write_json(job_dir / "resolved.json", resolved)
 
-        failure: tuple[str, str] | None = None
-        if report.valid:
-            try:
-                source = self.compiler2.compile(canonical, resolved)
-            except CompileUnsupported as exc:
-                detail = "; ".join(f"{item}: {reason}" for item, reason in exc.items)
-                failure = (
-                    "compile-unsupported",
-                    f"Cannot generate geometry for this document yet: {detail or exc}",
-                )
-            else:
-                self.storage.write_text(job_dir / "model.py", source)
+        failure = self._compile_model(job_dir, canonical, resolved) if report.valid else None
         prompt = canonical.get("source_prompt")
         return await self._finish(
             job_id=job_id,
@@ -231,7 +250,7 @@ class JobService:
         return manifest
 
     async def validate(self, spec: CadDocument) -> ValidationReport:
-        return await self._validate(spec)
+        return (await self._validate(spec))[0]
 
     def get(self, job_id: str) -> JobManifest | None:
         value = self.storage.read_manifest(job_id)

@@ -270,3 +270,14 @@
 - **REST API 與 CLI 在伺服器模式下仍可用**：**達成**。新增 `POST /api/v1/generate-from-document`，CLI 的 `render`、`validate` 接受 2.0 檔案；既有端點與 CLI 指令的行為未改變。
 
 結論：第 2 階段尚未結束（前端屬性編輯、檢視器元件選取與 port 顯示、1.0 Pydantic 生成、1.0 流程切換至 `Cad2Compiler` 並移除舊編譯器、ADR 0012 簽核尚未完成），階段順序不變。
+
+### 2026-11-27：第 2 階段 2e — 1.0 流程改用 Cad2Compiler、移除舊編譯器
+
+2e 的內容與細節見 `PROJECT_STATUS.md` 的「第 2 階段 2e 切片」。`POST /api/v1/generate`、`POST /api/v1/generate-from-spec` 與 CLI 的 `generate`、`render` 改由 `Cad2Compiler` 產生 `model.py`，`app/services/compiler.py`（`CadQueryCompiler`）已刪除。逐項對照第 2 階段的完成條件：
+
+- **所有 `examples/generated/` 的 1.0 文件經 adapter 後輸出等價幾何**：**達成（本機）；參照端改為凍結的 golden**。舊編譯器移除前，54 個唯一案例全數與 `Cad2Compiler` 等價（54 個 equal、0 個 mismatch），並以 `tests/fixtures/v1_geometry_golden.json` 凍結其指標與 `model_sha256`。CI 的 `docker` job（Linux、conda CadQuery 2.8.0）於移除前執行 golden 模式，結果 54 個 equal、0 個 mismatch。移除後本機 golden 模式為 54 個 equal，另 3 個 native equal。
+- **移除被取代的舊實作**（第 2 階段完成條件：每個階段都包含移除被取代的舊實作）：**達成**。`app/services/compiler.py` 已刪除；1.0 與 2.0 皆經 `Cad2Compiler`。`model.scad` 與 `preview.svg` 仍由 1.0 規格產生（`openscad.py`、`preview.py`），理由見 [0006](0006-geometry-kernel-occt-python-sidecar.md) 的 2e 回顧。已知缺口：`model.scad` 不受幾何 oracle 涵蓋。
+- **REST API 與 CLI 在伺服器模式下仍可用**：**達成（有行為變更）**。端點、狀態、產物名稱、HTTP 狀態碼與 CLI 結束碼不變；1.0 的 `model.py` 內容與略過警告文字有變更，`compile-unsupported` 也可能出現在 1.0 流程。清單見 `PROJECT_STATUS.md`。
+- **CI 的 schema 生成比對檢查已啟用**：**部分達成（未變）**。1.0 `CadDocument` 仍為手寫，見 [0008](0008-single-schema-source-of-truth.md) 的 2e 回顧。
+
+結論：第 2 階段尚未結束（1.0 `CadDocument` 的 Pydantic 由 Rust 生成、前端屬性編輯與檢視器元件選取、ADR 0012 簽核尚未完成；port 顯示已於本切片完成），階段順序不變。

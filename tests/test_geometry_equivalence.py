@@ -187,6 +187,3 @@ def _run_geometry(extra_args: list[str], mode: str) -> None:
 def test_corpus_matches_frozen_golden(core_binary):
     _run_geometry([], "golden")
 
-
-def test_corpus_geometry_equivalence_against_reference_compiler(core_binary):
-    _run_geometry(["--reference-compiler"], "reference-compiler")

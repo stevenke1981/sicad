@@ -96,7 +96,7 @@ jobs:
       - name: CadQuery imports in the runtime env
         run: docker exec promptcad /usr/local/bin/_entrypoint.sh python -c "import cadquery; print('cadquery', cadquery.__version__)"
       # The image's WORKDIR is /app (scripts/ is copied there), so no -w is needed.
-      - name: Geometry equivalence (Cad2Compiler vs CadQuery 1.0 corpus, in the runtime env)
+      - name: Geometry equivalence (Cad2Compiler output vs frozen golden, in the runtime env)
         run: docker exec promptcad /usr/local/bin/_entrypoint.sh python scripts/geometry_equivalence.py
       # The endpoint does not strip expected_resolved (a test-only key), so the caller removes it.
       - name: POST /api/v1/generate-from-document (2.0 plate yields model.step)

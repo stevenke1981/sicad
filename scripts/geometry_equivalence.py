@@ -1,34 +1,30 @@
 """Geometry-equivalence harness (ADR 0010 phase 2 completion condition).
 
-Two modes. Both need CadQuery (use the desktop venv); both run ``Cad2Compiler`` on the real
-core's ``validate`` result (the 1.0 document upgraded to 2.0 and solved by ``promptcad-core``)
-as side B and execute the generated ``model.py`` (``__name__ != "__main__"``).
+Golden mode (the only mode): ``Cad2Compiler`` runs on the real core's ``validate`` result for
+every corpus case (the 1.0 documents upgraded to 2.0 and solved by ``promptcad-core``) and the
+generated ``model.py`` is executed (``__name__ != "__main__"``). Its metrics are compared with
+the frozen oracle ``tests/fixtures/v1_geometry_golden.json``: volume (relative 1e-6), surface
+area (relative 1e-6), bounding box (absolute 1e-6), centre of mass (absolute 1e-6), solid
+count, warning count and ``shape_valid``. Where the golden records ``shape_valid: false`` only
+``shape_valid``, solids, warnings and the bounding box are compared. Cases are keyed by name
+plus ``spec_sha256``; a missing, extra or hash-changed case is a mismatch.
 
-* Golden mode (default): B is compared with the frozen oracle
-  ``tests/fixtures/v1_geometry_golden.json``: volume (relative 1e-6), surface area (relative
-  1e-6), bounding box (absolute 1e-6), centre of mass (absolute 1e-6), solid count, warning
-  count and ``shape_valid``. Where the golden records ``shape_valid: false`` only
-  ``shape_valid``, solids, warnings and the bounding box are compared. Cases are keyed by name
-  plus ``spec_sha256``; a missing, extra or hash-changed case is a mismatch.
-* ``--reference-compiler``: the original A/B check. A is the 1.0 ``CadQueryCompiler`` run
-  directly on the 1.0 document; additionally the symmetric-difference volume
-  ``|A - B| + |B - A|`` must be < 1e-3 mm^3. A case where both sides fail is ``both_failed``;
-  a one-sided failure is a ``mismatch``. Documents the 1.0 Pydantic model or the core reject
-  are ``skipped``. ``--write-golden PATH`` (only with ``--reference-compiler`` and only when
-  every case is ``equal``) writes the golden: per case the A metrics, ``spec_sha256`` and the
-  ``model_sha256`` of the B source, plus a ``native`` entry and a ``meta`` block.
+``--write-golden PATH`` re-baselines the oracle from the current Cad2Compiler output: per case
+it writes the metrics, ``spec_sha256`` and the ``model_sha256`` of the generated source, plus
+the ``native`` entry and a ``meta`` block. It prints a reminder to stderr and refuses to write
+unless every native check passes and every corpus case compiles. Differences from the
+checked-in golden are reported as ``rebaselined``. Justify any re-baseline in the PR.
 
 Corpus: ``examples/generated/*/spec.json``, the 49 specs of
 ``crates/promptcad-core/tests/fixtures/v1_parity.json`` and ``frozen_smoke.smoke_cases()``
 (deduplicated by content). Specs are compiled regardless of ``report.valid``: many parity
 specs are deliberately invalid.
 
-Native 2.0 checks: ``plate-four-holes.cad2.json`` (golden mode: against its core
-``downgrade`` -> ``validate`` -> ``Cad2Compiler`` round trip and the frozen golden entry;
-reference mode: against the 1.0 compiler on the downgrade); ``enclosure-with-lid.cad2.json``
-against analytic bounding box and volume; an ``l_bracket`` placed in all 24 axis-aligned
-poses against the analytically rotated local bounding box and centre of mass (the latter also
-catches a mirrored placement).
+Native 2.0 checks: ``plate-four-holes.cad2.json`` against its core ``downgrade`` ->
+``validate`` -> ``Cad2Compiler`` round trip and the frozen ``native`` golden entry;
+``enclosure-with-lid.cad2.json`` against analytic bounding box and volume; an ``l_bracket``
+placed in all 24 axis-aligned poses against the analytically rotated local bounding box and
+centre of mass (the latter also catches a mirrored placement).
 
 The core is located the normal way (``PROMPTCAD_CORE_BIN`` or the dev fallback); no token
 is needed. Exits 1 on any mismatch or failed check, 2 when CadQuery is missing. The JSON
@@ -37,7 +33,7 @@ summary goes to stdout, progress to stderr.
 Usage::
 
     python scripts/geometry_equivalence.py [--case SUBSTRING] [--limit N]
-    python scripts/geometry_equivalence.py --reference-compiler [--write-golden PATH]
+    python scripts/geometry_equivalence.py --write-golden PATH
 """
 
 from __future__ import annotations
@@ -325,93 +321,69 @@ def compile_v2(core: Core, document: dict[str, Any]) -> str:
 # --------------------------------------------------------------------------- corpus cases
 
 
-def run_corpus_case(core: Core, name: str, spec: dict[str, Any]) -> dict[str, Any]:
-    """Reference mode: A (1.0 compiler) against B (Cad2Compiler); ``_golden`` on success."""
-    from app.models.cad import CadDocument
-    from app.services.compiler import CadQueryCompiler
-
-    entry: dict[str, Any] = {"name": name}
-    try:
-        doc1 = CadDocument.model_validate(spec)
-    except Exception:
-        return {**entry, "status": "skipped", "details": ["1.0 pydantic model rejects the spec"]}
-    try:
-        core_result = core.validate(spec)
-    except Exception:
-        return {**entry, "status": "skipped", "details": [f"core: {_short_error()}"]}
-    entry["valid"] = bool(core_result["report"]["valid"])
-
-    a, a_result = build_outcome(lambda: CadQueryCompiler().compile(doc1))
-    sources: list[str] = []
-
-    def source_b() -> str:
-        from app.services.compiler2 import Cad2Compiler
-
-        sources.append(Cad2Compiler().compile(core_result["document"], core_result["resolved"]))
-        return sources[0]
-
-    b, b_result = build_outcome(source_b)
-    symdiff = None
-    if a_result is not None and b_result is not None:
-        if not (a["shape_valid"] and b["shape_valid"]):
-            # Booleans on an invalid solid (e.g. an over-large fillet) are undefined; the other
-            # metrics are still compared.
-            entry["symdiff_skipped"] = "invalid shape"
-        else:
-            try:
-                symdiff = symmetric_difference(a_result, b_result)
-            except Exception:
-                symdiff = None
-                b = {**b, "ok": False, "error": f"symmetric difference failed: {_short_error()}"}
-    status, details = classify(a, b, symdiff)
-    entry.update(status=status, details=details)
-    if symdiff is not None:
-        entry["symdiff"] = symdiff
-    if a["ok"] and b["ok"]:
-        entry["volume_delta"] = abs(a["volume"] - b["volume"])
-        entry["volume_a"] = a["volume"]
-        if status == "equal" and sources:
-            entry["_golden"] = {
-                **golden_metrics(a),
-                "spec_sha256": spec_sha256(spec),
-                "model_sha256": source_sha256(sources[0]),
-            }
-    if status == "mismatch" and name in ALLOWED_DIFFERENCES:
-        entry["status"] = "allowed_difference"
-        entry["allowed_reason"] = ALLOWED_DIFFERENCES[name]
-    return entry
-
-
 def run_golden_case(
-    core: Core, name: str, spec: dict[str, Any], golden_cases: dict[str, Any]
+    core: Core,
+    name: str,
+    spec: dict[str, Any],
+    golden_cases: dict[str, Any],
+    *,
+    rebaseline: bool = False,
 ) -> dict[str, Any]:
-    """Golden mode: B (Cad2Compiler on the core's validate result) against the frozen entry."""
+    """B (Cad2Compiler on the core's validate result) against the frozen entry.
+
+    With ``rebaseline`` the frozen entry only reports what changed; the fresh metrics and source
+    hash are returned in ``_golden`` for ``--write-golden``.
+    """
     entry: dict[str, Any] = {"name": name}
     golden = golden_cases.get(name)
-    if golden is None:
-        return {**entry, "status": "mismatch", "details": ["case missing from the golden"]}
-    if golden.get("spec_sha256") != spec_sha256(spec):
-        return {
-            **entry,
-            "status": "mismatch",
-            "details": ["spec_sha256 changed since the golden was written (re-baseline needed)"],
-        }
+    spec_hash = spec_sha256(spec)
+    if not rebaseline:
+        if golden is None:
+            return {**entry, "status": "mismatch", "details": ["case missing from the golden"]}
+        if golden.get("spec_sha256") != spec_hash:
+            return {
+                **entry,
+                "status": "mismatch",
+                "details": [
+                    "spec_sha256 changed since the golden was written (re-baseline needed)"
+                ],
+            }
     try:
         core_result = core.validate(spec)
     except Exception:
         return {**entry, "status": "mismatch", "details": [f"core: {_short_error()}"]}
     entry["valid"] = bool(core_result["report"]["valid"])
-    b, _ = build_outcome(lambda: _compile_result(core_result))
-    diffs = compare_golden(golden, b)
-    entry.update(status="mismatch" if diffs else "equal", details=diffs)
-    if golden.get("shape_valid") is False:
+    sources: list[str] = []
+
+    def source_b() -> str:
+        sources.append(_compile_result(core_result))
+        return sources[0]
+
+    b, _ = build_outcome(source_b)
+    if golden is None:
+        diffs = ["case missing from the golden"]
+    elif golden.get("spec_sha256") != spec_hash:
+        diffs = ["spec_sha256 changed since the golden was written"]
+    else:
+        diffs = compare_golden(golden, b)
+    status = "mismatch" if diffs else "equal"
+    if rebaseline and diffs and b["ok"]:
+        status = "rebaselined"
+    entry.update(status=status, details=diffs)
+    if golden is not None and golden.get("shape_valid") is False:
         entry["reduced_comparison"] = "invalid shape"
-    if b["ok"]:
+    if b["ok"] and golden is not None:
         entry["volume_delta"] = abs(b["volume"] - golden["volume"])
         entry["volume_a"] = golden["volume"]
     if entry["status"] == "mismatch" and name in ALLOWED_DIFFERENCES:
         entry["status"] = "allowed_difference"
         entry["allowed_reason"] = ALLOWED_DIFFERENCES[name]
+    if b["ok"]:
+        entry["_golden"] = {
+            **golden_metrics(b),
+            "spec_sha256": spec_hash,
+            "model_sha256": source_sha256(sources[0]),
+        }
     return entry
 
 
@@ -441,41 +413,20 @@ def _plate_b(core: Core, document: dict[str, Any]) -> tuple[dict[str, Any], Any,
     return outcome, result, sources
 
 
-def check_plate_vs_downgrade(core: Core, capture: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Reference mode: the 1.0 compiler on the core's downgrade against Cad2Compiler on the 2.0."""
-    from app.models.cad import CadDocument
-    from app.services.compiler import CadQueryCompiler
-
-    check = {"name": "plate-four-holes vs 1.0 compiler on downgrade"}
-    document = _load_cad2("plate-four-holes.cad2.json")
-    down = core.call({"op": "downgrade", "document": document})["result"]
-    if not down.get("expressible"):
-        return {**check, "status": "mismatch", "details": ["downgrade is not expressible"]}
-    doc1 = CadDocument.model_validate(down["document"])
-    a, a_result = build_outcome(lambda: CadQueryCompiler().compile(doc1))
-    b, b_result, sources = _plate_b(core, document)
-    symdiff = (
-        symmetric_difference(a_result, b_result)
-        if a_result is not None and b_result is not None
-        else None
-    )
-    status, details = classify(a, b, symdiff)
-    if status == "both_failed":
-        status = "mismatch"
-    if status == "equal" and capture is not None and sources:
-        capture[NATIVE_PLATE] = {**golden_metrics(a), "model_sha256": source_sha256(sources[0])}
-    return {**check, "status": status, "details": details, "symdiff": symdiff}
-
-
-def check_plate_roundtrip(core: Core, golden: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Golden mode: the 2.0 plate against its downgrade -> validate -> Cad2Compiler round trip
-    (metrics and symmetric difference) and against the frozen ``native`` golden entry."""
+def check_plate_roundtrip(
+    core: Core,
+    frozen: dict[str, Any] | None = None,
+    capture: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """The 2.0 plate against its downgrade -> validate -> Cad2Compiler round trip (metrics and
+    symmetric difference), then against the frozen ``native`` golden entry. With ``capture``
+    (re-baseline) the direct metrics and source hash are stored there instead."""
     check = {"name": "plate-four-holes round trip via downgrade and frozen golden"}
     document = _load_cad2("plate-four-holes.cad2.json")
     down = core.call({"op": "downgrade", "document": document})["result"]
     if not down.get("expressible"):
         return {**check, "status": "mismatch", "details": ["downgrade is not expressible"]}
-    direct, direct_result, _ = _plate_b(core, document)
+    direct, direct_result, direct_sources = _plate_b(core, document)
     trip, trip_result, _ = _plate_b(core, down["document"])
     symdiff = (
         symmetric_difference(direct_result, trip_result)
@@ -485,13 +436,19 @@ def check_plate_roundtrip(core: Core, golden: dict[str, Any] | None = None) -> d
     status, details = classify(direct, trip, symdiff)
     if status == "both_failed":
         status = "mismatch"
-    if golden is None:
+    if capture is not None:
+        if status == "equal":
+            capture[NATIVE_PLATE] = {
+                **golden_metrics(direct),
+                "model_sha256": source_sha256(direct_sources[0]),
+            }
+    elif frozen is None:
         details = [*details, f"no frozen {NATIVE_PLATE} entry in the golden"]
         status = "mismatch"
     else:
-        frozen = compare_golden(golden, direct)
-        if frozen:
-            details = [*details, *(f"frozen: {d}" for d in frozen)]
+        frozen_diffs = compare_golden(frozen, direct)
+        if frozen_diffs:
+            details = [*details, *(f"frozen: {d}" for d in frozen_diffs)]
             status = "mismatch"
     return {**check, "status": status, "details": details, "symdiff": symdiff}
 
@@ -609,7 +566,7 @@ def summarize(
 ) -> dict[str, Any]:
     counts = {"equal": 0, "both_failed": 0, "mismatch": 0, "skipped": 0, "allowed_difference": 0}
     for case in cases:
-        counts[case["status"]] += 1
+        counts[case["status"]] = counts.get(case["status"], 0) + 1
     deltas = [c["volume_delta"] for c in cases if "volume_delta" in c]
     rel = [c["volume_delta"] / max(abs(c["volume_a"]), 1e-12) for c in cases if "volume_delta" in c]
     symdiffs = [c["symdiff"] for c in cases if c.get("symdiff") is not None]
@@ -645,19 +602,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, help="at most this many corpus cases")
     parser.add_argument("--skip-native", action="store_true", help="skip the 2.0-native checks")
     parser.add_argument(
-        "--reference-compiler",
-        action="store_true",
-        help="A/B against the 1.0 CadQueryCompiler instead of the frozen golden",
-    )
-    parser.add_argument(
         "--write-golden",
         metavar="PATH",
-        help="with --reference-compiler: write the golden oracle when every case is equal",
+        help="re-baseline the golden from the current Cad2Compiler output (full corpus only; "
+        "refused unless every native check passes and every case compiles)",
     )
     args = parser.parse_args(argv)
-    if args.write_golden and not args.reference_compiler:
-        parser.error("--write-golden requires --reference-compiler")
-    if args.write_golden and (args.case or args.limit is not None or args.skip_native):
+    rebaseline = bool(args.write_golden)
+    if rebaseline and (args.case or args.limit is not None or args.skip_native):
         parser.error("--write-golden needs the full corpus (no --case/--limit/--skip-native)")
 
     try:
@@ -668,13 +620,19 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
+    if rebaseline:
+        print(
+            "geometry_equivalence: re-baselining the geometry golden: justify this in the PR",
+            file=sys.stderr,
+        )
     golden: dict[str, Any] = {}
-    if not args.reference_compiler:
-        try:
-            golden = load_golden()
-        except (OSError, ValueError) as exc:
+    try:
+        golden = load_golden()
+    except (OSError, ValueError) as exc:
+        if not rebaseline:
             print(f"geometry_equivalence: cannot read {GOLDEN_PATH}: {exc}", file=sys.stderr)
             return 1
+        print(f"geometry_equivalence: no readable golden to compare with ({exc})", file=sys.stderr)
 
     started = time.perf_counter()
     cases_in, duplicates = corpus()
@@ -689,24 +647,28 @@ def main(argv: list[str] | None = None) -> int:
     captured: dict[str, Any] = {}
     native_captured: dict[str, Any] = {}
 
-    def plate_reference(c: Core) -> dict[str, Any]:
-        return check_plate_vs_downgrade(c, native_captured)
-
-    def plate_golden(c: Core) -> dict[str, Any]:
-        return check_plate_roundtrip(c, golden.get("native", {}).get(NATIVE_PLATE))
+    def plate(c: Core) -> dict[str, Any]:
+        return check_plate_roundtrip(
+            c,
+            golden.get("native", {}).get(NATIVE_PLATE),
+            native_captured if rebaseline else None,
+        )
 
     try:
         results = []
         for name, spec in cases_in:
-            if args.reference_compiler:
-                entry = run_corpus_case(core, name, copy.deepcopy(spec))
-            else:
-                entry = run_golden_case(core, name, copy.deepcopy(spec), golden.get("cases", {}))
+            entry = run_golden_case(
+                core,
+                name,
+                copy.deepcopy(spec),
+                golden.get("cases", {}),
+                rebaseline=rebaseline,
+            )
             if "_golden" in entry:
                 captured[name] = entry.pop("_golden")
             print(f"[{entry['status']}] {name}", file=sys.stderr)
             results.append(entry)
-        if not args.reference_compiler and not filtered:
+        if not rebaseline and not filtered:
             for extra in sorted(set(golden.get("cases", {})) - set(full_corpus)):
                 print(f"[mismatch] {extra} (only in the golden)", file=sys.stderr)
                 results.append(
@@ -718,7 +680,6 @@ def main(argv: list[str] | None = None) -> int:
                 )
         natives: list[dict[str, Any]] = []
         if not args.skip_native and not args.case:
-            plate = plate_reference if args.reference_compiler else plate_golden
             for check in (plate, check_enclosure_with_lid, check_l_bracket_poses):
                 try:
                     entry = check(core)
@@ -737,22 +698,23 @@ def main(argv: list[str] | None = None) -> int:
     summary = summarize(
         results,
         natives,
-        mode="reference-compiler" if args.reference_compiler else "golden",
+        mode="golden",
         duplicates_skipped=duplicates,
         runtime_seconds=round(time.perf_counter() - started, 1),
     )
     failed = bool(summary["counts"]["mismatch"] or any(n["status"] != "equal" for n in natives))
 
-    if args.write_golden:
-        everything_equal = (
+    if rebaseline:
+        complete = (
             not failed
-            and summary["counts"]["equal"] == len(results) == len(captured)
             and len(natives) == 3
             and NATIVE_PLATE in native_captured
+            and len(results) == len(captured) == len(full_corpus)
         )
-        if not everything_equal:
+        if not complete:
             print(
-                "geometry_equivalence: not writing the golden: not every case is equal",
+                "geometry_equivalence: not writing the golden: a native check or a corpus case "
+                "did not pass",
                 file=sys.stderr,
             )
             summary["golden_written"] = False

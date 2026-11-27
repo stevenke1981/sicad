@@ -4,7 +4,7 @@ The input is the core's ``validate`` result: the canonical ``document`` plus ``r
 This module does **no solving**: it only reads the solved world placement of every component
 (``resolved.components``), the solved hole cutters (``resolved.holes``) and the hole entry
 ports, applies rigid placement and the section 7.2 counterbore / countersink arithmetic, and
-emits the same ``model.py`` contract as the 1.0 :class:`app.services.compiler.CadQueryCompiler`
+emits the ``model.py`` contract used by every 1.0 and 2.0 flow
 (``build() -> (result, warnings)``, ``export_all``, ``--output-dir`` / ``--formats``,
 ``render-warnings.json``).
 

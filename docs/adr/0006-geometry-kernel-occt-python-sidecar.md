@@ -134,3 +134,11 @@
 - **已知偏差**：2.0 幾何在世界座標建立，不採用 [CAD_DSL_2](CAD_DSL_2.md) §6.2 的零件座標系與 `cq.Location` 組裝（延後）。
 - **通孔切刀方向**：非盲孔的主切刀由負端沿正向軸建立（1.0 的形式）。改用另一種參數化時，`cylinder_y_axis_outside` 的 OCC 體積積分相對差異為 3.3e-6。
 - **本機證據**：`scripts/geometry_equivalence.py` 的 54 個唯一案例全數與 1.0 等價（見 [0010](0010-migration-phases.md) 的 2d 回顧）；CI 結果待確認。
+
+### 2026-11-27：1.0 幾何改由 `Cad2Compiler` 產生（第 2 階段 2e）
+
+- **單一 CadQuery 編譯器**：`app/services/compiler2.py`（`Cad2Compiler`）是專案唯一的 CadQuery 編譯器，1.0 與 2.0 共用；`app/services/compiler.py` 已刪除。1.0 流程經 core 的單一 `validate` 呼叫取得報告、`resolved` 與正規化文件後交給它。
+- **保留 `model.scad` 與 `preview.svg`**：兩者仍由 1.0 規格經 `openscad.py` 與 `preview.py` 產生，未改動。理由：`preview.svg` 是 source-only 使用者唯一的視覺（前端會退回顯示它）；`model.scad` 是沒有 CadQuery 時唯一的 STL 路徑。代價：`model.scad` 使用獨立的 1.0 算術，不受幾何 oracle 涵蓋。這個缺口先前即存在，本切片未擴大。
+- **回歸基準改為凍結的 golden**：舊編譯器移除前，`tests/fixtures/v1_geometry_golden.json` 凍結其輸出（A/B 為 54／54 相等）。metrics 層需要 CadQuery；source 層以 `Cad2Compiler` 原始碼的 sha256 檢查，不需要 CadQuery。舊編譯器的對稱差檢查已不再進行，表面積指標僅部分補償。
+- **跨平台證據**：移除前的 golden 於 CI 的 Linux conda CadQuery 2.8.0 通過 54／54，未需要任何核心敏感的例外。
+- **本機證據**：移除後的 golden 模式 54 個 equal、3 個 native equal；實機輸出 `examples/generated/plate-four-holes` 約 5.4 秒，其 `model.py` 與 golden 的 `model_sha256` 相同。
