@@ -2,8 +2,13 @@ import type { ResultOf } from '../api/coreClient';
 
 export type Description = ResultOf<'describe'>;
 
+export type ResolvedPorts = ResultOf<'validate'>['resolved']['ports'];
+type ResolvedPort = ResolvedPorts[string];
+
 interface Props {
   description: Description;
+  /** Optional world geometry of the ports, keyed `<component id>.<port name>` (from `validate`). */
+  resolvedPorts?: ResolvedPorts;
 }
 
 type PartView = Description['parts'][number];
@@ -16,7 +21,38 @@ function formatValue(value: number | null): string {
   return value === null ? '—' : String(value);
 }
 
-function ComponentDetails({ component }: { component: ComponentView }) {
+/** At most 4 decimals, trailing zeros trimmed, -0 shown as 0. */
+function formatNumber(value: number): string {
+  const rounded = Number(value.toFixed(4));
+  return String(rounded === 0 ? 0 : rounded);
+}
+
+function formatVec(values: number[]): string {
+  return `(${values.map(formatNumber).join(', ')})`;
+}
+
+function describePort(port: ResolvedPort): string {
+  switch (port.type) {
+    case 'point':
+      return formatVec(port.position);
+    case 'axis':
+      return `${formatVec(port.position)} 方向 ${port.direction}`;
+    case 'face':
+      return `${formatVec(port.origin)} 法向 ${port.normal}`;
+    case 'region':
+      return `${formatVec(port.min)}–${formatVec(port.max)}`;
+    default:
+      return '';
+  }
+}
+
+function ComponentDetails({
+  component,
+  resolvedPorts,
+}: {
+  component: ComponentView;
+  resolvedPorts?: ResolvedPorts;
+}) {
   return (
     <details className="ct-component">
       <summary>
@@ -50,12 +86,16 @@ function ComponentDetails({ component }: { component: ComponentView }) {
         {component.ports.length > 0 ? (
           <p className="ct-ports">
             <span className="muted">連接點：</span>
-            {component.ports.map((port) => (
-              <span key={port.name} className="ct-port">
-                <span className="mono">{port.name}</span>
-                <small>{port.type}</small>
-              </span>
-            ))}
+            {component.ports.map((port) => {
+              const resolved = resolvedPorts?.[`${component.id}.${port.name}`];
+              return (
+                <span key={port.name} className="ct-port">
+                  <span className="mono">{port.name}</span>
+                  <small>{port.type}</small>
+                  {resolved && <small className="ct-coord mono">{describePort(resolved)}</small>}
+                </span>
+              );
+            })}
           </p>
         ) : (
           <p className="muted">沒有連接點。</p>
@@ -68,9 +108,11 @@ function ComponentDetails({ component }: { component: ComponentView }) {
 function PartBody({
   part,
   components,
+  resolvedPorts,
 }: {
   part: PartView;
   components: Map<string, ComponentView>;
+  resolvedPorts?: ResolvedPorts;
 }) {
   if (part.body.length === 0) return <p className="muted">此零件沒有本體操作。</p>;
   return (
@@ -81,7 +123,7 @@ function PartBody({
           <li key={`${op.component}-${index}`}>
             <span className={`ct-op ${op.op}`}>{OP_LABEL[op.op]}</span>
             {component ? (
-              <ComponentDetails component={component} />
+              <ComponentDetails component={component} resolvedPorts={resolvedPorts} />
             ) : (
               <span className="mono">{op.component}（找不到元件）</span>
             )}
@@ -96,10 +138,12 @@ function Node({
   node,
   parts,
   components,
+  resolvedPorts,
 }: {
   node: TreeNode;
   parts: Map<string, PartView>;
   components: Map<string, ComponentView>;
+  resolvedPorts?: ResolvedPorts;
 }) {
   if (node.node === 'missing') {
     return (
@@ -145,17 +189,23 @@ function Node({
         <ul className="ct-list">
           {node.children.map((child, index) => (
             // Index-qualified: a child id can occur more than once (`repeated` nodes).
-            <Node key={`${index}-${child.id}`} node={child} parts={parts} components={components} />
+            <Node
+              key={`${index}-${child.id}`}
+              node={child}
+              parts={parts}
+              components={components}
+              resolvedPorts={resolvedPorts}
+            />
           ))}
         </ul>
       )}
-      {part && <PartBody part={part} components={components} />}
+      {part && <PartBody part={part} components={components} resolvedPorts={resolvedPorts} />}
     </li>
   );
 }
 
 /** Read-only view of a `describe` result: assembly/part tree, body ops, components, constraints. */
-export function ComponentTree({ description }: Props) {
+export function ComponentTree({ description, resolvedPorts }: Props) {
   const parts = new Map(description.parts.map((part) => [part.id, part]));
   const components = new Map(description.components.map((component) => [component.id, component]));
   const inTree = new Set<string>();
@@ -182,7 +232,13 @@ export function ComponentTree({ description }: Props) {
       ) : (
         <ul className="ct-list ct-root" aria-label="組件與零件">
           {description.tree.map((node, index) => (
-            <Node key={`${index}-${node.id}`} node={node} parts={parts} components={components} />
+            <Node
+              key={`${index}-${node.id}`}
+              node={node}
+              parts={parts}
+              components={components}
+              resolvedPorts={resolvedPorts}
+            />
           ))}
           {loose.map((part, index) => (
             <Node
@@ -190,6 +246,7 @@ export function ComponentTree({ description }: Props) {
               node={{ id: part.id, node: 'part', name: part.name, repeated: false, children: [] }}
               parts={parts}
               components={components}
+              resolvedPorts={resolvedPorts}
             />
           ))}
         </ul>

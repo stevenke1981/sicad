@@ -90,7 +90,8 @@ notices-check:
 sidecar: core
 	$(DESKTOP_PYTHON) scripts/build_sidecar.py
 
-# Cad2Compiler vs CadQuery 1.0 geometry corpus (needs the CadQuery venv and the core binary).
+# Cad2Compiler vs the frozen v1 geometry golden (tests/fixtures/v1_geometry_golden.json) plus the 2.0-native checks;
+# needs the CadQuery venv and the core binary. `--reference-compiler` runs the old A/B instead.
 geometry-check: core
 	$(DESKTOP_PYTHON) scripts/geometry_equivalence.py
 
